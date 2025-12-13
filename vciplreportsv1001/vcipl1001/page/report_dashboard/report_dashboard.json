@@ -4,13 +4,17 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2025-12-13 21:22:48.862443",
+ "modified": "2025-12-13 22:41:19.597751",
  "modified_by": "Administrator",
  "module": "vcipl1001",
  "name": "report-dashboard",
  "owner": "Administrator",
  "page_name": "report-dashboard",
- "roles": [],
+ "roles": [
+  {
+   "role": "Dashboard Manager"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

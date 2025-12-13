@@ -6,9 +6,13 @@ app_email = "sai@aitsind.com"
 app_license = "mit"
 
 app_include_js = [
-    "/assets/vciplreportsv1001/js/desk.js"
+    "/assets/vciplreportsv1001/js/report_nav_button.js"
 ]
 
+app_include_css = [
+    "/assets/vciplreportsv1001/css/report_nav_button1.css"
+]
+#sai
 
 # Apps
 # ------------------

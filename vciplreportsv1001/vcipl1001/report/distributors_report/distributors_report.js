@@ -1,62 +1,76 @@
-frappe.query_reports["Distributor Report"] = {
+frappe.query_reports["Distributors Report"] = {
 
-    // FORMATTER (Makes Invoice Count Clickable)
-    formatter: function(value, row, column, data, default_formatter) {
+    formatter(value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
-        // Make invoice count clickable (opens popup)
-        if (column.fieldname === "invoice_count" && data.invoices) {
-            return `<a style="cursor:pointer; color:#1674E0; font-weight:bold;"
-                onclick='frappe.query_reports["Distributor Report"].show_invoice_popup(${data.invoices})'>
-                ${value}
-            </a>`;
+        if (column.fieldname === "total_outstanding" && data.outstanding_drill) {
+            return this.make_link(value, data.outstanding_drill, "Outstanding Invoices");
+        }
+
+        if (column.fieldname === "total_overdue" && data.overdue_drill) {
+            return this.make_link(value, data.overdue_drill, "Overdue Invoices");
+        }
+
+        if (column.fieldname === "avg_overdue_days" && data.avg_overdue_drill) {
+            return this.make_link(value, data.avg_overdue_drill, "Invoices – Average Overdue Days");
+        }
+
+        if (column.fieldname === "avg_payment_days" && data.avg_payment_drill) {
+            return this.make_link(value, data.avg_payment_drill, "Invoices – Average Payment Days");
         }
 
         return value;
     },
 
-    // POPUP FUNCTION - Shows list of invoices for that customer
-    show_invoice_popup(invoices) {
-        let html = `
-            <div style="max-height:500px; overflow-y:auto;">
-            <table class="table table-bordered" style="font-size:13px;">
-                <thead>
-                    <tr>
-                        <th>Invoice No</th>
-                        <th>Posting Date</th>
-                        <th>Outstanding</th>
-                        <th>Overdue</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
+    make_link(value, data, title) {
+        return `<a style="font-weight:bold;cursor:pointer;color:#1674E0"
+            onclick='frappe.query_reports["Distributors Report"]
+            .show_popup(${data}, "${title}")'>
+            ${value}
+        </a>`;
+    },
 
-        invoices.forEach(inv => {
-            html += `
+    show_popup(rows, title) {
+
+        if (!rows || rows.length === 0) {
+            frappe.msgprint(__("No data available"));
+            return;
+        }
+
+        let html = `
+        <div style="max-height:500px;overflow:auto">
+        <table class="table table-bordered">
+            <thead>
                 <tr>
-                    <td>
-                        <a href="/app/sales-invoice/${inv.invoice}"
-                           target="_blank"
-                           style="color:#1674E0; font-weight:bold;">
-                            ${inv.invoice}
-                        </a>
-                    </td>
-                    <td>${inv.posting_date}</td>
-                    <td>${format_currency(inv.outstanding)}</td>
-                    <td>${format_currency(inv.overdue)}</td>
+                    <th>Invoice</th>
+                    <th>Posting Date</th>
+                    <th>Due / Payment Date</th>
+                    <th>Amount</th>
+                    <th>Days</th>
                 </tr>
-            `;
+            </thead><tbody>`;
+
+        rows.forEach(r => {
+            html += `
+            <tr>
+                <td>
+                    <a href="/app/sales-invoice/${r.invoice}"
+                       target="_blank"
+                       style="font-weight:bold">
+                        ${r.invoice}
+                    </a>
+                </td>
+                <td>${r.posting_date}</td>
+                <td>${r.due_date || r.payment_date || "-"}</td>
+                <td>${r.amount ? format_currency(r.amount) : "-"}</td>
+                <td>${r.days || r.overdue_days || "-"}</td>
+            </tr>`;
         });
 
-        html += `
-                </tbody>
-            </table>
-            </div>
-        `;
+        html += `</tbody></table></div>`;
 
         frappe.msgprint({
-            title: __("Invoice Details"),
-            indicator: "blue",
+            title: title,
             message: html,
             wide: true
         });

@@ -1,4 +1,4 @@
-frappe.query_reports["Monthwise Sales Report"] = {
+frappe.query_reports["Monthwises Purchase"] = {
 
     filters: [
         {

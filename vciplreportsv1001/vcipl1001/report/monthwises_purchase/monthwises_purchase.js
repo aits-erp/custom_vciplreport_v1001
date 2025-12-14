@@ -1,4 +1,4 @@
-frappe.query_reports["Monthwise Purchases"] = {
+frappe.query_reports["Monthwises Purchase"] = {
 
     filters: [
         {
@@ -28,7 +28,7 @@ frappe.query_reports["Monthwise Purchases"] = {
             let filters = report.get_values();
 
             frappe.call({
-                method: "vciplreports_v01.vciplreports_v01.vcipl.report.monthwise_purchases.monthwise_purchases.get_month_breakup",
+                method: "vciplreports_v01.vciplreports_v01.vcipl.report.monthwise_purchase_report.monthwise_purchase_report.get_month_breakup",
                 args: {
                     supplier: supplier,
                     supplier_group: filters.supplier_group,
@@ -41,14 +41,14 @@ frappe.query_reports["Monthwise Purchases"] = {
                     `;
 
                     frappe.msgprint({
-                        title: "Month-wise Purchases - " + supplier,
+                        title: "Month-wise Purchase - " + supplier,
                         message: content,
                         wide: true
                     });
 
                     setTimeout(() => {
                         new frappe.Chart("#supplier_purchase_chart", {
-                            title: "Purchase Trend",
+                            title: "Monthly Purchase Trend",
                             data: {
                                 labels: r.message.labels,
                                 datasets: [{

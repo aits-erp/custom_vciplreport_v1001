@@ -3,18 +3,31 @@ frappe.query_reports["Distributors Report"] = {
     formatter(value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
+        // CUSTOMER CLICK
+        if (column.fieldname === "customer" && data.customer_code) {
+            return `<a href="/app/customer/${data.customer_code}"
+                        target="_blank"
+                        style="font-weight:bold;color:#1674E0">
+                        ${value}
+                    </a>`;
+        }
+
+        // TOTAL OUTSTANDING
         if (column.fieldname === "total_outstanding" && data.outstanding_drill) {
             return this.make_link(value, data.outstanding_drill, "Outstanding Invoices");
         }
 
+        // TOTAL OVERDUE
         if (column.fieldname === "total_overdue" && data.overdue_drill) {
             return this.make_link(value, data.overdue_drill, "Overdue Invoices");
         }
 
+        // AVG OVERDUE
         if (column.fieldname === "avg_overdue_days" && data.avg_overdue_drill) {
             return this.make_link(value, data.avg_overdue_drill, "Invoices – Average Overdue Days");
         }
 
+        // AVG PAYMENT
         if (column.fieldname === "avg_payment_days" && data.avg_payment_drill) {
             return this.make_link(value, data.avg_payment_drill, "Invoices – Average Payment Days");
         }

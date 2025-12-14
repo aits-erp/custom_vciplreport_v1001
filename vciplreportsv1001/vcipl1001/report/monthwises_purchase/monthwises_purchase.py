@@ -8,8 +8,8 @@ def execute(filters=None):
 # ---------------------- COLUMNS ----------------------
 def get_columns():
     return [
-        {"label": "Supplier Group", "fieldname": "supplier_group", "width": 150},
-        {"label": "Supplier", "fieldname": "supplier", "fieldtype": "HTML", "width": 220},
+        {"label": "Supplier Group", "fieldname": "supplier_group", "width": 160},
+        {"label": "Supplier", "fieldname": "supplier", "fieldtype": "HTML", "width": 240},
 
         {"label": "Jan", "fieldname": "jan", "fieldtype": "Currency", "width": 110},
         {"label": "Feb", "fieldname": "feb", "fieldtype": "Currency", "width": 110},
@@ -24,7 +24,7 @@ def get_columns():
         {"label": "Nov", "fieldname": "nov", "fieldtype": "Currency", "width": 110},
         {"label": "Dec", "fieldname": "dec", "fieldtype": "Currency", "width": 110},
 
-        {"label": "Total", "fieldname": "total", "fieldtype": "Currency", "width": 130}
+        {"label": "Total", "fieldname": "total", "fieldtype": "Currency", "width": 140}
     ]
 
 

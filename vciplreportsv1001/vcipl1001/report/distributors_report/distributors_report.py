@@ -14,6 +14,7 @@ def get_columns():
         {"label": "Customer Group", "fieldname": "customer_group",
          "fieldtype": "Link", "options": "Customer Group", "width": 140},
 
+        # Customer Name (click handled in JS)
         {"label": "Distributor", "fieldname": "customer",
          "fieldtype": "Data", "width": 260},
 
@@ -35,7 +36,8 @@ def get_columns():
         {"label": "Average Payment Days", "fieldname": "avg_payment_days",
          "fieldtype": "Float", "precision": 2, "width": 170},
 
-        # hidden drilldown payloads
+        # hidden helpers
+        {"label": "Customer Code", "fieldname": "customer_code", "hidden": 1},
         {"label": "Outstanding Drill", "fieldname": "outstanding_drill", "hidden": 1},
         {"label": "Overdue Drill", "fieldname": "overdue_drill", "hidden": 1},
         {"label": "Avg Overdue Drill", "fieldname": "avg_overdue_drill", "hidden": 1},
@@ -90,20 +92,18 @@ def get_data(filters=None):
     for p in payments:
         pay_map.setdefault(p.invoice, []).append(p.payment_date)
 
-    # ---------------- CUSTOMER SALES TEAM (SOURCE OF TRUTH) ----------------
+    # ---------------- CUSTOMER SALES TEAM ----------------
     sales_team = frappe.db.sql("""
         SELECT
             st.parent AS customer,
-            st.sales_person,
-            sp.sales_person_name
+            st.sales_person
         FROM `tabSales Team` st
-        JOIN `tabSales Person` sp ON sp.name = st.sales_person
         WHERE st.parenttype = 'Customer'
     """, as_dict=True)
 
-    sales_map = {}
+    cust_sales_map = {}
     for s in sales_team:
-        sales_map.setdefault(s.customer, []).append(s)
+        cust_sales_map.setdefault(s.customer, []).append(s.sales_person)
 
     cust_map = {}
 
@@ -113,7 +113,8 @@ def get_data(filters=None):
 
         if cust not in cust_map:
             cust_map[cust] = {
-                "customer": inv.customer_name,
+                "customer_code": cust,
+                "customer_name": inv.customer_name,
                 "customer_group": inv.customer_group,
                 "total_outstanding": 0,
                 "total_overdue": 0,
@@ -125,17 +126,16 @@ def get_data(filters=None):
 
         cust_map[cust]["total_outstanding"] += inv.outstanding_amount
 
-        # outstanding drill
         cust_map[cust]["outstanding_list"].append({
             "invoice": inv.invoice,
             "posting_date": str(inv.posting_date),
             "amount": float(inv.outstanding_amount),
         })
 
-        # overdue logic
+        # overdue
         for due in due_map.get(inv.invoice, []):
             if due and getdate(today()) > getdate(due):
-                overdue_days = date_diff(today(), due)
+                days = date_diff(today(), due)
                 cust_map[cust]["total_overdue"] += inv.outstanding_amount
 
                 cust_map[cust]["overdue_list"].append({
@@ -143,17 +143,17 @@ def get_data(filters=None):
                     "posting_date": str(inv.posting_date),
                     "due_date": str(due),
                     "amount": float(inv.outstanding_amount),
-                    "overdue_days": overdue_days,
+                    "overdue_days": days,
                 })
 
                 cust_map[cust]["avg_overdue_list"].append({
                     "invoice": inv.invoice,
                     "posting_date": str(inv.posting_date),
                     "due_date": str(due),
-                    "days": overdue_days,
+                    "days": days,
                 })
 
-        # payment days logic
+        # payment days
         for pay_date in pay_map.get(inv.invoice, []):
             days = date_diff(pay_date, inv.posting_date)
             cust_map[cust]["avg_payment_list"].append({
@@ -168,6 +168,19 @@ def get_data(filters=None):
 
     for cust, row in cust_map.items():
 
+        # ASM / RSM (correct logic)
+        asm = None
+        rsm = None
+        for sp in cust_sales_map.get(cust, []):
+            parent_sp = frappe.db.get_value("Sales Person", sp, "parent_sales_person")
+            if parent_sp:
+                parent_is_group = frappe.db.get_value("Sales Person", parent_sp, "is_group")
+                if parent_is_group:
+                    if parent_sp.lower().startswith("asm"):
+                        asm = sp
+                    if parent_sp.lower().startswith("rsm"):
+                        rsm = sp
+
         avg_overdue = (
             sum(i["days"] for i in row["avg_overdue_list"]) / len(row["avg_overdue_list"])
             if row["avg_overdue_list"] else 0
@@ -178,19 +191,10 @@ def get_data(filters=None):
             if row["avg_payment_list"] else None
         )
 
-        # ASM / RSM (ONLY from customer sales team)
-        asm = None
-        rsm = None
-        for s in sales_map.get(cust, []):
-            name = s.sales_person_name.lower()
-            if "asm" in name:
-                asm = s.sales_person
-            if "rsm" in name:
-                rsm = s.sales_person
-
         result.append({
             "customer_group": row["customer_group"],
-            "customer": row["customer"],
+            "customer": row["customer_name"],      # shown
+            "customer_code": row["customer_code"], # hidden for click
             "asm": asm,
             "rsm": rsm,
             "total_outstanding": row["total_outstanding"],

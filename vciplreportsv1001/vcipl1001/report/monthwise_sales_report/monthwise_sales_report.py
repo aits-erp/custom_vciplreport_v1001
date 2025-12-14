@@ -4,140 +4,134 @@ def execute(filters=None):
     filters = filters or {}
     return get_columns(), get_data(filters)
 
+
 # ---------------------- COLUMNS ----------------------
 def get_columns():
     return [
-        {"label": "Supplier Group", "fieldname": "supplier_group", "fieldtype": "Data", "width": 150},
-        {"label": "Supplier", "fieldname": "supplier", "fieldtype": "HTML", "width": 220},
+        {"label": "Customer Group", "fieldname": "customer_group", "width": 160},
+        {"label": "Customer", "fieldname": "customer", "fieldtype": "HTML", "width": 240},
 
-        {"label": "Jan", "fieldname": "jan", "fieldtype": "Currency", "width": 120},
-        {"label": "Feb", "fieldname": "feb", "fieldtype": "Currency", "width": 120},
-        {"label": "Mar", "fieldname": "mar", "fieldtype": "Currency", "width": 120},
-        {"label": "Apr", "fieldname": "apr", "fieldtype": "Currency", "width": 120},
-        {"label": "May", "fieldname": "may", "fieldtype": "Currency", "width": 120},
-        {"label": "Jun", "fieldname": "jun", "fieldtype": "Currency", "width": 120},
-        {"label": "Jul", "fieldname": "jul", "fieldtype": "Currency", "width": 120},
-        {"label": "Aug", "fieldname": "aug", "fieldtype": "Currency", "width": 120},
-        {"label": "Sep", "fieldname": "sep", "fieldtype": "Currency", "width": 120},
-        {"label": "Oct", "fieldname": "oct", "fieldtype": "Currency", "width": 120},
-        {"label": "Nov", "fieldname": "nov", "fieldtype": "Currency", "width": 120},
-        {"label": "Dec", "fieldname": "dec", "fieldtype": "Currency", "width": 120},
+        {"label": "Jan", "fieldname": "jan", "fieldtype": "Currency", "width": 110},
+        {"label": "Feb", "fieldname": "feb", "fieldtype": "Currency", "width": 110},
+        {"label": "Mar", "fieldname": "mar", "fieldtype": "Currency", "width": 110},
+        {"label": "Apr", "fieldname": "apr", "fieldtype": "Currency", "width": 110},
+        {"label": "May", "fieldname": "may", "fieldtype": "Currency", "width": 110},
+        {"label": "Jun", "fieldname": "jun", "fieldtype": "Currency", "width": 110},
+        {"label": "Jul", "fieldname": "jul", "fieldtype": "Currency", "width": 110},
+        {"label": "Aug", "fieldname": "aug", "fieldtype": "Currency", "width": 110},
+        {"label": "Sep", "fieldname": "sep", "fieldtype": "Currency", "width": 110},
+        {"label": "Oct", "fieldname": "oct", "fieldtype": "Currency", "width": 110},
+        {"label": "Nov", "fieldname": "nov", "fieldtype": "Currency", "width": 110},
+        {"label": "Dec", "fieldname": "dec", "fieldtype": "Currency", "width": 110},
 
-        {"label": "Total", "fieldname": "total", "fieldtype": "Currency", "width": 150}
+        {"label": "Total", "fieldname": "total", "fieldtype": "Currency", "width": 140}
     ]
 
 
-# ---------------------- MAIN DATA ----------------------
+# ---------------------- DATA ----------------------
 def get_data(filters):
+
     sql = """
         SELECT
-            pi.supplier_group,
-            pi.supplier,
-            MONTH(pi.posting_date) AS month,
-            SUM(pi.grand_total) AS amount
-        FROM `tabPurchase Invoice` pi
-        WHERE pi.docstatus = 1
+            si.customer_group,
+            si.customer,
+            MONTH(si.posting_date) AS month,
+            SUM(si.grand_total) AS amount
+        FROM `tabSales Invoice` si
+        WHERE si.docstatus = 1
     """
+
     values = []
 
-    if filters.get("company"):
-        sql += " AND pi.company = %s"
-        values.append(filters["company"])
+    if filters.get("customer_group"):
+        sql += " AND si.customer_group = %s"
+        values.append(filters["customer_group"])
 
-    if filters.get("year"):
-        sql += " AND YEAR(pi.posting_date) = %s"
-        values.append(filters["year"])
+    if filters.get("month"):
+        sql += " AND DATE_FORMAT(si.posting_date, '%%b') = %s"
+        values.append(filters["month"])
 
-    sql += " GROUP BY pi.supplier, MONTH(pi.posting_date)"
-    sql += " ORDER BY pi.supplier"
+    sql += " GROUP BY si.customer, MONTH(si.posting_date)"
+    sql += " ORDER BY si.customer"
 
     raw = frappe.db.sql(sql, values, as_dict=True)
-
     if not raw:
         return []
 
-    # ---------------- Pivot Transform ----------------
+    month_map = {
+        1: "jan", 2: "feb", 3: "mar", 4: "apr",
+        5: "may", 6: "jun", 7: "jul", 8: "aug",
+        9: "sep", 10: "oct", 11: "nov", 12: "dec"
+    }
+
     data_map = {}
 
     for row in raw:
-        supplier = row.supplier
+        customer = row.customer
 
-        if supplier not in data_map:
-            data_map[supplier] = {
-                "supplier_group": row.supplier_group,
-                "supplier": f'<a href="#" class="supplier-link" data-supplier="{supplier}">{supplier}</a>',
+        if customer not in data_map:
+            data_map[customer] = {
+                "customer_group": row.customer_group,
+                "customer": f'<a href="#" class="customer-link" data-customer="{customer}">{customer}</a>',
                 "jan": 0, "feb": 0, "mar": 0, "apr": 0,
                 "may": 0, "jun": 0, "jul": 0, "aug": 0,
                 "sep": 0, "oct": 0, "nov": 0, "dec": 0,
                 "total": 0
             }
 
-        month_map = {
-            1: "jan", 2: "feb", 3: "mar", 4: "apr",
-            5: "may", 6: "jun", 7: "jul", 8: "aug",
-            9: "sep", 10: "oct", 11: "nov", 12: "dec"
-        }
-
-        month_key = month_map[row.month]
-        data_map[supplier][month_key] = row.amount or 0
-        data_map[supplier]["total"] += row.amount or 0
+        key = month_map[row.month]
+        data_map[customer][key] += row.amount or 0
+        data_map[customer]["total"] += row.amount or 0
 
     return list(data_map.values())
 
 
-# ---------------------- BAR-CHART POPUP ----------------------
+# ---------------------- POPUP BREAKUP ----------------------
 @frappe.whitelist()
-def get_month_breakup(supplier, company=None, year=None):
+def get_month_breakup(customer, customer_group=None, month=None):
 
     sql = """
-        SELECT 
-            MONTH(posting_date) AS month_num,
+        SELECT
             DATE_FORMAT(posting_date, '%%b') AS month,
             SUM(grand_total) AS amount
-        FROM `tabPurchase Invoice`
-        WHERE docstatus = 1 AND supplier = %s
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1 AND customer = %s
     """
 
-    values = [supplier]
+    values = [customer]
 
-    if company:
-        sql += " AND company = %s"
-        values.append(company)
+    if customer_group:
+        sql += " AND customer_group = %s"
+        values.append(customer_group)
 
-    if year:
-        sql += " AND YEAR(posting_date) = %s"
-        values.append(year)
+    if month:
+        sql += " AND DATE_FORMAT(posting_date, '%%b') = %s"
+        values.append(month)
 
-    sql += " GROUP BY MONTH(posting_date) ORDER BY MONTH(posting_date)"
+    sql += " GROUP BY DATE_FORMAT(posting_date, '%%b')"
 
     rows = frappe.db.sql(sql, values, as_dict=True)
 
     if not rows:
-        return {
-            "html": "<b>No data found.</b>",
-            "labels": [],
-            "values": []
-        }
+        return {"html": "<b>No data found</b>", "labels": [], "values": []}
 
-    # ------- HTML TABLE -------
     html = """
-        <h4>Month-wise Purchases</h4>
+        <h4>Sales Details</h4>
         <table class="table table-bordered">
             <tr><th>Month</th><th>Amount</th></tr>
     """
 
-    labels = []
-    values = []
+    labels, values_list = [], []
 
     for r in rows:
         html += f"<tr><td>{r.month}</td><td>{frappe.utils.fmt_money(r.amount)}</td></tr>"
         labels.append(r.month)
-        values.append(float(r.amount))
+        values_list.append(float(r.amount))
 
     html += "</table>"
 
     return {
         "html": html,
         "labels": labels,
-        "values": values
+        "values": values_list
     }

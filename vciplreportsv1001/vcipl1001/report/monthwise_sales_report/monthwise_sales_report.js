@@ -2,60 +2,60 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
     filters: [
         {
-            fieldname: "company",
-            label: "Company",
+            fieldname: "customer_group",
+            label: "Customer Group",
             fieldtype: "Link",
-            options: "Company"
+            options: "Customer Group"
         },
         {
-            fieldname: "year",
-            label: "Year",
-            fieldtype: "Int",
-            default: new Date().getFullYear()
+            fieldname: "month",
+            label: "Month",
+            fieldtype: "Select",
+            options: [
+                "",
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+            ]
         }
     ],
 
     after_datatable_render: function (report) {
 
-        $(".supplier-link").off("click").on("click", function (e) {
+        $(".customer-link").off("click").on("click", function (e) {
             e.preventDefault();
 
-            let supplier = $(this).data("supplier");
+            let customer = $(this).data("customer");
             let filters = report.get_values();
 
             frappe.call({
-                method: "vciplreports_v01.vciplreports_v01.vcipl.report.monthwise_purchases.monthwise_purchases.get_month_breakup",
+                method: "vciplreports_v01.vciplreports_v01.vcipl.report.monthwise_sales_report.monthwise_sales_report.get_month_breakup",
                 args: {
-                    supplier: supplier,
-                    company: filters.company,
-                    year: filters.year
+                    customer: customer,
+                    customer_group: filters.customer_group,
+                    month: filters.month
                 },
                 callback: function (r) {
 
-                    // Add chart container
                     let content = r.message.html + `
-                        <div id="supplier_purchase_chart" style="margin-top:20px;"></div>
+                        <div id="customer_sales_chart" style="margin-top:20px;"></div>
                     `;
 
                     frappe.msgprint({
-                        title: "Month-wise Purchases - " + supplier,
+                        title: "Month-wise Sales - " + customer,
                         message: content,
                         wide: true
                     });
 
-                    // Render Chart
                     setTimeout(() => {
-                        new frappe.Chart("#supplier_purchase_chart", {
-                            title: "Monthly Purchase Trend",
+                        new frappe.Chart("#customer_sales_chart", {
+                            title: "Monthly Sales Trend",
                             data: {
                                 labels: r.message.labels,
-                                datasets: [
-                                    {
-                                        name: "Purchase",
-                                        type: "bar",
-                                        values: r.message.values
-                                    }
-                                ]
+                                datasets: [{
+                                    name: "Sales",
+                                    type: "bar",
+                                    values: r.message.values
+                                }]
                             },
                             type: "bar",
                             height: 300

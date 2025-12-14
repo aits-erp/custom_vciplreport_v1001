@@ -1,63 +1,63 @@
 <style>
-    .dashboard-container { margin: 25px; }
+.dashboard-container { margin: 25px; }
 
-    .section-title {
-        font-size: 22px;
-        font-weight: 700;
-        margin: 30px 0 15px;
-        color: #2c3e50;
-    }
+.section-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 30px 0 15px;
+    color: #2c3e50;
+}
 
-    .dashboard-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 22px;
-    }
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 22px;
+}
 
-    .dashboard-card {
-        background: #ffffff;
-        border-radius: 18px;
-        padding: 20px 15px 18px;
-        text-align: center;
-        cursor: pointer;
-        transition: all .25s ease;
-        box-shadow: 0 8px 25px rgba(0,0,0,.08);
-    }
+.dashboard-card {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 20px 15px 18px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .25s ease;
+    box-shadow: 0 8px 25px rgba(0,0,0,.08);
+}
 
-    .dashboard-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 16px 35px rgba(0,0,0,.15);
-    }
+.dashboard-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 16px 35px rgba(0,0,0,.15);
+}
 
-    .icon-box {
-        width: 90px;
-        height: 90px;
-        margin: 0 auto 12px;
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
+.icon-box {
+    width: 90px;
+    height: 90px;
+    margin: 0 auto 12px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-    .icon-box svg {
-        width: 44px;
-        height: 44px;
-        fill: white;
-    }
+.icon-box svg {
+    width: 44px;
+    height: 44px;
+    fill: white;
+}
 
-    .dashboard-title {
-        font-weight: 600;
-        font-size: 15px;
-        color: #2d3436;
-        margin-top: 6px;
-    }
+.dashboard-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: #2d3436;
+    margin-top: 6px;
+}
 
-    /* gradients */
-    .g-blue { background: linear-gradient(135deg,#4facfe,#00f2fe); }
-    .g-green { background: linear-gradient(135deg,#43e97b,#38f9d7); }
-    .g-orange { background: linear-gradient(135deg,#f7971e,#ffd200); }
-    .g-purple { background: linear-gradient(135deg,#667eea,#764ba2); }
-    .g-red { background: linear-gradient(135deg,#ff416c,#ff4b2b); }
+/* gradients */
+.g-blue { background: linear-gradient(135deg,#4facfe,#00f2fe); }
+.g-green { background: linear-gradient(135deg,#43e97b,#38f9d7); }
+.g-orange { background: linear-gradient(135deg,#f7971e,#ffd200); }
+.g-purple { background: linear-gradient(135deg,#667eea,#764ba2); }
+.g-red { background: linear-gradient(135deg,#ff416c,#ff4b2b); }
 </style>
 
 <div class="dashboard-container">
@@ -65,64 +65,97 @@
     <div class="section-title">📊 Sales Reports</div>
     <div class="dashboard-grid">
 
-        <!-- Distributor -->
         <div class="dashboard-card report-card" data-report="Distributor Report">
             <div class="icon-box g-blue">
-                <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/></svg>
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/>
+                </svg>
             </div>
             <div class="dashboard-title">Distributor Report</div>
         </div>
 
-        <!-- Top Selling MSL -->
         <div class="dashboard-card report-card" data-report="Top selling below MSL report">
             <div class="icon-box g-green">
-                <svg viewBox="0 0 24 24"><path d="M3 17h4v-7H3v7zm7 0h4V3h-4v14zm7 0h4v-10h-4v10z"/></svg>
+                <svg viewBox="0 0 24 24">
+                    <path d="M3 17h4v-7H3v7zm7 0h4V3h-4v14zm7 0h4v-10h-4v10z"/>
+                </svg>
             </div>
             <div class="dashboard-title">Top Selling (Below MSL)</div>
         </div>
 
-        <!-- Top 100 -->
-        <div class="dashboard-card report-card" data-report="Top 100 Most selling Item">
-            <div class="icon-box g-orange">
-                <svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>
-            </div>
-            <div class="dashboard-title">Top 100 Most Selling</div>
-        </div>
-
-        <!-- Bottom 100 -->
+    
         <div class="dashboard-card report-card" data-report="Bottom 100 Most selling Item">
             <div class="icon-box g-red">
-                <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+                <svg viewBox="0 0 24 24">
+                    <path d="M7 10l5 5 5-5z"/>
+                </svg>
             </div>
             <div class="dashboard-title">Bottom 100 Most Selling</div>
         </div>
 
-        <!-- Debtors -->
         <div class="dashboard-card report-card" data-report="Outstanding Debtors Monthwise">
             <div class="icon-box g-purple">
-                <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5l-9-4z"/></svg>
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 1L3 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5l-9-4z"/>
+                </svg>
             </div>
             <div class="dashboard-title">Outstanding Debtors</div>
         </div>
 
     </div>
 
-    <div class="section-title">📦 Inventory Reports</div>
+    <div class="section-title"> </div>
     <div class="dashboard-grid">
 
-        <div class="dashboard-card report-card" data-report="Stock Ledger">
+        <div class="dashboard-card report-card" data-report="Sales Analytics Report">
             <div class="icon-box g-blue">
-                <svg viewBox="0 0 24 24"><path d="M3 3h18v4H3V3zm0 6h18v4H3V9zm0 6h18v4H3v-4z"/></svg>
+                <svg viewBox="0 0 24 24">
+                    <path d="M3 3h18v4H3V3zm0 6h18v4H3V9zm0 6h18v4H3v-4z"/>
+                </svg>
             </div>
-            <div class="dashboard-title">Stock Ledger</div>
+            <div class="dashboard-title">Sales Analytics Report</div>
         </div>
 
-        <div class="dashboard-card report-card" data-report="Stock Summary">
+        <div class="dashboard-card report-card" data-report="Monthwise Sales Report">
             <div class="icon-box g-green">
-                <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/></svg>
+                <svg viewBox="0 0 24 24">
+                    <path d="M4 4h16v16H4z"/>
+                </svg>
             </div>
-            <div class="dashboard-title">Stock Summary</div>
+            <div class="dashboard-title">Monthwise Sales Report</div>
+        </div>
+
+        <div class="dashboard-card report-card" data-report="Monthwises Purchase">
+            <div class="icon-box g-orange">
+                <svg viewBox="0 0 24 24">
+                    <path d="M3 9h18v2H3V9zm0 4h18v2H3v-2z"/>
+                </svg>
+            </div>
+            <div class="dashboard-title">Monthwises Purchase</div>
         </div>
 
     </div>
 </div>
+
+<script>
+const REPORT_PATHS = {
+    "Distributor Report": "/app/query-report/Distributors%20Report",
+    "Top selling below MSL report": "/app/query-report/Most%20Selling%20Below%20MSL%20Report?custom_item_type=Finished+Goods",
+    "Bottom 100 Most selling Item": "/app/query-report/Bottom%20100%20Most%20selling%20Item",
+    "Outstanding Debtors Monthwise": "/app/query-report/Outstanding%20Debtors%20Monthwise?customer_group=Debtors+Distributors&from_date=2025-08-01&to_date=2025-08-20",
+    "Sales Analytics Report": "/app/query-report/Sales%20Analytics%20Report?tree_type=Customer&doc_type=Sales+Invoice&value_quantity=Value&from_date=2025-04-01&to_date=2026-03-31&company=Vinod+Cookware+India+Private+Limited&range=Monthly",
+    "Monthwise Sales Report": "/app/query-report/Monthwise%20Sales%20Report",
+    "Monthwises Purchase": "/app/report/Monthwises%20Purchase"
+};
+
+document.querySelectorAll(".report-card").forEach(card => {
+    card.addEventListener("click", function () {
+        const report = this.getAttribute("data-report");
+        if (REPORT_PATHS[report]) {
+            window.location.href = REPORT_PATHS[report];
+        } else {
+            frappe.msgprint("Report path not found: " + report);
+        }
+    });
+});
+</script>

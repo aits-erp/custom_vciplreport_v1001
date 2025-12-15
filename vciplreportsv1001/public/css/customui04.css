@@ -1,0 +1,110 @@
+/* =====================================================
+   ERPNext v15 – NAVBAR TEXT FORCE FIX
+   (Breadcrumb text turning black issue)
+   ===================================================== */
+
+/* NAVBAR BACKGROUND */
+header.navbar,
+.navbar,
+.navbar-expand {
+    background-color: #0077B6 !important;
+}
+
+/* -----------------------------------------------------
+   FORCE BREADCRUMB TEXT COLOR (MAIN FIX)
+   ----------------------------------------------------- */
+
+/* Breadcrumb container */
+header.navbar .breadcrumb,
+header.navbar .breadcrumb *,
+.navbar .breadcrumb,
+.navbar .breadcrumb * {
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+    opacity: 1 !important;
+}
+
+/* Breadcrumb links */
+header.navbar .breadcrumb a,
+.navbar .breadcrumb a {
+    color: #FFFFFF !important;
+    font-weight: 500 !important;
+    text-decoration: none;
+}
+
+/* Active breadcrumb (current page) */
+header.navbar .breadcrumb-item.active,
+.navbar .breadcrumb-item.active {
+    color: #CAF0F8 !important;
+    font-weight: 600 !important;
+}
+
+/* Breadcrumb separator ">" */
+header.navbar .breadcrumb-item::before,
+.navbar .breadcrumb-item::before {
+    color: rgba(255,255,255,0.7) !important;
+}
+
+/* -----------------------------------------------------
+   PAGE TITLE / ROUTE STRING (ERPNext specific)
+   ----------------------------------------------------- */
+header.navbar .route-string,
+header.navbar .title-text,
+header.navbar h1,
+header.navbar h2 {
+    color: #FFFFFF !important;
+    font-weight: 500 !important;
+}
+
+/* -----------------------------------------------------
+   HELP TEXT (REFERENCE STYLE)
+   ----------------------------------------------------- */
+header.navbar .help-dropdown-toggle,
+header.navbar .help-dropdown-toggle *,
+.navbar .help-dropdown-toggle,
+.navbar .help-dropdown-toggle * {
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+}
+
+/* -----------------------------------------------------
+   NAVBAR ICONS (Bell, Search, Profile)
+   ----------------------------------------------------- */
+header.navbar .nav-link,
+header.navbar .icon,
+header.navbar svg,
+.navbar .nav-link,
+.navbar svg {
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+}
+
+/* -----------------------------------------------------
+   SEARCH BAR
+   ----------------------------------------------------- */
+header.navbar .search-bar,
+header.navbar input[type="text"] {
+    background-color: rgba(255,255,255,0.18) !important;
+    color: #FFFFFF !important;
+    border-radius: 20px;
+}
+
+header.navbar input::placeholder {
+    color: rgba(255,255,255,0.75) !important;
+}
+
+/* -----------------------------------------------------
+   HOVER EFFECTS (MATCH HELP)
+   ----------------------------------------------------- */
+header.navbar a:hover,
+header.navbar .nav-link:hover {
+    color: #90E0EF !important;
+}
+
+/* -----------------------------------------------------
+   LAST RESORT (ANTI ERP OVERRIDE)
+   ----------------------------------------------------- */
+header.navbar * {
+    text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+    opacity: 1 !important;
+}

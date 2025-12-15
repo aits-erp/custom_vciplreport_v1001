@@ -13,8 +13,8 @@ frappe.query_reports["Monthwises Purchase"] = {
             fieldtype: "Select",
             options: [
                 "",
-                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+                "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"
             ]
         }
     ],
@@ -24,11 +24,11 @@ frappe.query_reports["Monthwises Purchase"] = {
         $(".supplier-link").off("click").on("click", function (e) {
             e.preventDefault();
 
-            let supplier = $(this).data("supplier");
-            let filters = report.get_values();
+            const supplier = $(this).data("supplier");
+            const filters = report.get_values();
 
             frappe.call({
-                method: "vciplreports_v01.vciplreports_v01.vcipl.report.monthwise_purchase_report.monthwise_purchase_report.get_month_breakup",
+                method: "vciplreportsv1001.vciplreportsv1001.vcipl1001.report.monthwises_purchase.monthwises_purchase.get_month_breakup",
                 args: {
                     supplier: supplier,
                     supplier_group: filters.supplier_group,
@@ -36,7 +36,7 @@ frappe.query_reports["Monthwises Purchase"] = {
                 },
                 callback: function (r) {
 
-                    let content = r.message.html + `
+                    const content = r.message.html + `
                         <div id="supplier_purchase_chart" style="margin-top:20px;"></div>
                     `;
 
@@ -52,7 +52,7 @@ frappe.query_reports["Monthwises Purchase"] = {
                             data: {
                                 labels: r.message.labels,
                                 datasets: [{
-                                    name: "Purchase",
+                                    name: "Purchase Amount",
                                     type: "bar",
                                     values: r.message.values
                                 }]

@@ -1,102 +1,51 @@
-<style>
-.dashboard-container { margin: 25px; }
-
-.section-title {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 30px 0 15px;
-    color: #2c3e50;
-}
-
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 22px;
-}
-
-.dashboard-card {
-    background: #ffffff;
-    border-radius: 18px;
-    padding: 20px 15px 18px;
-    text-align: center;
-    cursor: pointer;
-    transition: all .25s ease;
-    box-shadow: 0 8px 25px rgba(0,0,0,.08);
-}
-
-.dashboard-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 16px 35px rgba(0,0,0,.15);
-}
-
-.icon-box {
-    width: 90px;
-    height: 90px;
-    margin: 0 auto 12px;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.icon-box svg {
-    width: 44px;
-    height: 44px;
-    fill: white;
-}
-
-.dashboard-title {
-    font-weight: 600;
-    font-size: 15px;
-    color: #2d3436;
-    margin-top: 6px;
-}
-
-/* gradients */
-.g-blue { background: linear-gradient(135deg,#4facfe,#00f2fe); }
-.g-green { background: linear-gradient(135deg,#43e97b,#38f9d7); }
-.g-orange { background: linear-gradient(135deg,#f7971e,#ffd200); }
-.g-purple { background: linear-gradient(135deg,#667eea,#764ba2); }
-.g-red { background: linear-gradient(135deg,#ff416c,#ff4b2b); }
-</style>
-
 <div class="dashboard-container">
 
     <div class="section-title">📊 Sales Reports</div>
     <div class="dashboard-grid">
 
+        <!-- Distributor -->
         <div class="dashboard-card report-card" data-report="Distributor Report">
             <div class="icon-box g-blue">
+                <!-- Users -->
                 <svg viewBox="0 0 24 24">
-                    <path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/>
+                    <circle cx="17" cy="8" r="3"/>
                 </svg>
             </div>
             <div class="dashboard-title">Distributor Report</div>
         </div>
 
+        <!-- Top Selling -->
         <div class="dashboard-card report-card" data-report="Top selling below MSL report">
             <div class="icon-box g-green">
+                <!-- Trending Up -->
                 <svg viewBox="0 0 24 24">
-                    <path d="M3 17h4v-7H3v7zm7 0h4V3h-4v14zm7 0h4v-10h-4v10z"/>
+                    <polyline points="3 17 9 11 13 15 21 7"/>
+                    <polyline points="14 7 21 7 21 14"/>
                 </svg>
             </div>
             <div class="dashboard-title">Top Selling (Below MSL)</div>
         </div>
 
-    
+        <!-- Bottom Selling -->
         <div class="dashboard-card report-card" data-report="Bottom 100 Most selling Item">
             <div class="icon-box g-red">
+                <!-- Trending Down -->
                 <svg viewBox="0 0 24 24">
-                    <path d="M7 10l5 5 5-5z"/>
+                    <polyline points="3 7 9 13 13 9 21 17"/>
+                    <polyline points="14 17 21 17 21 10"/>
                 </svg>
             </div>
             <div class="dashboard-title">Bottom 100 Most Selling</div>
         </div>
 
+        <!-- Outstanding -->
         <div class="dashboard-card report-card" data-report="Outstanding Debtors Monthwise">
             <div class="icon-box g-purple">
+                <!-- Shield -->
                 <svg viewBox="0 0 24 24">
-                    <path d="M12 1L3 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5l-9-4z"/>
+                    <path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/>
                 </svg>
             </div>
             <div class="dashboard-title">Outstanding Debtors</div>
@@ -104,31 +53,44 @@
 
     </div>
 
-    <div class="section-title"> </div>
+    <div class="section-title"></div>
     <div class="dashboard-grid">
 
+        <!-- Sales Analytics -->
         <div class="dashboard-card report-card" data-report="Sales Analytics Report">
             <div class="icon-box g-blue">
+                <!-- Bar Chart -->
                 <svg viewBox="0 0 24 24">
-                    <path d="M3 3h18v4H3V3zm0 6h18v4H3V9zm0 6h18v4H3v-4z"/>
+                    <line x1="6" y1="20" x2="6" y2="10"/>
+                    <line x1="12" y1="20" x2="12" y2="4"/>
+                    <line x1="18" y1="20" x2="18" y2="14"/>
                 </svg>
             </div>
             <div class="dashboard-title">Sales Analytics Report</div>
         </div>
 
+        <!-- Monthwise Sales -->
         <div class="dashboard-card report-card" data-report="Monthwise Sales Report">
             <div class="icon-box g-green">
+                <!-- Calendar -->
                 <svg viewBox="0 0 24 24">
-                    <path d="M4 4h16v16H4z"/>
+                    <rect x="3" y="4" width="18" height="18" rx="2"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/>
                 </svg>
             </div>
             <div class="dashboard-title">Monthwise Sales Report</div>
         </div>
 
+        <!-- Purchase -->
         <div class="dashboard-card report-card" data-report="Monthwises Purchase">
             <div class="icon-box g-orange">
+                <!-- Receipt -->
                 <svg viewBox="0 0 24 24">
-                    <path d="M3 9h18v2H3V9zm0 4h18v2H3v-2z"/>
+                    <path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/>
+                    <line x1="9" y1="6" x2="15" y2="6"/>
+                    <line x1="9" y1="10" x2="15" y2="10"/>
                 </svg>
             </div>
             <div class="dashboard-title">Monthwises Purchase</div>
@@ -136,26 +98,3 @@
 
     </div>
 </div>
-
-<script>
-const REPORT_PATHS = {
-    "Distributor Report": "/app/query-report/Distributors%20Report",
-    "Top selling below MSL report": "/app/query-report/Most%20Selling%20Below%20MSL%20Report?custom_item_type=Finished+Goods",
-    "Bottom 100 Most selling Item": "/app/query-report/Bottom%20100%20Most%20selling%20Item",
-    "Outstanding Debtors Monthwise": "/app/query-report/Outstanding%20Debtors%20Monthwise?customer_group=Debtors+Distributors&from_date=2025-08-01&to_date=2025-08-20",
-    "Sales Analytics Report": "/app/query-report/Sales%20Analytics%20Report?tree_type=Customer&doc_type=Sales+Invoice&value_quantity=Value&from_date=2025-04-01&to_date=2026-03-31&company=Vinod+Cookware+India+Private+Limited&range=Monthly",
-    "Monthwise Sales Report": "/app/query-report/Monthwise%20Sales%20Report",
-    "Monthwises Purchase": "/app/report/Monthwises%20Purchase"
-};
-
-document.querySelectorAll(".report-card").forEach(card => {
-    card.addEventListener("click", function () {
-        const report = this.getAttribute("data-report");
-        if (REPORT_PATHS[report]) {
-            window.location.href = REPORT_PATHS[report];
-        } else {
-            frappe.msgprint("Report path not found: " + report);
-        }
-    });
-});
-</script>

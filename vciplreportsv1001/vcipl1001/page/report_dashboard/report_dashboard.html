@@ -51,6 +51,17 @@
             <div class="dashboard-title">Outstanding Debtors</div>
         </div>
 
+                <!-- Sales Person Target -->
+        <div class="dashboard-card report-card" data-report="Sales Person Target Report">
+            <div class="icon-box g-purple">
+                <!-- Shield -->
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/>
+                </svg>
+            </div>
+            <div class="dashboard-title">Sales Person Target Report</div>
+        </div>
+
     </div>
 
     <div class="section-title"></div>
@@ -98,3 +109,27 @@
 
     </div>
 </div>
+<script>
+const REPORT_PATHS = {
+    "Distributor Report": "/app/query-report/Distributors%20Report",
+    "Top selling below MSL report": "/app/report/Most%20Selling%20Below%20MSL%20Report",
+    "Top 100 Most selling Item": "/app/query-report/Top%20100%20Most%20selling%20Item",
+    "Bottom 100 Most selling Item": "/app/report/Bottom%20100%20Most%20selling%20Item",
+    "Outstanding Debtors Monthwise": "/app/report/Outstanding%20Debtors%20Monthwise",
+    "Sales Analytics Report": "/app/report/Sales%20Analytics%20Report",
+    "Monthwise Sales Report": "/app/report/Monthwise%20Sales%20Report",
+    "Monthwises Purchase": "/app/report/Monthwises%20Purchase",
+    "Sales Person Target Report": "/app/query-report/Sales%20Person%20Target%20Report"
+};
+
+document.querySelectorAll(".report-card").forEach(card => {
+    card.addEventListener("click", function () {
+        const report = this.getAttribute("data-report");
+        if (REPORT_PATHS[report]) {
+            window.location.href = REPORT_PATHS[report];
+        } else {
+            frappe.msgprint("Report path not found: " + report);
+        }
+    });
+});
+</script>

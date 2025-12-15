@@ -1,3 +1,5 @@
+print("🔥 vciplreportsv1001 hooks.py loaded")
+
 app_name = "vciplreportsv1001"
 app_title = "vcipl1001"
 app_publisher = "AITS"
@@ -5,13 +7,9 @@ app_description = "sai"
 app_email = "sai@aitsind.com"
 app_license = "mit"
 
-app_include_js = [
-    "/assets/vciplreportsv1001/js/report_nav_button.js"
-]
+app_include_js = "/assets/vciplreportsv1001/js/global_dashboard_btn_v2.js"
 
-app_include_css = [
-    "/assets/vciplreportsv1001/css/report_nav_button1.css"
-]
+app_include_css = "/assets/vciplreportsv1001/css/customui01.css"
 #sai
 
 # Apps

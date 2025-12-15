@@ -28,16 +28,16 @@ function renderDashboardButton() {
   });
 
   if (isReportDashboard) {
-    // 🔙 BACK BUTTON
+    // 🔙 BACK → Accounting
     btn.innerText = "⬅";
-    btn.title = "Back";
+    btn.title = "Back to Accounting";
 
     btn.onclick = () => {
-      frappe.router.back();
+      frappe.set_route("accounting");
     };
 
   } else {
-    // 📊 DASHBOARD BUTTON
+    // 📊 DASHBOARD
     btn.innerText = "📊";
     btn.title = "Open Report Dashboard";
 
@@ -54,7 +54,7 @@ frappe.after_ajax(() => {
   renderDashboardButton();
 });
 
-// re-render on every route change
+// update on route change
 frappe.router.on("change", () => {
   renderDashboardButton();
 });

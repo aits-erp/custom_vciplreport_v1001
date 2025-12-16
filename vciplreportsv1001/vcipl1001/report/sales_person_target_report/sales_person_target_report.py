@@ -32,7 +32,7 @@ def get_columns():
         {"label": "February", "fieldname": "custom_february", "fieldtype": "Data", "width": 120},
         {"label": "March", "fieldname": "custom_march", "fieldtype": "Data", "width": 120},
         {"label": "April", "fieldname": "custom_april", "fieldtype": "Data", "width": 120},
-        {"label": "May", "fieldname": "custom_may", "fieldtype": "Data", "width": 120},
+        {"label": "May", "fieldname": "custom_may_", "fieldtype": "Data", "width": 120},
         {"label": "June", "fieldname": "custom_june", "fieldtype": "Data", "width": 120},
         {"label": "July", "fieldname": "custom_july", "fieldtype": "Data", "width": 120},
         {"label": "August", "fieldname": "custom_august", "fieldtype": "Data", "width": 120},

@@ -1,15 +1,29 @@
-frappe.query_reports["Sales Person Target Report"] = {
-    filters: [
-        {
-            fieldname: "sales_person",
-            label: "Sales Person",
-            fieldtype: "Link",
-            options: "Sales Person"
-        }
-    ],
+frappe.query_reports["Customer Sales Target vs Achievement"] = {
 
-    tree: true,
-    name_field: "sales_person",
-    parent_field: "parent_sales_person",
-    initial_depth: 2
+    formatter: function (value, row, column, data, default_formatter) {
+        value = default_formatter(value, row, column, data);
+
+        if (!data || !column.fieldname.endsWith("_ach")) return value;
+
+        let month = column.fieldname.replace("_ach", "");
+        let drill = JSON.parse(data.ach_drill || "{}");
+
+        if (!drill[month]) return value;
+
+        return `<a href="#" class="ach-drill" data-invoices="${drill[month]}">${value}</a>`;
+    },
+
+    onload: function () {
+        $(document).on("click", ".ach-drill", function (e) {
+            e.preventDefault();
+
+            let invoices = $(this).data("invoices").split(",");
+
+            frappe.msgprint({
+                title: "Invoices",
+                message: invoices.join("<br>"),
+                indicator: "blue"
+            });
+        });
+    }
 };

@@ -2,9 +2,12 @@ import frappe
 
 
 def execute(filters=None):
-    return get_columns(), get_data(filters)
+    return get_columns(), get_data(filters or {})
 
 
+# ------------------------
+# COLUMNS
+# ------------------------
 def get_columns():
     return [
         {
@@ -43,6 +46,9 @@ def get_columns():
     ]
 
 
+# ------------------------
+# DATA
+# ------------------------
 def get_data(filters):
     conditions = ""
     if filters.get("sales_person"):
@@ -54,18 +60,18 @@ def get_data(filters):
             sp.parent_sales_person AS parent_sales_person,
             st.allocated_percentage AS allocated_percentage,
 
-            st.custom_january,
-            st.custom_february,
-            st.custom_march,
-            st.custom_april,
-            st.custom_may,
-            st.custom_june,
-            st.custom_july,
-            st.custom_august,
-            st.custom_september,
-            st.custom_october,
-            st.custom_november,
-            st.custom_december
+            IFNULL(st.custom_january, '')   AS custom_january,
+            IFNULL(st.custom_february, '')  AS custom_february,
+            IFNULL(st.custom_march, '')     AS custom_march,
+            IFNULL(st.custom_april, '')     AS custom_april,
+            IFNULL(st.custom_may_, '')      AS custom_may_,
+            IFNULL(st.custom_june, '')      AS custom_june,
+            IFNULL(st.custom_july, '')      AS custom_july,
+            IFNULL(st.custom_august, '')    AS custom_august,
+            IFNULL(st.custom_september, '') AS custom_september,
+            IFNULL(st.custom_october, '')   AS custom_october,
+            IFNULL(st.custom_november, '')  AS custom_november,
+            IFNULL(st.custom_december, '')  AS custom_december
 
         FROM
             `tabSales Person` sp

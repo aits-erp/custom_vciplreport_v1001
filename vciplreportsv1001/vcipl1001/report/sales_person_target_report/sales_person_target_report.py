@@ -9,10 +9,26 @@ def execute(filters=None):
 
 def get_columns():
     return [
-        {"label": "Sales Person", "fieldname": "sales_person", "fieldtype": "Link", "options": "Sales Person", "width": 200},
-        {"label": "Parent Sales Person", "fieldname": "parent_sales_person", "fieldtype": "Link", "options": "Sales Person", "width": 200},
-        {"label": "Role", "fieldname": "role", "fieldtype": "Data", "width": 100},
-        {"label": "Contribution (%)", "fieldname": "contribution", "fieldtype": "Float", "width": 130},
+        {
+            "label": "Sales Person",
+            "fieldname": "sales_person",
+            "fieldtype": "Link",
+            "options": "Sales Person",
+            "width": 200
+        },
+        {
+            "label": "Parent Sales Person",
+            "fieldname": "parent_sales_person",
+            "fieldtype": "Link",
+            "options": "Sales Person",
+            "width": 200
+        },
+        {
+            "label": "Contribution (%)",
+            "fieldname": "allocated_percentage",
+            "fieldtype": "Float",
+            "width": 130
+        },
 
         {"label": "January", "fieldname": "january", "fieldtype": "Currency", "width": 140},
         {"label": "February", "fieldname": "february", "fieldtype": "Currency", "width": 140},
@@ -39,8 +55,7 @@ def get_data(filters):
         SELECT
             sp.name AS sales_person,
             sp.parent_sales_person AS parent_sales_person,
-            sp.custom_role AS role,
-            st.contribution AS contribution,
+            st.allocated_percentage AS allocated_percentage,
 
             st.custom_january AS january,
             st.custom_february AS february,
@@ -58,7 +73,8 @@ def get_data(filters):
         FROM
             `tabSales Person` sp
         LEFT JOIN
-            `tabSales Team` st ON st.sales_person = sp.name
+            `tabSales Team` st
+                ON st.sales_person = sp.name
 
         WHERE
             sp.disabled = 0

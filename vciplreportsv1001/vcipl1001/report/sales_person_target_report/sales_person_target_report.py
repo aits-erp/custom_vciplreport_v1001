@@ -12,14 +12,14 @@ def get_columns():
             "fieldname": "sales_person",
             "fieldtype": "Link",
             "options": "Sales Person",
-            "width": 200,
+            "width": 220,
         },
         {
             "label": "Parent Sales Person",
             "fieldname": "parent_sales_person",
             "fieldtype": "Link",
             "options": "Sales Person",
-            "width": 200,
+            "width": 220,
         },
         {
             "label": "Contribution (%)",
@@ -46,7 +46,7 @@ def get_columns():
 def get_data(filters):
     conditions = ""
     if filters.get("sales_person"):
-        conditions = "AND sp.name = %(sales_person)s"
+        conditions = " AND sp.name = %(sales_person)s"
 
     query = f"""
         SELECT
@@ -67,14 +67,18 @@ def get_data(filters):
             st.custom_november,
             st.custom_december
 
-        FROM `tabSales Person` sp
-        LEFT JOIN `tabSales Team` st
-            ON st.sales_person = sp.name
+        FROM
+            `tabSales Person` sp
+        LEFT JOIN
+            `tabSales Team` st
+                ON st.sales_person = sp.name
 
-        WHERE sp.disabled = 0
-        {conditions}
+        WHERE
+            sp.disabled = 0
+            {conditions}
 
-        ORDER BY sp.lft
+        ORDER BY
+            sp.lft
     """
 
     return frappe.db.sql(query, filters, as_dict=True)

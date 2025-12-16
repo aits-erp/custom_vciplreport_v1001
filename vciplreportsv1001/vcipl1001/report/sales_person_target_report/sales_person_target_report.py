@@ -58,7 +58,7 @@ def get_data(filters):
             st.custom_february,
             st.custom_march,
             st.custom_april,
-            st.custom_may_,
+            st.custom_may,
             st.custom_june,
             st.custom_july,
             st.custom_august,
@@ -74,7 +74,7 @@ def get_data(filters):
                 ON st.sales_person = sp.name
 
         WHERE
-            sp.disabled = 0
+            sp.enabled = 1
             {conditions}
 
         ORDER BY

@@ -26,7 +26,7 @@ def get_columns():
         {"label": "Total Target", "fieldname": "total_target", "fieldtype": "Currency", "width": 150},
         {"label": "Total Ach", "fieldname": "total_ach", "fieldtype": "Currency", "width": 150},
         {"label": "Total %", "fieldname": "total_pct", "fieldtype": "Percent", "width": 120},
-        {"label": "ach_drill", "fieldname": "ach_drill", "hidden": 1},  # for click
+        {"label": "ach_drill", "fieldname": "ach_drill", "hidden": 1},
     ])
 
     return cols
@@ -54,7 +54,8 @@ def get_data(filters):
             st.custom_september AS sep,
             st.custom_october   AS oct,
             st.custom_november  AS nov,
-            st.custom_december  AS dec
+            st.custom_december  AS dec_val
+
         FROM `tabCustomer` c
         JOIN `tabSales Team` st
             ON st.parent = c.name
@@ -62,7 +63,6 @@ def get_data(filters):
         WHERE c.disabled = 0
     """, as_dict=True)
 
-    # ---- Achievement (Invoices)
     invoices = frappe.db.sql("""
         SELECT
             si.customer,
@@ -98,12 +98,13 @@ def get_data(filters):
 
         month_map = {
             1: t.jan, 2: t.feb, 3: t.mar, 4: t.apr, 5: t.may, 6: t.jun,
-            7: t.jul, 8: t.aug, 9: t.sep, 10: t.oct, 11: t.nov, 12: t.dec
+            7: t.jul, 8: t.aug, 9: t.sep, 10: t.oct, 11: t.nov, 12: t.dec_val
         }
 
-        for m_no, m_key in zip(range(1,13),
-                               ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]):
-
+        for m_no, m_key in zip(
+            range(1, 13),
+            ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]
+        ):
             target = flt(month_map.get(m_no))
             ach = flt(ach_map.get((t.customer, t.sales_person), {}).get(m_no, {}).get("amount"))
             pct = (ach / target * 100) if target else 0

@@ -72,72 +72,112 @@ def get_columns():
 def get_data(filters):
 
     sales_person = filters.get("sales_person")
+    year = filters.get("year")
 
-    # 🔑 IMPORTANT: do NOT throw error
     if not sales_person:
         return []
 
-    # 1️⃣ Customer Targets
-    targets = frappe.db.sql("""
-        SELECT
-            c.name AS customer,
-            st.custom_january   AS jan,
-            st.custom_february  AS feb,
-            st.custom_march     AS mar,
-            st.custom_april     AS apr,
-            st.custom_may_      AS may,
-            st.custom_june      AS jun,
-            st.custom_july      AS jul,
-            st.custom_august    AS aug,
-            st.custom_september AS sep,
-            st.custom_october   AS oct,
-            st.custom_november  AS nov,
-            st.custom_december  AS dec_val
-        FROM `tabCustomer` c
-        JOIN `tabSales Team` st
-            ON st.parent = c.name
-           AND st.parenttype = 'Customer'
-        WHERE st.sales_person = %s
-          AND c.disabled = 0
+    # -----------------------------
+    # CUSTOMER LIST (BASE)
+    # -----------------------------
+    customers = frappe.db.sql("""
+        SELECT DISTINCT
+            st.parent AS customer
+        FROM `tabSales Team` st
+        WHERE st.parenttype = 'Customer'
+          AND st.sales_person = %s
     """, sales_person, as_dict=True)
 
-    # 2️⃣ Achievements (Sales Invoice)
-    invoices = frappe.db.sql("""
+    if not customers:
+        return []
+
+    customer_names = [c.customer for c in customers]
+
+    # -----------------------------
+    # TARGETS
+    # -----------------------------
+    targets = frappe.db.sql("""
+        SELECT
+            parent AS customer,
+            custom_january   AS jan,
+            custom_february  AS feb,
+            custom_march     AS mar,
+            custom_april     AS apr,
+            custom_may_      AS may,
+            custom_june      AS jun,
+            custom_july      AS jul,
+            custom_august    AS aug,
+            custom_september AS sep,
+            custom_october   AS oct,
+            custom_november  AS nov,
+            custom_december  AS dec_val
+        FROM `tabSales Team`
+        WHERE parenttype = 'Customer'
+          AND sales_person = %s
+    """, sales_person, as_dict=True)
+
+    target_map = {t.customer: t for t in targets}
+
+    # -----------------------------
+    # ACHIEVEMENTS
+    # -----------------------------
+    conditions = ""
+    values = [sales_person]
+
+    if year:
+        conditions += " AND YEAR(si.posting_date) = %s"
+        values.append(year)
+
+    invoices = frappe.db.sql(f"""
         SELECT
             si.customer,
             MONTH(si.posting_date) AS month,
             SUM(si.base_net_total) AS amount
         FROM `tabSales Invoice` si
-        JOIN `tabSales Team` st
-            ON st.parent = si.name
+        JOIN `tabSales Team` st ON st.parent = si.name
         WHERE si.docstatus = 1
           AND st.sales_person = %s
+          {conditions}
         GROUP BY si.customer, MONTH(si.posting_date)
-    """, sales_person, as_dict=True)
+    """, values, as_dict=True)
 
     ach_map = {}
     for r in invoices:
         ach_map.setdefault(r.customer, {})[r.month] = flt(r.amount)
 
+    # -----------------------------
+    # FINAL RESULT
+    # -----------------------------
     result = []
 
-    for t in targets:
-        row = {"customer": t.customer}
+    for cust in customer_names:
+        t = target_map.get(cust, {})
 
+        row = {"customer": cust}
         total_target = 0
         total_ach = 0
 
         month_targets = {
-            1: t.jan, 2: t.feb, 3: t.mar, 4: t.apr, 5: t.may, 6: t.jun,
-            7: t.jul, 8: t.aug, 9: t.sep, 10: t.oct, 11: t.nov, 12: t.dec_val
+            1: flt(getattr(t, "jan", 0)),
+            2: flt(getattr(t, "feb", 0)),
+            3: flt(getattr(t, "mar", 0)),
+            4: flt(getattr(t, "apr", 0)),
+            5: flt(getattr(t, "may", 0)),
+            6: flt(getattr(t, "jun", 0)),
+            7: flt(getattr(t, "jul", 0)),
+            8: flt(getattr(t, "aug", 0)),
+            9: flt(getattr(t, "sep", 0)),
+            10: flt(getattr(t, "oct", 0)),
+            11: flt(getattr(t, "nov", 0)),
+            12: flt(getattr(t, "dec_val", 0)),
         }
 
         for m_no, m_key in zip(
             range(1, 13),
             ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]
         ):
-            target = flt(month_targets.get(m_no))
-            ach = flt(ach_map.get(t.customer, {}).get(m_no))
+            target = month_targets[m_no]
+            ach = flt(ach_map.get(cust, {}).get(m_no))
             pct = (ach / target * 100) if target else 0
 
             row[f"{m_key}_target"] = target

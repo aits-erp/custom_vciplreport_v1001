@@ -1,10 +1,31 @@
 frappe.query_reports["Sales Person Target Report"] = {
 
+    filters: [
+        {
+            fieldname: "company",
+            label: "Company",
+            fieldtype: "Link",
+            options: "Company",
+            default: frappe.defaults.get_user_default("Company")
+        },
+        {
+            fieldname: "year",
+            label: "Year",
+            fieldtype: "Select",
+            options: [
+                "2023",
+                "2024",
+                "2025"
+            ],
+            default: new Date().getFullYear().toString()
+        }
+    ],
+
     formatter: function (value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
-        // 🔹 Serial No drill column
-        if (column.fieldname === "sr_no") {
+        // 🔹 Serial No clickable
+        if (column.fieldname === "sr_no" && data) {
             return `
                 <span class="sr-drill"
                       style="color:#1f6fd6; cursor:pointer; font-weight:600"
@@ -13,33 +34,34 @@ frappe.query_reports["Sales Person Target Report"] = {
                 </span>
             `;
         }
-
         return value;
     },
 
-    onload: function () {
+    onload: function (report) {
 
-        $(document).on("click", ".sr-drill", function (e) {
-            e.preventDefault();
-            e.stopPropagation();
+        report.datatable.on("click", function (e) {
 
-            // Get clicked row index
-            const row = $(this).closest(".dt-row");
-            const rowIndex = row.attr("data-row-index");
+            const cell = e.target.closest(".dt-cell");
+            if (!cell) return;
 
-            const rowData =
-                frappe.query_report.datatable.datamanager.getRow(rowIndex);
+            const colIndex = cell.dataset.colIndex;
+            const rowIndex = cell.dataset.rowIndex;
 
+            const column = report.datatable.datamanager.getColumn(colIndex);
+            if (column.fieldname !== "sr_no") return;
+
+            const rowData = report.datatable.datamanager.getRow(rowIndex);
             const sales_person = rowData.sales_person;
 
             if (!sales_person) {
-                frappe.msgprint("Sales Person not found");
+                frappe.msgprint("Sales Person not found in this row");
                 return;
             }
 
-            // 🔑 CORRECT WAY: set route_options BEFORE routing
+            // ✅ Correct ERPNext way
             frappe.route_options = {
-                sales_person: sales_person
+                sales_person: sales_person,
+                year: report.get_values().year
             };
 
             frappe.set_route(

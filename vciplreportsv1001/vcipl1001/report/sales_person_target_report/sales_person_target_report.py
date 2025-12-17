@@ -71,16 +71,16 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters):
 
-    if not filters.get("sales_person"):
-        frappe.throw("Sales Person filter is required")
-
     sales_person = filters.get("sales_person")
+
+    # 🔑 IMPORTANT: do NOT throw error
+    if not sales_person:
+        return []
 
     # 1️⃣ Customer Targets
     targets = frappe.db.sql("""
         SELECT
             c.name AS customer,
-
             st.custom_january   AS jan,
             st.custom_february  AS feb,
             st.custom_march     AS mar,
@@ -93,7 +93,6 @@ def get_data(filters):
             st.custom_october   AS oct,
             st.custom_november  AS nov,
             st.custom_december  AS dec_val
-
         FROM `tabCustomer` c
         JOIN `tabSales Team` st
             ON st.parent = c.name
@@ -116,7 +115,6 @@ def get_data(filters):
         GROUP BY si.customer, MONTH(si.posting_date)
     """, sales_person, as_dict=True)
 
-    # Map achievements
     ach_map = {}
     for r in invoices:
         ach_map.setdefault(r.customer, {})[r.month] = flt(r.amount)
@@ -124,9 +122,7 @@ def get_data(filters):
     result = []
 
     for t in targets:
-        row = {
-            "customer": t.customer
-        }
+        row = {"customer": t.customer}
 
         total_target = 0
         total_ach = 0

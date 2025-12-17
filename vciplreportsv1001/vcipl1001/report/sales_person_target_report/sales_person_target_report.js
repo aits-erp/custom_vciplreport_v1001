@@ -3,12 +3,14 @@ frappe.query_reports["Customer Sales Target vs Achievement"] = {
     formatter: function (value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
-        // Make Sales Person clickable
-        if (column.fieldname === "sales_person" && data.customer_drill) {
-            return `<a href="#" class="sp-drill"
-                        data-customers='${data.customer_drill}'>
-                        ${value}
-                    </a>`;
+        if (column.fieldname === "sr_no") {
+            return `
+                <span class="sr-drill"
+                      style="color:#1f6fd6; cursor:pointer; font-weight:600"
+                      data-sales-person="${data.sales_person}">
+                      ${value}
+                </span>
+            `;
         }
 
         return value;
@@ -16,26 +18,15 @@ frappe.query_reports["Customer Sales Target vs Achievement"] = {
 
     onload: function () {
 
-        $(document).on("click", ".sp-drill", function (e) {
+        $(document).on("click", ".sr-drill", function (e) {
             e.preventDefault();
+            e.stopPropagation();
 
-            let customers = [];
+            const sales_person = $(this).data("sales-person");
 
-            try {
-                customers = JSON.parse($(this).attr("data-customers"));
-            } catch (err) {
-                console.error(err);
-            }
-
-            if (!customers.length) {
-                frappe.msgprint("No customers tagged with this Sales Person");
-                return;
-            }
-
-            frappe.msgprint({
-                title: "Customers Tagged",
-                message: customers.join("<br>"),
-                indicator: "blue"
+            // 🔥 Open customer-wise report
+            frappe.set_route("query-report", "Customer Wise Sales Target Report", {
+                sales_person: sales_person
             });
         });
     }

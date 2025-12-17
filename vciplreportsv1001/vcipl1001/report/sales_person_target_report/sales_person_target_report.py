@@ -10,26 +10,76 @@ def execute(filters=None):
 # COLUMNS
 # --------------------------------------------------
 def get_columns():
-    cols = [
-        {"label": "Customer", "fieldname": "customer", "fieldtype": "Link", "options": "Customer", "width": 220},
-        {"label": "Sales Person", "fieldname": "sales_person", "fieldtype": "Link", "options": "Sales Person", "width": 180},
-        {"label": "Role", "fieldname": "role", "fieldtype": "Data", "width": 80},
+    columns = [
+        {
+            "label": "Sales Person",
+            "fieldname": "sales_person",
+            "fieldtype": "Link",
+            "options": "Sales Person",
+            "width": 200
+        },
+        {
+            "label": "Role",
+            "fieldname": "role",
+            "fieldtype": "Data",
+            "width": 80
+        },
+        {
+            "label": "Region",
+            "fieldname": "region",
+            "fieldtype": "Data",
+            "width": 140
+        }
     ]
 
     months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
     for m in months:
-        cols.append({"label": f"{m} Target", "fieldname": f"{m.lower()}_target", "fieldtype": "Currency", "width": 120})
-        cols.append({"label": f"{m} Ach", "fieldname": f"{m.lower()}_ach", "fieldtype": "Currency", "width": 120})
-        cols.append({"label": f"{m} %", "fieldname": f"{m.lower()}_pct", "fieldtype": "Percent", "width": 90})
+        columns.append({
+            "label": f"{m} Target",
+            "fieldname": f"{m.lower()}_target",
+            "fieldtype": "Currency",
+            "width": 120
+        })
+        columns.append({
+            "label": f"{m} Ach",
+            "fieldname": f"{m.lower()}_ach",
+            "fieldtype": "Currency",
+            "width": 120
+        })
+        columns.append({
+            "label": f"{m} %",
+            "fieldname": f"{m.lower()}_pct",
+            "fieldtype": "Percent",
+            "width": 90
+        })
 
-    cols.extend([
-        {"label": "Total Target", "fieldname": "total_target", "fieldtype": "Currency", "width": 150},
-        {"label": "Total Ach", "fieldname": "total_ach", "fieldtype": "Currency", "width": 150},
-        {"label": "Total %", "fieldname": "total_pct", "fieldtype": "Percent", "width": 120},
-        {"label": "ach_drill", "fieldname": "ach_drill", "hidden": 1},
+    columns.extend([
+        {
+            "label": "Total Target",
+            "fieldname": "total_target",
+            "fieldtype": "Currency",
+            "width": 150
+        },
+        {
+            "label": "Total Ach",
+            "fieldname": "total_ach",
+            "fieldtype": "Currency",
+            "width": 150
+        },
+        {
+            "label": "Total %",
+            "fieldname": "total_pct",
+            "fieldtype": "Percent",
+            "width": 120
+        },
+        {
+            "label": "Customer Drill",
+            "fieldname": "customer_drill",
+            "hidden": 1
+        }
     ])
 
-    return cols
+    return columns
 
 
 # --------------------------------------------------
@@ -37,66 +87,64 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters):
 
+    # ---- Targets (Aggregated per Sales Person)
     targets = frappe.db.sql("""
         SELECT
-            c.name AS customer,
             st.sales_person,
-            st.allocated_percentage,
-
-            st.custom_january   AS jan,
-            st.custom_february  AS feb,
-            st.custom_march     AS mar,
-            st.custom_april     AS apr,
-            st.custom_may_      AS may,
-            st.custom_june      AS jun,
-            st.custom_july      AS jul,
-            st.custom_august    AS aug,
-            st.custom_september AS sep,
-            st.custom_october   AS oct,
-            st.custom_november  AS nov,
-            st.custom_december  AS dec_val
-
-        FROM `tabCustomer` c
-        JOIN `tabSales Team` st
-            ON st.parent = c.name
-           AND st.parenttype = 'Customer'
-        WHERE c.disabled = 0
+            SUM(st.custom_january)   AS jan,
+            SUM(st.custom_february)  AS feb,
+            SUM(st.custom_march)     AS mar,
+            SUM(st.custom_april)     AS apr,
+            SUM(st.custom_may_)      AS may,
+            SUM(st.custom_june)      AS jun,
+            SUM(st.custom_july)      AS jul,
+            SUM(st.custom_august)    AS aug,
+            SUM(st.custom_september) AS sep,
+            SUM(st.custom_october)   AS oct,
+            SUM(st.custom_november)  AS nov,
+            SUM(st.custom_december)  AS dec_val
+        FROM `tabSales Team` st
+        WHERE st.parenttype = 'Customer'
+        GROUP BY st.sales_person
     """, as_dict=True)
 
+    # ---- Achievements (Sales Invoice)
     invoices = frappe.db.sql("""
         SELECT
-            si.customer,
             st.sales_person,
+            si.customer,
             MONTH(si.posting_date) AS month,
-            SUM(si.base_net_total) AS amount,
-            GROUP_CONCAT(si.name) AS invoices
+            SUM(si.base_net_total) AS amount
         FROM `tabSales Invoice` si
         JOIN `tabSales Team` st ON st.parent = si.name
         WHERE si.docstatus = 1
-        GROUP BY si.customer, st.sales_person, MONTH(si.posting_date)
+        GROUP BY st.sales_person, si.customer, MONTH(si.posting_date)
     """, as_dict=True)
 
     ach_map = {}
+    customer_map = {}
+
     for r in invoices:
-        ach_map.setdefault((r.customer, r.sales_person), {})[r.month] = {
-            "amount": flt(r.amount),
-            "invoices": r.invoices
-        }
+        ach_map.setdefault(r.sales_person, {}).setdefault(r.month, 0)
+        ach_map[r.sales_person][r.month] += flt(r.amount)
+
+        customer_map.setdefault(r.sales_person, set()).add(r.customer)
 
     result = []
 
     for t in targets:
+        role, region = get_role_and_region(t.sales_person)
+
         row = {
-            "customer": t.customer,
             "sales_person": t.sales_person,
-            "role": get_role(t.sales_person),
+            "role": role,
+            "region": region
         }
 
         total_target = 0
         total_ach = 0
-        drill = {}
 
-        month_map = {
+        month_targets = {
             1: t.jan, 2: t.feb, 3: t.mar, 4: t.apr, 5: t.may, 6: t.jun,
             7: t.jul, 8: t.aug, 9: t.sep, 10: t.oct, 11: t.nov, 12: t.dec_val
         }
@@ -105,8 +153,8 @@ def get_data(filters):
             range(1, 13),
             ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]
         ):
-            target = flt(month_map.get(m_no))
-            ach = flt(ach_map.get((t.customer, t.sales_person), {}).get(m_no, {}).get("amount"))
+            target = flt(month_targets.get(m_no))
+            ach = flt(ach_map.get(t.sales_person, {}).get(m_no))
             pct = (ach / target * 100) if target else 0
 
             row[f"{m_key}_target"] = target
@@ -116,25 +164,31 @@ def get_data(filters):
             total_target += target
             total_ach += ach
 
-            if ach:
-                drill[m_key] = ach_map[(t.customer, t.sales_person)][m_no]["invoices"]
-
         row["total_target"] = total_target
         row["total_ach"] = total_ach
         row["total_pct"] = (total_ach / total_target * 100) if total_target else 0
-        row["ach_drill"] = frappe.as_json(drill)
+
+        row["customer_drill"] = frappe.as_json(list(customer_map.get(t.sales_person, [])))
 
         result.append(row)
 
     return result
 
 
-def get_role(sp):
-    parent = frappe.db.get_value("Sales Person", sp, "parent_sales_person")
+# --------------------------------------------------
+# ROLE & REGION
+# --------------------------------------------------
+def get_role_and_region(sales_person):
+    parent = frappe.db.get_value("Sales Person", sales_person, "parent_sales_person")
+
     if not parent:
-        return "RSM"
+        return "RSM", sales_person
+
     if parent.lower().startswith("rsm"):
-        return "ASM"
+        return "ASM", parent
+
     if parent.lower().startswith("asm"):
-        return "TSO"
-    return "TSO"
+        rsm = frappe.db.get_value("Sales Person", parent, "parent_sales_person")
+        return "TSO", rsm or parent
+
+    return "TSO", parent

@@ -3,25 +3,38 @@ frappe.query_reports["Customer Sales Target vs Achievement"] = {
     formatter: function (value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
-        if (!data || !column.fieldname.endsWith("_ach")) return value;
+        // Make Sales Person clickable
+        if (column.fieldname === "sales_person" && data.customer_drill) {
+            return `<a href="#" class="sp-drill"
+                        data-customers='${data.customer_drill}'>
+                        ${value}
+                    </a>`;
+        }
 
-        let month = column.fieldname.replace("_ach", "");
-        let drill = JSON.parse(data.ach_drill || "{}");
-
-        if (!drill[month]) return value;
-
-        return `<a href="#" class="ach-drill" data-invoices="${drill[month]}">${value}</a>`;
+        return value;
     },
 
     onload: function () {
-        $(document).on("click", ".ach-drill", function (e) {
+
+        $(document).on("click", ".sp-drill", function (e) {
             e.preventDefault();
 
-            let invoices = $(this).data("invoices").split(",");
+            let customers = [];
+
+            try {
+                customers = JSON.parse($(this).attr("data-customers"));
+            } catch (err) {
+                console.error(err);
+            }
+
+            if (!customers.length) {
+                frappe.msgprint("No customers tagged with this Sales Person");
+                return;
+            }
 
             frappe.msgprint({
-                title: "Invoices",
-                message: invoices.join("<br>"),
+                title: "Customers Tagged",
+                message: customers.join("<br>"),
                 indicator: "blue"
             });
         });

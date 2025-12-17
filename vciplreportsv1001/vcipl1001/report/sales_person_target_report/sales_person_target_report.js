@@ -1,4 +1,4 @@
-frappe.query_reports["Customer Sales Target vs Achievement"] = {
+frappe.query_reports["Sales Person Target Report"] = {
 
     formatter: function (value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);

@@ -19,8 +19,17 @@ frappe.query_reports["Monthwise Sales Report"] = {
         }
     ],
 
+    // ===============================
+    // AFTER TABLE LOAD
+    // ===============================
     after_datatable_render: function (report) {
 
+        // 🔥 MAIN BAR CHART (like Accounts Receivable)
+        render_main_bar_chart(report);
+
+        // ===============================
+        // CUSTOMER CLICK POPUP
+        // ===============================
         $(".customer-link").off("click").on("click", function (e) {
             e.preventDefault();
 
@@ -37,7 +46,8 @@ frappe.query_reports["Monthwise Sales Report"] = {
                 callback: function (r) {
 
                     let content = r.message.html + `
-                        <div id="customer_sales_chart" style="margin-top:20px;"></div>
+                        <div id="customer_bar_chart" style="margin-top:20px;"></div>
+                        <div id="customer_pie_chart" style="margin-top:20px;"></div>
                     `;
 
                     frappe.msgprint({
@@ -47,22 +57,89 @@ frappe.query_reports["Monthwise Sales Report"] = {
                     });
 
                     setTimeout(() => {
-                        new frappe.Chart("#customer_sales_chart", {
+
+                        // BAR CHART (Popup)
+                        new frappe.Chart("#customer_bar_chart", {
                             title: "Monthly Sales Trend",
                             data: {
                                 labels: r.message.labels,
                                 datasets: [{
                                     name: "Sales",
-                                    type: "bar",
                                     values: r.message.values
                                 }]
                             },
                             type: "bar",
-                            height: 300
+                            height: 260
                         });
+
+                        // PIE CHART (Popup)
+                        new frappe.Chart("#customer_pie_chart", {
+                            title: "Sales Distribution",
+                            data: {
+                                labels: r.message.labels,
+                                datasets: [{
+                                    values: r.message.values
+                                }]
+                            },
+                            type: "pie",
+                            height: 240
+                        });
+
                     }, 300);
                 }
             });
         });
     }
 };
+
+
+// ==================================================
+// MAIN REPORT BAR CHART (NATIVE ERPNext STYLE)
+// ==================================================
+function render_main_bar_chart(report) {
+
+    if (!report.data || report.data.length === 0) return;
+
+    const month_keys = [
+        "jan", "feb", "mar", "apr", "may", "jun",
+        "jul", "aug", "sep", "oct", "nov", "dec"
+    ];
+
+    const month_labels = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+
+    let totals = Array(12).fill(0);
+
+    report.data.forEach(row => {
+        month_keys.forEach((key, idx) => {
+            totals[idx] += flt(row[key] || 0);
+        });
+    });
+
+    let labels = [];
+    let values = [];
+
+    totals.forEach((val, idx) => {
+        if (val > 0) {
+            labels.push(month_labels[idx]);
+            values.push(val);
+        }
+    });
+
+    // 🔥 Native ERPNext chart (same behavior as Accounts Receivable)
+    report.chart = {
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    name: "Total Sales",
+                    values: values
+                }
+            ]
+        },
+        type: "bar",   // ✅ BAR chart
+        height: 250
+    };
+}

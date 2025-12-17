@@ -14,7 +14,6 @@ def get_columns():
         {"label": "Customer Group", "fieldname": "customer_group",
          "fieldtype": "Link", "options": "Customer Group", "width": 140},
 
-        # Customer Name (click handled in JS)
         {"label": "Distributor", "fieldname": "customer",
          "fieldtype": "Data", "width": 260},
 
@@ -36,7 +35,7 @@ def get_columns():
         {"label": "Average Payment Days", "fieldname": "avg_payment_days",
          "fieldtype": "Float", "precision": 2, "width": 170},
 
-        # hidden helpers
+        # hidden drill helpers
         {"label": "Customer Code", "fieldname": "customer_code", "hidden": 1},
         {"label": "Outstanding Drill", "fieldname": "outstanding_drill", "hidden": 1},
         {"label": "Overdue Drill", "fieldname": "overdue_drill", "hidden": 1},
@@ -126,40 +125,52 @@ def get_data(filters=None):
 
         cust_map[cust]["total_outstanding"] += inv.outstanding_amount
 
+        # ---------- Due Date ----------
+        due_dates = due_map.get(inv.invoice, [])
+        due_date = due_dates[0] if due_dates else None
+        overdue_days = (
+            date_diff(today(), due_date)
+            if due_date and getdate(today()) > getdate(due_date)
+            else None
+        )
+
+        # ---------- Outstanding Drill ----------
         cust_map[cust]["outstanding_list"].append({
             "invoice": inv.invoice,
             "posting_date": str(inv.posting_date),
+            "due_date": str(due_date) if due_date else "-",
             "amount": float(inv.outstanding_amount),
+            "days": overdue_days if overdue_days else "-"
         })
 
-        # overdue
-        for due in due_map.get(inv.invoice, []):
-            if due and getdate(today()) > getdate(due):
-                days = date_diff(today(), due)
-                cust_map[cust]["total_overdue"] += inv.outstanding_amount
+        # ---------- Overdue ----------
+        if overdue_days:
+            cust_map[cust]["total_overdue"] += inv.outstanding_amount
 
-                cust_map[cust]["overdue_list"].append({
-                    "invoice": inv.invoice,
-                    "posting_date": str(inv.posting_date),
-                    "due_date": str(due),
-                    "amount": float(inv.outstanding_amount),
-                    "overdue_days": days,
-                })
+            cust_map[cust]["overdue_list"].append({
+                "invoice": inv.invoice,
+                "posting_date": str(inv.posting_date),
+                "due_date": str(due_date),
+                "amount": float(inv.outstanding_amount),
+                "overdue_days": overdue_days,
+            })
 
-                cust_map[cust]["avg_overdue_list"].append({
-                    "invoice": inv.invoice,
-                    "posting_date": str(inv.posting_date),
-                    "due_date": str(due),
-                    "days": days,
-                })
+            cust_map[cust]["avg_overdue_list"].append({
+                "invoice": inv.invoice,
+                "posting_date": str(inv.posting_date),
+                "due_date": str(due_date),
+                "amount": float(inv.outstanding_amount),
+                "days": overdue_days,
+            })
 
-        # payment days
+        # ---------- Payment Days ----------
         for pay_date in pay_map.get(inv.invoice, []):
             days = date_diff(pay_date, inv.posting_date)
             cust_map[cust]["avg_payment_list"].append({
                 "invoice": inv.invoice,
                 "posting_date": str(inv.posting_date),
                 "payment_date": str(pay_date),
+                "amount": float(inv.outstanding_amount),
                 "days": days,
             })
 
@@ -168,9 +179,9 @@ def get_data(filters=None):
 
     for cust, row in cust_map.items():
 
-        # ASM / RSM (correct logic)
         asm = None
         rsm = None
+
         for sp in cust_sales_map.get(cust, []):
             parent_sp = frappe.db.get_value("Sales Person", sp, "parent_sales_person")
             if parent_sp:
@@ -188,13 +199,13 @@ def get_data(filters=None):
 
         avg_payment = (
             sum(i["days"] for i in row["avg_payment_list"]) / len(row["avg_payment_list"])
-            if row["avg_payment_list"] else None
+            if row["avg_payment_list"] else 0
         )
 
         result.append({
             "customer_group": row["customer_group"],
-            "customer": row["customer_name"],      # shown
-            "customer_code": row["customer_code"], # hidden for click
+            "customer": row["customer_name"],
+            "customer_code": row["customer_code"],
             "asm": asm,
             "rsm": rsm,
             "total_outstanding": row["total_outstanding"],

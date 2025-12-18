@@ -11,81 +11,39 @@ frappe.query_reports["Monthwise Sales Report"] = {
             fieldname: "month",
             label: "Month",
             fieldtype: "Select",
+            reqd: 1,
             options: [
-                "",
-                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+                "Jan","Feb","Mar","Apr","May","Jun",
+                "Jul","Aug","Sep","Oct","Nov","Dec"
             ]
         }
     ],
 
-    // ===============================
-    // AFTER TABLE LOAD
-    // ===============================
     after_datatable_render: function (report) {
 
-        // 🔥 MAIN BAR CHART (like Accounts Receivable)
         render_main_bar_chart(report);
 
-        // ===============================
-        // CUSTOMER CLICK POPUP
-        // ===============================
-        $(".customer-link").off("click").on("click", function (e) {
+        // ------------------------------
+        // CLICK ON AMOUNT → DRILLDOWN
+        // ------------------------------
+        $(".month-amount").off("click").on("click", function (e) {
             e.preventDefault();
 
-            let customer = $(this).data("customer");
-            let filters = report.get_values();
+            const customer = $(this).data("customer");
+            const month = report.get_values().month;
 
             frappe.call({
-                method: "vciplreports_v01.vciplreports_v01.vcipl.report.monthwise_sales_report.monthwise_sales_report.get_month_breakup",
+                method: "vciplreports_v01.vciplreports_v01.vcipl.report.monthwise_sales_report.monthwise_sales_report.get_invoice_drilldown",
                 args: {
                     customer: customer,
-                    customer_group: filters.customer_group,
-                    month: filters.month
+                    month: month
                 },
                 callback: function (r) {
-
-                    let content = r.message.html + `
-                        <div id="customer_bar_chart" style="margin-top:20px;"></div>
-                        <div id="customer_pie_chart" style="margin-top:20px;"></div>
-                    `;
-
                     frappe.msgprint({
-                        title: "Month-wise Sales - " + customer,
-                        message: content,
+                        title: `Sales Invoices - ${customer} (${month})`,
+                        message: r.message,
                         wide: true
                     });
-
-                    setTimeout(() => {
-
-                        // BAR CHART (Popup)
-                        new frappe.Chart("#customer_bar_chart", {
-                            title: "Monthly Sales Trend",
-                            data: {
-                                labels: r.message.labels,
-                                datasets: [{
-                                    name: "Sales",
-                                    values: r.message.values
-                                }]
-                            },
-                            type: "bar",
-                            height: 260
-                        });
-
-                        // PIE CHART (Popup)
-                        new frappe.Chart("#customer_pie_chart", {
-                            title: "Sales Distribution",
-                            data: {
-                                labels: r.message.labels,
-                                datasets: [{
-                                    values: r.message.values
-                                }]
-                            },
-                            type: "pie",
-                            height: 240
-                        });
-
-                    }, 300);
                 }
             });
         });
@@ -93,53 +51,28 @@ frappe.query_reports["Monthwise Sales Report"] = {
 };
 
 
-// ==================================================
-// MAIN REPORT BAR CHART (NATIVE ERPNext STYLE)
-// ==================================================
+// ----------------------------------
+// MAIN BAR CHART
+// ----------------------------------
 function render_main_bar_chart(report) {
 
     if (!report.data || report.data.length === 0) return;
 
-    const month_keys = [
-        "jan", "feb", "mar", "apr", "may", "jun",
-        "jul", "aug", "sep", "oct", "nov", "dec"
-    ];
+    let total = 0;
 
-    const month_labels = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-    ];
-
-    let totals = Array(12).fill(0);
-
-    report.data.forEach(row => {
-        month_keys.forEach((key, idx) => {
-            totals[idx] += flt(row[key] || 0);
-        });
+    report.data.forEach(r => {
+        total += flt(r.month_amount || 0);
     });
 
-    let labels = [];
-    let values = [];
-
-    totals.forEach((val, idx) => {
-        if (val > 0) {
-            labels.push(month_labels[idx]);
-            values.push(val);
-        }
-    });
-
-    // 🔥 Native ERPNext chart (same behavior as Accounts Receivable)
     report.chart = {
         data: {
-            labels: labels,
-            datasets: [
-                {
-                    name: "Total Sales",
-                    values: values
-                }
-            ]
+            labels: [report.get_values().month],
+            datasets: [{
+                name: "Total Sales",
+                values: [total]
+            }]
         },
-        type: "bar",   // ✅ BAR chart
+        type: "bar",
         height: 250
     };
 }

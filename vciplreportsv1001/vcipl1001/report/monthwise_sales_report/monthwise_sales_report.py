@@ -1,137 +1,123 @@
 import frappe
 
+
 def execute(filters=None):
     filters = filters or {}
-    return get_columns(), get_data(filters)
+    return get_columns(filters), get_data(filters)
 
 
 # ---------------------- COLUMNS ----------------------
-def get_columns():
+def get_columns(filters):
+
+    month = filters.get("month")
+
     return [
         {"label": "Customer Group", "fieldname": "customer_group", "width": 160},
         {"label": "Customer", "fieldname": "customer", "fieldtype": "HTML", "width": 240},
-
-        {"label": "Jan", "fieldname": "jan", "fieldtype": "Currency", "width": 110},
-        {"label": "Feb", "fieldname": "feb", "fieldtype": "Currency", "width": 110},
-        {"label": "Mar", "fieldname": "mar", "fieldtype": "Currency", "width": 110},
-        {"label": "Apr", "fieldname": "apr", "fieldtype": "Currency", "width": 110},
-        {"label": "May", "fieldname": "may", "fieldtype": "Currency", "width": 110},
-        {"label": "Jun", "fieldname": "jun", "fieldtype": "Currency", "width": 110},
-        {"label": "Jul", "fieldname": "jul", "fieldtype": "Currency", "width": 110},
-        {"label": "Aug", "fieldname": "aug", "fieldtype": "Currency", "width": 110},
-        {"label": "Sep", "fieldname": "sep", "fieldtype": "Currency", "width": 110},
-        {"label": "Oct", "fieldname": "oct", "fieldtype": "Currency", "width": 110},
-        {"label": "Nov", "fieldname": "nov", "fieldtype": "Currency", "width": 110},
-        {"label": "Dec", "fieldname": "dec", "fieldtype": "Currency", "width": 110},
-
-        {"label": "Total", "fieldname": "total", "fieldtype": "Currency", "width": 140}
+        {
+            "label": f"{month} Sales",
+            "fieldname": "month_amount",
+            "fieldtype": "HTML",
+            "width": 140
+        },
+        {
+            "label": "Total",
+            "fieldname": "total",
+            "fieldtype": "Currency",
+            "width": 140
+        }
     ]
 
 
 # ---------------------- DATA ----------------------
 def get_data(filters):
 
-    sql = """
-        SELECT
-            si.customer_group,
-            si.customer,
-            MONTH(si.posting_date) AS month,
-            SUM(si.grand_total) AS amount
-        FROM `tabSales Invoice` si
-        WHERE si.docstatus = 1
-    """
-
-    values = []
-
-    if filters.get("customer_group"):
-        sql += " AND si.customer_group = %s"
-        values.append(filters["customer_group"])
-
-    if filters.get("month"):
-        sql += " AND DATE_FORMAT(si.posting_date, '%%b') = %s"
-        values.append(filters["month"])
-
-    sql += " GROUP BY si.customer, MONTH(si.posting_date)"
-    sql += " ORDER BY si.customer"
-
-    raw = frappe.db.sql(sql, values, as_dict=True)
-    if not raw:
-        return []
-
-    month_map = {
-        1: "jan", 2: "feb", 3: "mar", 4: "apr",
-        5: "may", 6: "jun", 7: "jul", 8: "aug",
-        9: "sep", 10: "oct", 11: "nov", 12: "dec"
-    }
-
-    data_map = {}
-
-    for row in raw:
-        customer = row.customer
-
-        if customer not in data_map:
-            data_map[customer] = {
-                "customer_group": row.customer_group,
-                "customer": f'<a href="#" class="customer-link" data-customer="{customer}">{customer}</a>',
-                "jan": 0, "feb": 0, "mar": 0, "apr": 0,
-                "may": 0, "jun": 0, "jul": 0, "aug": 0,
-                "sep": 0, "oct": 0, "nov": 0, "dec": 0,
-                "total": 0
-            }
-
-        key = month_map[row.month]
-        data_map[customer][key] += row.amount or 0
-        data_map[customer]["total"] += row.amount or 0
-
-    return list(data_map.values())
-
-
-# ---------------------- POPUP BREAKUP ----------------------
-@frappe.whitelist()
-def get_month_breakup(customer, customer_group=None, month=None):
+    month = filters.get("month")
 
     sql = """
         SELECT
-            DATE_FORMAT(posting_date, '%%b') AS month,
-            SUM(grand_total) AS amount
+            customer_group,
+            customer,
+            SUM(grand_total) AS total,
+            SUM(
+                CASE 
+                    WHEN DATE_FORMAT(posting_date, '%%b') = %s THEN grand_total
+                    ELSE 0
+                END
+            ) AS month_amount
         FROM `tabSales Invoice`
-        WHERE docstatus = 1 AND customer = %s
+        WHERE docstatus = 1
+        GROUP BY customer
+        ORDER BY customer
     """
 
-    values = [customer]
+    rows = frappe.db.sql(sql, (month,), as_dict=True)
 
-    if customer_group:
-        sql += " AND customer_group = %s"
-        values.append(customer_group)
-
-    if month:
-        sql += " AND DATE_FORMAT(posting_date, '%%b') = %s"
-        values.append(month)
-
-    sql += " GROUP BY DATE_FORMAT(posting_date, '%%b')"
-
-    rows = frappe.db.sql(sql, values, as_dict=True)
-
-    if not rows:
-        return {"html": "<b>No data found</b>", "labels": [], "values": []}
-
-    html = """
-        <h4>Sales Details</h4>
-        <table class="table table-bordered">
-            <tr><th>Month</th><th>Amount</th></tr>
-    """
-
-    labels, values_list = [], []
+    data = []
 
     for r in rows:
-        html += f"<tr><td>{r.month}</td><td>{frappe.utils.fmt_money(r.amount)}</td></tr>"
-        labels.append(r.month)
-        values_list.append(float(r.amount))
+        data.append({
+            "customer_group": r.customer_group,
+            "customer": r.customer,
+            "month_amount": f"""
+                <a href="#" 
+                   class="month-amount" 
+                   data-customer="{r.customer}">
+                   {frappe.utils.fmt_money(r.month_amount)}
+                </a>
+            """,
+            "total": r.total
+        })
 
-    html += "</table>"
+    return data
 
-    return {
-        "html": html,
-        "labels": labels,
-        "values": values_list
-    }
+
+# ---------------------- DRILLDOWN POPUP ----------------------
+@frappe.whitelist()
+def get_invoice_drilldown(customer, month):
+
+    sql = """
+        SELECT
+            name,
+            posting_date,
+            grand_total
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1
+          AND customer = %s
+          AND DATE_FORMAT(posting_date, '%%b') = %s
+        ORDER BY posting_date
+    """
+
+    rows = frappe.db.sql(sql, (customer, month), as_dict=True)
+
+    if not rows:
+        return "<b>No Sales Invoices found</b>"
+
+    html = """
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Sales Invoice</th>
+                    <th>Posting Date</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+
+    for r in rows:
+        html += f"""
+            <tr>
+                <td>
+                    <a href="/app/sales-invoice/{r.name}" target="_blank">
+                        {r.name}
+                    </a>
+                </td>
+                <td>{r.posting_date}</td>
+                <td>{frappe.utils.fmt_money(r.grand_total)}</td>
+            </tr>
+        """
+
+    html += "</tbody></table>"
+
+    return html

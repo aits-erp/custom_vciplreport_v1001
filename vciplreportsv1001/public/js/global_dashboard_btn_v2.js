@@ -3,7 +3,7 @@ console.log("✅ global_dashboard_btn.js loaded");
 // 🔐 ONLY THIS ROLE CAN SEE THE BUTTON
 const REQUIRED_ROLE = "Dashboard Manager";
 
-// ✅ YOUR COMPANY LOGO (CONFIRMED PATH)
+// ✅ YOUR LOGO PATH
 const COMPANY_LOGO = "/assets/vciplreportsv1001/images/dashboard_logo.png";
 
 function userHasDashboardAccess() {
@@ -18,17 +18,22 @@ function replaceNavbarLogo() {
     document.querySelector(".navbar-brand img") ||
     document.querySelector(".app-logo img");
 
-  if (logo && !logo.src.includes("dashboard_logo.png")) {
-    logo.src = COMPANY_LOGO;
-    logo.style.height = "34px";
-    logo.style.width = "auto";
-    logo.style.objectFit = "contain";
-  }
+  if (!logo) return;
+
+  logo.src = COMPANY_LOGO;
+
+  // 🔧 FIX LOOK & ALIGNMENT
+  logo.style.height = "28px";        // PERFECT NAVBAR SIZE
+  logo.style.width = "auto";
+  logo.style.maxHeight = "28px";
+  logo.style.objectFit = "contain";
+  logo.style.marginTop = "2px";
+  logo.style.padding = "0";
+  logo.style.background = "transparent";
 }
 
 function renderDashboardButton() {
 
-  // ❌ Remove button if user doesn't have role
   if (!userHasDashboardAccess()) {
     document
       .querySelectorAll(".dashboard-btn-global")
@@ -39,7 +44,6 @@ function renderDashboardButton() {
   const route = frappe.get_route();
   const isReportDashboard = route && route[0] === "report-dashboard";
 
-  // Remove existing button
   document
     .querySelectorAll(".dashboard-btn-global")
     .forEach(el => el.remove());
@@ -85,12 +89,12 @@ function renderDashboardButton() {
 
 // Initial render
 frappe.after_ajax(() => {
-  renderDashboardButton();
   replaceNavbarLogo();
+  renderDashboardButton();
 });
 
-// Re-render on route change
+// Route change
 frappe.router.on("change", () => {
-  renderDashboardButton();
   replaceNavbarLogo();
+  renderDashboardButton();
 });

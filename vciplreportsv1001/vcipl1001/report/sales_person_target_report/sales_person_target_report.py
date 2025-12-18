@@ -3,14 +3,15 @@ from frappe.utils import flt
 
 
 def execute(filters=None):
-    return get_columns(), get_data(filters or {})
+    filters = filters or {}
+    return get_columns(), get_data(filters)
 
 
 # --------------------------------------------------
 # COLUMNS
 # --------------------------------------------------
 def get_columns():
-    cols = [
+    return [
         {"label": "#", "fieldname": "sr_no", "fieldtype": "Int", "width": 50},
         {
             "label": "Sales Person",
@@ -21,21 +22,15 @@ def get_columns():
         },
         {"label": "Role", "fieldname": "role", "fieldtype": "Data", "width": 80},
         {"label": "Region", "fieldname": "region", "fieldtype": "Data", "width": 120},
-    ]
 
-    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-    for m in months:
-        cols.append({"label": f"{m} Target", "fieldname": f"{m.lower()}_target", "fieldtype": "Currency", "width": 120})
-        cols.append({"label": f"{m} Ach", "fieldname": f"{m.lower()}_ach", "fieldtype": "Currency", "width": 120})
-        cols.append({"label": f"{m} %", "fieldname": f"{m.lower()}_pct", "fieldtype": "Percent", "width": 90})
+        {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 140},
+        {"label": "Achieved", "fieldname": "achieved", "fieldtype": "Currency", "width": 140},
+        {"label": "%", "fieldname": "pct", "fieldtype": "Percent", "width": 80},
 
-    cols.extend([
-        {"label": "Total Target", "fieldname": "total_target", "fieldtype": "Currency", "width": 140},
-        {"label": "Total Ach", "fieldname": "total_ach", "fieldtype": "Currency", "width": 140},
+        {"label": "Total Target", "fieldname": "total_target", "fieldtype": "Currency", "width": 150},
+        {"label": "Total Achieved", "fieldname": "total_achieved", "fieldtype": "Currency", "width": 150},
         {"label": "Total %", "fieldname": "total_pct", "fieldtype": "Percent", "width": 100},
-    ])
-
-    return cols
+    ]
 
 
 # --------------------------------------------------
@@ -43,85 +38,99 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters):
 
-    # 🔹 Aggregate TARGETS per Sales Person
+    month = int(filters.get("month"))
+    year = int(filters.get("year"))
+
+    # ---------- TARGETS (MONTH + TOTAL) ----------
     targets = frappe.db.sql("""
         SELECT
             st.sales_person,
-            SUM(st.custom_january)   AS jan,
-            SUM(st.custom_february)  AS feb,
-            SUM(st.custom_march)     AS mar,
-            SUM(st.custom_april)     AS apr,
-            SUM(st.custom_may_)      AS may,
-            SUM(st.custom_june)      AS jun,
-            SUM(st.custom_july)      AS jul,
-            SUM(st.custom_august)    AS aug,
-            SUM(st.custom_september) AS sep,
-            SUM(st.custom_october)   AS oct,
-            SUM(st.custom_november)  AS nov,
-            SUM(st.custom_december)  AS dec_val
+            SUM(
+                CASE %(month)s
+                    WHEN 1 THEN st.custom_january
+                    WHEN 2 THEN st.custom_february
+                    WHEN 3 THEN st.custom_march
+                    WHEN 4 THEN st.custom_april
+                    WHEN 5 THEN st.custom_may_
+                    WHEN 6 THEN st.custom_june
+                    WHEN 7 THEN st.custom_july
+                    WHEN 8 THEN st.custom_august
+                    WHEN 9 THEN st.custom_september
+                    WHEN 10 THEN st.custom_october
+                    WHEN 11 THEN st.custom_november
+                    WHEN 12 THEN st.custom_december
+                END
+            ) AS month_target,
+
+            SUM(
+                st.custom_january + st.custom_february + st.custom_march +
+                st.custom_april + st.custom_may_ + st.custom_june +
+                st.custom_july + st.custom_august + st.custom_september +
+                st.custom_october + st.custom_november + st.custom_december
+            ) AS total_target
+
         FROM `tabSales Team` st
         WHERE st.parenttype = 'Customer'
         GROUP BY st.sales_person
-    """, as_dict=True)
+    """, {"month": month}, as_dict=True)
 
-    # 🔹 Aggregate ACHIEVEMENTS per Sales Person
-    invoices = frappe.db.sql("""
+    # ---------- ACHIEVED ----------
+    achieved = frappe.db.sql("""
         SELECT
             st.sales_person,
-            MONTH(si.posting_date) AS month,
-            SUM(si.base_net_total) AS amount
+            SUM(si.base_net_total) AS achieved
         FROM `tabSales Invoice` si
         JOIN `tabSales Team` st ON st.parent = si.name
         WHERE si.docstatus = 1
-        GROUP BY st.sales_person, MONTH(si.posting_date)
-    """, as_dict=True)
+          AND MONTH(si.posting_date) = %s
+          AND YEAR(si.posting_date) = %s
+        GROUP BY st.sales_person
+    """, (month, year), as_dict=True)
 
-    ach_map = {}
-    for r in invoices:
-        ach_map.setdefault(r.sales_person, {})[r.month] = flt(r.amount)
+    achieved_map = {a.sales_person: flt(a.achieved) for a in achieved}
 
+    # ---------- TOTAL ACHIEVED ----------
+    total_achieved = frappe.db.sql("""
+        SELECT
+            st.sales_person,
+            SUM(si.base_net_total) AS achieved
+        FROM `tabSales Invoice` si
+        JOIN `tabSales Team` st ON st.parent = si.name
+        WHERE si.docstatus = 1
+          AND YEAR(si.posting_date) = %s
+        GROUP BY st.sales_person
+    """, year, as_dict=True)
+
+    total_ach_map = {a.sales_person: flt(a.achieved) for a in total_achieved}
+
+    # ---------- FINAL RESULT ----------
     result = []
     sr_no = 1
 
     for t in targets:
         role, region = get_role_and_region(t.sales_person)
 
-        row = {
+        month_target = flt(t.month_target)
+        month_ach = flt(achieved_map.get(t.sales_person))
+        month_pct = (month_ach / month_target * 100) if month_target else 0
+
+        tot_target = flt(t.total_target)
+        tot_ach = flt(total_ach_map.get(t.sales_person))
+        tot_pct = (tot_ach / tot_target * 100) if tot_target else 0
+
+        result.append({
             "sr_no": sr_no,
             "sales_person": t.sales_person,
             "role": role,
             "region": region,
-        }
+            "target": month_target,
+            "achieved": month_ach,
+            "pct": month_pct,
+            "total_target": tot_target,
+            "total_achieved": tot_ach,
+            "total_pct": tot_pct,
+        })
         sr_no += 1
-
-        total_target = 0
-        total_ach = 0
-
-        month_targets = {
-            1: t.jan, 2: t.feb, 3: t.mar, 4: t.apr, 5: t.may, 6: t.jun,
-            7: t.jul, 8: t.aug, 9: t.sep, 10: t.oct, 11: t.nov, 12: t.dec_val
-        }
-
-        for m_no, m_key in zip(
-            range(1, 13),
-            ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]
-        ):
-            target = flt(month_targets.get(m_no))
-            ach = flt(ach_map.get(t.sales_person, {}).get(m_no))
-            pct = (ach / target * 100) if target else 0
-
-            row[f"{m_key}_target"] = target
-            row[f"{m_key}_ach"] = ach
-            row[f"{m_key}_pct"] = pct
-
-            total_target += target
-            total_ach += ach
-
-        row["total_target"] = total_target
-        row["total_ach"] = total_ach
-        row["total_pct"] = (total_ach / total_target * 100) if total_target else 0
-
-        result.append(row)
 
     return result
 

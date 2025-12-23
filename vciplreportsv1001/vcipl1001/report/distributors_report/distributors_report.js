@@ -1,8 +1,5 @@
 frappe.query_reports["Distributors Report"] = {
 
-    // =====================
-    // FILTERS
-    // =====================
     filters: [
         {
             fieldname: "customer_group",
@@ -31,9 +28,6 @@ frappe.query_reports["Distributors Report"] = {
         }
     ],
 
-    // =====================
-    // FORMATTER & DRILL
-    // =====================
     formatter(value, row, column, data, default_formatter) {
 
         value = default_formatter(value, row, column, data);

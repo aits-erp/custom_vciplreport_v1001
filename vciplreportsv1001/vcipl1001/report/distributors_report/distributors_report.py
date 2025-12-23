@@ -67,9 +67,7 @@ def get_data(filters=None):
         WHERE si.docstatus = 1
           AND (%(customer_group)s IS NULL
                OR si.customer_group = %(customer_group)s)
-    """, {
-        "customer_group": customer_group
-    }, as_dict=True)
+    """, {"customer_group": customer_group}, as_dict=True)
 
     if not invoices:
         return []
@@ -186,15 +184,26 @@ def get_data(filters=None):
         asm = None
         rsm = None
 
-        # ✅ Only Sales Person attached to Customer
+        # 1️⃣ Get leaf Sales Person attached to Customer
+        leaf_sp = None
         for sp in cust_sales_map.get(cust, []):
-            is_group = frappe.db.get_value("Sales Person", sp, "is_group")
-            if not is_group:
-                tso = sp
-                asm = frappe.db.get_value("Sales Person", tso, "parent_sales_person")
-                if asm:
-                    rsm = frappe.db.get_value("Sales Person", asm, "parent_sales_person")
+            if not frappe.db.get_value("Sales Person", sp, "is_group"):
+                leaf_sp = sp
                 break
+
+        # 2️⃣ Walk UP the hierarchy
+        if leaf_sp:
+            tso = leaf_sp
+            parent = frappe.db.get_value("Sales Person", tso, "parent_sales_person")
+
+            while parent:
+                if frappe.db.get_value("Sales Person", parent, "is_group"):
+                    if not asm:
+                        asm = parent
+                    elif not rsm:
+                        rsm = parent
+                        break
+                parent = frappe.db.get_value("Sales Person", parent, "parent_sales_person")
 
         avg_overdue = (
             sum(i["days"] for i in row["avg_overdue_list"]) / len(row["avg_overdue_list"])

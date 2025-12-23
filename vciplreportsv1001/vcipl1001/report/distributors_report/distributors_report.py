@@ -184,26 +184,28 @@ def get_data(filters=None):
         asm = None
         rsm = None
 
-        # 1️⃣ Get leaf Sales Person attached to Customer
-        leaf_sp = None
+        # 🔥 CORRECT ROLE DETECTION BASED ON TREE POSITION
         for sp in cust_sales_map.get(cust, []):
-            if not frappe.db.get_value("Sales Person", sp, "is_group"):
-                leaf_sp = sp
-                break
 
-        # 2️⃣ Walk UP the hierarchy
-        if leaf_sp:
-            tso = leaf_sp
-            parent = frappe.db.get_value("Sales Person", tso, "parent_sales_person")
+            parent = frappe.db.get_value(
+                "Sales Person",
+                sp,
+                "parent_sales_person"
+            )
 
-            while parent:
-                if frappe.db.get_value("Sales Person", parent, "is_group"):
-                    if not asm:
-                        asm = parent
-                    elif not rsm:
-                        rsm = parent
-                        break
-                parent = frappe.db.get_value("Sales Person", parent, "parent_sales_person")
+            if not parent:
+                continue
+
+            parent_name = parent.lower()
+
+            if parent_name.startswith("tso") and not tso:
+                tso = sp
+
+            elif parent_name.startswith("asm") and not asm:
+                asm = sp
+
+            elif parent_name.startswith("rsm") and not rsm:
+                rsm = sp
 
         avg_overdue = (
             sum(i["days"] for i in row["avg_overdue_list"]) / len(row["avg_overdue_list"])

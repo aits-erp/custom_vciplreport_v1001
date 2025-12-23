@@ -17,10 +17,13 @@ def get_columns():
         {"label": "Distributor", "fieldname": "customer",
          "fieldtype": "Data", "width": 260},
 
+        {"label": "RSM", "fieldname": "rsm",
+         "fieldtype": "Link", "options": "Sales Person", "width": 150},
+
         {"label": "ASM", "fieldname": "asm",
          "fieldtype": "Link", "options": "Sales Person", "width": 150},
 
-        {"label": "RSM", "fieldname": "rsm",
+        {"label": "TSO", "fieldname": "tso",
          "fieldtype": "Link", "options": "Sales Person", "width": 150},
 
         {"label": "Total Outstanding", "fieldname": "total_outstanding",
@@ -49,6 +52,10 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters=None):
 
+    tso_filter = filters.get("tso") if filters else None
+    asm_filter = filters.get("asm") if filters else None
+    rsm_filter = filters.get("rsm") if filters else None
+
     # ---------------- SALES INVOICES ----------------
     invoices = frappe.db.sql("""
         SELECT
@@ -76,7 +83,7 @@ def get_data(filters=None):
     for p in payment_terms:
         due_map.setdefault(p.parent, []).append(p.due_date)
 
-    # ---------------- PAYMENT ENTRY ----------------4eddsw
+    # ---------------- PAYMENT ENTRY ----------------
     payments = frappe.db.sql("""
         SELECT
             per.reference_name AS invoice,
@@ -125,16 +132,15 @@ def get_data(filters=None):
 
         cust_map[cust]["total_outstanding"] += inv.outstanding_amount
 
-        # ---------- Due Date ----------
         due_dates = due_map.get(inv.invoice, [])
         due_date = due_dates[0] if due_dates else None
+
         overdue_days = (
             date_diff(today(), due_date)
             if due_date and getdate(today()) > getdate(due_date)
             else None
         )
 
-        # ---------- Outstanding Drill ----------
         cust_map[cust]["outstanding_list"].append({
             "invoice": inv.invoice,
             "posting_date": str(inv.posting_date),
@@ -143,10 +149,8 @@ def get_data(filters=None):
             "days": overdue_days if overdue_days else "-"
         })
 
-        # ---------- Overdue ----------
         if overdue_days:
             cust_map[cust]["total_overdue"] += inv.outstanding_amount
-
             cust_map[cust]["overdue_list"].append({
                 "invoice": inv.invoice,
                 "posting_date": str(inv.posting_date),
@@ -154,7 +158,6 @@ def get_data(filters=None):
                 "amount": float(inv.outstanding_amount),
                 "overdue_days": overdue_days,
             })
-
             cust_map[cust]["avg_overdue_list"].append({
                 "invoice": inv.invoice,
                 "posting_date": str(inv.posting_date),
@@ -163,7 +166,6 @@ def get_data(filters=None):
                 "days": overdue_days,
             })
 
-        # ---------- Payment Days ----------
         for pay_date in pay_map.get(inv.invoice, []):
             days = date_diff(pay_date, inv.posting_date)
             cust_map[cust]["avg_payment_list"].append({
@@ -179,18 +181,23 @@ def get_data(filters=None):
 
     for cust, row in cust_map.items():
 
+        tso = None
         asm = None
         rsm = None
 
         for sp in cust_sales_map.get(cust, []):
-            parent_sp = frappe.db.get_value("Sales Person", sp, "parent_sales_person")
-            if parent_sp:
-                parent_is_group = frappe.db.get_value("Sales Person", parent_sp, "is_group")
-                if parent_is_group:
-                    if parent_sp.lower().startswith("asm"):
-                        asm = sp
-                    if parent_sp.lower().startswith("rsm"):
-                        rsm = sp
+            tso = sp
+            asm = frappe.db.get_value("Sales Person", tso, "parent_sales_person")
+            if asm:
+                rsm = frappe.db.get_value("Sales Person", asm, "parent_sales_person")
+
+        # -------- APPLY FILTERS --------
+        if tso_filter and tso != tso_filter:
+            continue
+        if asm_filter and asm != asm_filter:
+            continue
+        if rsm_filter and rsm != rsm_filter:
+            continue
 
         avg_overdue = (
             sum(i["days"] for i in row["avg_overdue_list"]) / len(row["avg_overdue_list"])
@@ -206,6 +213,7 @@ def get_data(filters=None):
             "customer_group": row["customer_group"],
             "customer": row["customer_name"],
             "customer_code": row["customer_code"],
+            "tso": tso,
             "asm": asm,
             "rsm": rsm,
             "total_outstanding": row["total_outstanding"],

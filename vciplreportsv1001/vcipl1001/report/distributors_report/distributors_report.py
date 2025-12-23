@@ -52,9 +52,7 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters=None):
 
-    tso_filter = filters.get("tso") if filters else None
-    asm_filter = filters.get("asm") if filters else None
-    rsm_filter = filters.get("rsm") if filters else None
+    customer_group = filters.get("customer_group") if filters else None
 
     # ---------------- SALES INVOICES ----------------
     invoices = frappe.db.sql("""
@@ -67,8 +65,11 @@ def get_data(filters=None):
             si.outstanding_amount
         FROM `tabSales Invoice` si
         WHERE si.docstatus = 1
-          AND si.customer_group = 'Distributor'
-    """, as_dict=True)
+          AND (%(customer_group)s IS NULL
+               OR si.customer_group = %(customer_group)s)
+    """, {
+        "customer_group": customer_group
+    }, as_dict=True)
 
     if not invoices:
         return []
@@ -185,19 +186,15 @@ def get_data(filters=None):
         asm = None
         rsm = None
 
+        # ✅ Only Sales Person attached to Customer
         for sp in cust_sales_map.get(cust, []):
-            tso = sp
-            asm = frappe.db.get_value("Sales Person", tso, "parent_sales_person")
-            if asm:
-                rsm = frappe.db.get_value("Sales Person", asm, "parent_sales_person")
-
-        # -------- APPLY FILTERS --------
-        if tso_filter and tso != tso_filter:
-            continue
-        if asm_filter and asm != asm_filter:
-            continue
-        if rsm_filter and rsm != rsm_filter:
-            continue
+            is_group = frappe.db.get_value("Sales Person", sp, "is_group")
+            if not is_group:
+                tso = sp
+                asm = frappe.db.get_value("Sales Person", tso, "parent_sales_person")
+                if asm:
+                    rsm = frappe.db.get_value("Sales Person", asm, "parent_sales_person")
+                break
 
         avg_overdue = (
             sum(i["days"] for i in row["avg_overdue_list"]) / len(row["avg_overdue_list"])
@@ -213,9 +210,9 @@ def get_data(filters=None):
             "customer_group": row["customer_group"],
             "customer": row["customer_name"],
             "customer_code": row["customer_code"],
-            "tso": tso,
-            "asm": asm,
             "rsm": rsm,
+            "asm": asm,
+            "tso": tso,
             "total_outstanding": row["total_outstanding"],
             "total_overdue": row["total_overdue"],
             "avg_overdue_days": avg_overdue,

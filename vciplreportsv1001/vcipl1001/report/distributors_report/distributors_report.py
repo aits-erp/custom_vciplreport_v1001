@@ -76,7 +76,7 @@ def get_data(filters=None):
     for p in payment_terms:
         due_map.setdefault(p.parent, []).append(p.due_date)
 
-    # ---------------- PAYMENT ENTRY ----------------
+    # ---------------- PAYMENT ENTRY ----------------4eddsw
     payments = frappe.db.sql("""
         SELECT
             per.reference_name AS invoice,

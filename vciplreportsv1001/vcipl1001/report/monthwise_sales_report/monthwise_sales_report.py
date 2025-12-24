@@ -42,7 +42,7 @@ def get_data(filters):
     customer_group = filters.get("customer_group")
 
     conditions = ""
-    values = [month_no, month_no]
+    values = [month_no]   # ✅ ONLY ONE PLACEHOLDER
 
     if customer_group:
         conditions += " AND customer_group = %s"
@@ -60,7 +60,8 @@ def get_data(filters):
                 END
             ) AS month_amount
         FROM `tabSales Invoice`
-        WHERE docstatus = 1 {conditions}
+        WHERE docstatus = 1
+        {conditions}
         GROUP BY customer
         ORDER BY customer
     """
@@ -73,7 +74,7 @@ def get_data(filters):
         data.append({
             "customer_group": r.customer_group,
             "customer": r.customer,
-            "month_amount_raw": r.month_amount,   # for chart
+            "month_amount_raw": r.month_amount,
             "month_amount": f"""
                 <a href="#"
                    class="month-amount"

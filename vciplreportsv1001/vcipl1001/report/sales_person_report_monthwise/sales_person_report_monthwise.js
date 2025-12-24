@@ -1,13 +1,23 @@
 frappe.query_reports["Sales Person Report Monthwise"] = {
 
+    filters: [
+        {
+            fieldname: "year",
+            label: "Year",
+            fieldtype: "Int",
+            default: new Date().getFullYear()
+        }
+    ],
+
     formatter(value, row, column, data, default_formatter) {
 
         value = default_formatter(value, row, column, data);
 
-        if (column.fieldname === "achieved" && data.ach_drill) {
-            return `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
+        if (column.fieldname.endsWith("_ach") && data.ach_drill) {
+
+            return `<a style="font-weight:bold;color:#1a73e8"
                 onclick='frappe.query_reports["Sales Person Report Monthwise"]
-                .show_popup(${data.ach_drill})'>
+                .show_popup(${data.ach_drill}, "${column.label}")'>
                 ${value}
             </a>`;
         }
@@ -15,9 +25,11 @@ frappe.query_reports["Sales Person Report Monthwise"] = {
         return value;
     },
 
-    show_popup(rows) {
+    show_popup(rows, title) {
 
-        if (!rows || rows.length === 0) {
+        rows = JSON.parse(rows || "[]");
+
+        if (!rows.length) {
             frappe.msgprint("No invoices found");
             return;
         }
@@ -49,7 +61,7 @@ frappe.query_reports["Sales Person Report Monthwise"] = {
         html += `</tbody></table></div>`;
 
         frappe.msgprint({
-            title: "Achieved Invoice Details",
+            title: title,
             message: html,
             wide: true
         });

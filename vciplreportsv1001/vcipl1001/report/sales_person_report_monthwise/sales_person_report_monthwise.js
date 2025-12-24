@@ -1,72 +1,114 @@
 frappe.query_reports["Sales Person Report Monthwise"] = {
 
-    filters: [
-        {
-            fieldname: "year",
-            label: "Year",
-            fieldtype: "Select",
-            options: ["2023", "2024", "2025"],
-            default: new Date().getFullYear().toString()
-        },
-        {
-            fieldname: "month",
-            label: "Month",
-            fieldtype: "Select",
-            options: [
-                { label: "January", value: 1 },
-                { label: "February", value: 2 },
-                { label: "March", value: 3 },
-                { label: "April", value: 4 },
-                { label: "May", value: 5 },
-                { label: "June", value: 6 },
-                { label: "July", value: 7 },
-                { label: "August", value: 8 },
-                { label: "September", value: 9 },
-                { label: "October", value: 10 },
-                { label: "November", value: 11 },
-                { label: "December", value: 12 },
-            ],
-            default: new Date().getMonth() + 1
-        },
-        {
-            fieldname: "main_group",
-            label: "Main Group",
-            fieldtype: "Data"
-        },
-        {
-            fieldname: "customer",
-            label: "Customer",
-            fieldtype: "Link",
-            options: "Customer"
-        },
-        {
-            fieldname: "sales_person",
-            label: "Sales Person",
-            fieldtype: "Link",
-            options: "Sales Person"
-        }
-    ],
+    // =====================
+    // STATE
+    // =====================
+    show_achievement: false,
 
-    formatter: function (value, row, column, data, default_formatter) {
+    // =====================
+    // ONLOAD
+    // =====================
+    onload(report) {
+        this.add_button(report);
+    },
+
+    // =====================
+    // BUTTON
+    // =====================
+    add_button(report) {
+        report.page.add_inner_button(
+            __("Generate Achievement"),
+            () => {
+                this.show_achievement = !this.show_achievement;
+                this.toggle_columns(report);
+            }
+        );
+    },
+
+    // =====================
+    // TOGGLE COLUMNS
+    // =====================
+    toggle_columns(report) {
+
+        const ach_fields = [
+            "total_achieved",
+            "jan_achieved",
+            "feb_achieved"
+        ];
+
+        report.columns.forEach(col => {
+            if (ach_fields.includes(col.fieldname)) {
+                col.hidden = !this.show_achievement;
+            }
+        });
+
+        report.refresh();
+    },
+
+    // =====================
+    // FORMATTER (CLICK → POPUP)
+    // =====================
+    formatter(value, row, column, data, default_formatter) {
+
         value = default_formatter(value, row, column, data);
 
-        // 🔥 ACHIEVED DRILLDOWN
-        if (column.fieldname === "achieved" && data.achieved > 0) {
+        const drill_map = {
+            "total_achieved": "total_ach_drill",
+            "jan_achieved": "jan_ach_drill",
+            "feb_achieved": "feb_ach_drill"
+        };
 
-            const f = frappe.query_report.get_values();
-
-            return `
-                <a href="/app/sales-invoice?
-                customer=${data.customer}
-                &sales_person=${data.sales_person}
-                &from_date=${f.year}-${String(f.month).padStart(2, '0')}-01
-                &to_date=${f.year}-${String(f.month).padStart(2, '0')}-31"
-                target="_blank">
+        if (drill_map[column.fieldname] && data[drill_map[column.fieldname]]) {
+            return `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
+                onclick='frappe.query_reports["Distributors Report"]
+                .show_popup(${data[drill_map[column.fieldname]]}, "${column.label}")'>
                 ${value}
-                </a>
-            `;
+            </a>`;
         }
 
         return value;
+    },
+
+    // =====================
+    // POPUP
+    // =====================
+    show_popup(rows, title) {
+
+        if (!rows || rows.length === 0) {
+            frappe.msgprint("No data available");
+            return;
+        }
+
+        let html = `
+        <div style="max-height:500px;overflow:auto">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Invoice</th>
+                    <th>Date</th>
+                    <th>Amount</th>
+                </tr>
+            </thead><tbody>`;
+
+        rows.forEach(r => {
+            html += `
+            <tr>
+                <td>
+                    <a href="/app/sales-invoice/${r.invoice}" target="_blank">
+                        ${r.invoice}
+                    </a>
+                </td>
+                <td>${r.date}</td>
+                <td>${format_currency(r.amount)}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+
+        frappe.msgprint({
+            title: title,
+            message: html,
+            wide: true
+        });
     }
 };

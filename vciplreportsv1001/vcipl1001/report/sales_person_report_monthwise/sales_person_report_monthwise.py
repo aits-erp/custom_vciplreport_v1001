@@ -14,33 +14,34 @@ def execute(filters=None):
 # COLUMNS
 # ==========================================================
 def get_columns():
-    cols = [
-        {"label": "Customer", "fieldname": "customer", "fieldtype": "Link", "options": "Customer", "width": 140},
+
+    columns = [
+        {"label": "Customer", "fieldname": "customer", "fieldtype": "Link", "options": "Customer", "width": 150},
         {"label": "Sales Person", "fieldname": "sales_person", "fieldtype": "Link", "options": "Sales Person", "width": 180},
-        {"label": "Role", "fieldname": "role", "fieldtype": "Data", "width": 90},
+        {"label": "Role", "fieldname": "role", "width": 90},
     ]
 
     months = [
         ("jan", "January"), ("feb", "February"), ("mar", "March"),
         ("apr", "April"), ("may", "May"), ("jun", "June"),
         ("jul", "July"), ("aug", "August"), ("sep", "September"),
-        ("oct", "October"), ("nov", "November"), ("dec_m", "December")
+        ("oct", "October"), ("nov", "November"), ("dec_m", "December"),
     ]
 
-    for m, label in months:
-        cols.extend([
-            {"label": f"{label} Target", "fieldname": f"{m}_target", "fieldtype": "Currency", "width": 130},
-            {"label": f"{label} Achieved", "fieldname": f"{m}_ach", "fieldtype": "Currency", "width": 130},
-            {"label": f"{label} %", "fieldname": f"{m}_pct", "fieldtype": "Percent", "width": 90},
-        ])
+    for key, label in months:
+        columns += [
+            {"label": f"{label} Target", "fieldname": f"{key}_target", "fieldtype": "Currency", "width": 130},
+            {"label": f"{label} Achieved", "fieldname": f"{key}_ach", "fieldtype": "Currency", "width": 130},
+            {"label": f"{label} %", "fieldname": f"{key}_pct", "fieldtype": "Percent", "width": 90},
+        ]
 
-    cols.extend([
-        {"label": "Total Target", "fieldname": "total_target", "fieldtype": "Currency", "width": 140},
-        {"label": "Total Achieved", "fieldname": "total_ach", "fieldtype": "Currency", "width": 140},
+    columns += [
+        {"label": "Total Target", "fieldname": "total_target", "fieldtype": "Currency", "width": 150},
+        {"label": "Total Achieved", "fieldname": "total_ach", "fieldtype": "Currency", "width": 150},
         {"label": "Total %", "fieldname": "total_pct", "fieldtype": "Percent", "width": 100},
-    ])
+    ]
 
-    return cols
+    return columns
 
 
 # ==========================================================
@@ -57,7 +58,6 @@ def get_data(filters):
         SELECT
             st.parent AS customer,
             st.sales_person,
-            st.allocated_percentage,
 
             st.custom_january   AS jan,
             st.custom_february  AS feb,
@@ -108,21 +108,21 @@ def get_data(filters):
           AND YEAR(si.posting_date) = %s
     """, year, as_dict=True)
 
+    month_map = {
+        1:"jan", 2:"feb", 3:"mar", 4:"apr", 5:"may", 6:"jun",
+        7:"jul", 8:"aug", 9:"sep", 10:"oct", 11:"nov", 12:"dec_m"
+    }
+
     for inv in invoices:
         key = (inv.customer, inv.sales_person)
         if key not in data:
             continue
 
-        month = getdate(inv.posting_date).month
-        month_map = {
-            1:"jan",2:"feb",3:"mar",4:"apr",5:"may",6:"jun",
-            7:"jul",8:"aug",9:"sep",10:"oct",11:"nov",12:"dec_m"
-        }
-
-        data[key]["ach"][month_map[month]] += flt(inv.base_net_total)
+        m = month_map[getdate(inv.posting_date).month]
+        data[key]["ach"][m] += flt(inv.base_net_total)
 
     # ------------------------------------------------------
-    # FINAL ROW BUILD
+    # FINAL RESULT
     # ------------------------------------------------------
     result = []
 
@@ -131,10 +131,9 @@ def get_data(filters):
             "customer": row["customer"],
             "sales_person": row["sales_person"],
             "role": row["role"],
+            "total_target": 0,
+            "total_ach": 0,
         }
-
-        total_target = 0
-        total_ach = 0
 
         for m in row["targets"]:
             tgt = row["targets"][m]
@@ -144,13 +143,10 @@ def get_data(filters):
             out[f"{m}_ach"] = ach
             out[f"{m}_pct"] = (ach / tgt * 100) if tgt else 0
 
-            total_target += tgt
-            total_ach += ach
+            out["total_target"] += tgt
+            out["total_ach"] += ach
 
-        out["total_target"] = total_target
-        out["total_ach"] = total_ach
-        out["total_pct"] = (total_ach / total_target * 100) if total_target else 0
-
+        out["total_pct"] = (out["total_ach"] / out["total_target"] * 100) if out["total_target"] else 0
         result.append(out)
 
     return result
@@ -163,4 +159,8 @@ def get_role(sales_person):
     parent = frappe.db.get_value("Sales Person", sales_person, "parent_sales_person")
     if not parent:
         return "TSO"
-    return parent.split("-")[0].upper()
+    if parent.upper().startswith("ASM"):
+        return "TSO"
+    if parent.upper().startswith("RSM"):
+        return "ASM"
+    return "TSO"

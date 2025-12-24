@@ -1,5 +1,11 @@
 import frappe
 
+MONTH_MAP = {
+    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4,
+    "May": 5, "Jun": 6, "Jul": 7, "Aug": 8,
+    "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
+}
+
 
 def execute(filters=None):
     filters = filters or {}
@@ -13,7 +19,7 @@ def get_columns(filters):
 
     return [
         {"label": "Customer Group", "fieldname": "customer_group", "width": 160},
-        {"label": "Customer", "fieldname": "customer", "fieldtype": "HTML", "width": 240},
+        {"label": "Customer", "fieldname": "customer", "width": 240},
         {
             "label": f"{month} Sales",
             "fieldname": "month_amount",
@@ -32,26 +38,34 @@ def get_columns(filters):
 # ---------------------- DATA ----------------------
 def get_data(filters):
 
-    month = filters.get("month")
+    month_no = MONTH_MAP[filters.get("month")]
+    customer_group = filters.get("customer_group")
 
-    sql = """
+    conditions = ""
+    values = [month_no, month_no]
+
+    if customer_group:
+        conditions += " AND customer_group = %s"
+        values.append(customer_group)
+
+    sql = f"""
         SELECT
             customer_group,
             customer,
             SUM(grand_total) AS total,
             SUM(
                 CASE 
-                    WHEN DATE_FORMAT(posting_date, '%%b') = %s THEN grand_total
+                    WHEN MONTH(posting_date) = %s THEN grand_total
                     ELSE 0
                 END
             ) AS month_amount
         FROM `tabSales Invoice`
-        WHERE docstatus = 1
+        WHERE docstatus = 1 {conditions}
         GROUP BY customer
         ORDER BY customer
     """
 
-    rows = frappe.db.sql(sql, (month,), as_dict=True)
+    rows = frappe.db.sql(sql, values, as_dict=True)
 
     data = []
 
@@ -59,9 +73,10 @@ def get_data(filters):
         data.append({
             "customer_group": r.customer_group,
             "customer": r.customer,
+            "month_amount_raw": r.month_amount,   # for chart
             "month_amount": f"""
-                <a href="#" 
-                   class="month-amount" 
+                <a href="#"
+                   class="month-amount"
                    data-customer="{r.customer}">
                    {frappe.utils.fmt_money(r.month_amount)}
                 </a>
@@ -74,9 +89,18 @@ def get_data(filters):
 
 # ---------------------- DRILLDOWN POPUP ----------------------
 @frappe.whitelist()
-def get_invoice_drilldown(customer, month):
+def get_invoice_drilldown(customer, month, customer_group=None):
 
-    sql = """
+    month_no = MONTH_MAP[month]
+
+    conditions = ""
+    values = [customer, month_no]
+
+    if customer_group:
+        conditions += " AND customer_group = %s"
+        values.append(customer_group)
+
+    sql = f"""
         SELECT
             name,
             posting_date,
@@ -84,11 +108,12 @@ def get_invoice_drilldown(customer, month):
         FROM `tabSales Invoice`
         WHERE docstatus = 1
           AND customer = %s
-          AND DATE_FORMAT(posting_date, '%%b') = %s
+          AND MONTH(posting_date) = %s
+          {conditions}
         ORDER BY posting_date
     """
 
-    rows = frappe.db.sql(sql, (customer, month), as_dict=True)
+    rows = frappe.db.sql(sql, values, as_dict=True)
 
     if not rows:
         return "<b>No Sales Invoices found</b>"

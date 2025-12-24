@@ -20,49 +20,45 @@ frappe.query_reports["Monthwise Sales Report"] = {
     ],
 
     after_datatable_render: function (report) {
-
         render_main_bar_chart(report);
-
-        // ------------------------------
-        // CLICK ON AMOUNT → DRILLDOWN
-        // ------------------------------
-        $(".month-amount").off("click").on("click", function (e) {
-            e.preventDefault();
-
-            const customer = $(this).data("customer");
-            const month = report.get_values().month;
-
-            frappe.call({
-                method: "vciplreports_v01.vciplreports_v01.vcipl.report.monthwise_sales_report.monthwise_sales_report.get_invoice_drilldown",
-                args: {
-                    customer: customer,
-                    month: month
-                },
-                callback: function (r) {
-                    frappe.msgprint({
-                        title: `Sales Invoices - ${customer} (${month})`,
-                        message: r.message,
-                        wide: true
-                    });
-                }
-            });
-        });
     }
 };
 
 
-// ----------------------------------
+// ✅ EVENT DELEGATION (IMPORTANT FIX)
+$(document).on("click", ".month-amount", function (e) {
+    e.preventDefault();
+
+    const customer = $(this).data("customer");
+    const month = frappe.query_report.get_filter_value("month");
+    const customer_group = frappe.query_report.get_filter_value("customer_group");
+
+    frappe.call({
+        method: "vciplreports_v01.vciplreports_v01.vcipl.report.monthwise_sales_report.monthwise_sales_report.get_invoice_drilldown",
+        args: {
+            customer: customer,
+            month: month,
+            customer_group: customer_group
+        },
+        callback: function (r) {
+            frappe.msgprint({
+                title: `Sales Invoices - ${customer} (${month})`,
+                message: r.message,
+                wide: true
+            });
+        }
+    });
+});
+
+
+// ------------------------------
 // MAIN BAR CHART
-// ----------------------------------
+// ------------------------------
 function render_main_bar_chart(report) {
 
-    if (!report.data || report.data.length === 0) return;
+    if (!report.data || !report.data.length) return;
 
-    let total = 0;
-
-    report.data.forEach(r => {
-        total += flt(r.month_amount || 0);
-    });
+    let total = report.data.reduce((sum, r) => sum + flt(r.month_amount_raw || 0), 0);
 
     report.chart = {
         data: {

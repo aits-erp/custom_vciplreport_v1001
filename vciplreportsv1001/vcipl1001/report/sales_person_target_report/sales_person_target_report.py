@@ -13,6 +13,7 @@ def execute(filters=None):
 def get_columns():
     return [
         {"label": "#", "fieldname": "sr_no", "fieldtype": "Int", "width": 50},
+
         {
             "label": "Sales Person",
             "fieldname": "sales_person",
@@ -20,6 +21,7 @@ def get_columns():
             "options": "Sales Person",
             "width": 200,
         },
+
         {"label": "Role", "fieldname": "role", "fieldtype": "Data", "width": 80},
         {"label": "Region", "fieldname": "region", "fieldtype": "Data", "width": 120},
 
@@ -30,6 +32,9 @@ def get_columns():
         {"label": "Total Target", "fieldname": "total_target", "fieldtype": "Currency", "width": 150},
         {"label": "Total Achieved", "fieldname": "total_achieved", "fieldtype": "Currency", "width": 150},
         {"label": "Total %", "fieldname": "total_pct", "fieldtype": "Percent", "width": 100},
+
+        # 🔥 NEW (HIDDEN DRILL COLUMN – NO UI CHANGE)
+        {"label": "Achieved Drill", "fieldname": "achieved_drill", "hidden": 1},
     ]
 
 
@@ -41,7 +46,7 @@ def get_data(filters):
     month = int(filters.get("month"))
     year = int(filters.get("year"))
 
-    # ---------- TARGETS (MONTH + TOTAL) ----------
+    # ---------- TARGETS ----------
     targets = frappe.db.sql("""
         SELECT
             st.sales_person,
@@ -74,20 +79,32 @@ def get_data(filters):
         GROUP BY st.sales_person
     """, {"month": month}, as_dict=True)
 
-    # ---------- ACHIEVED ----------
-    achieved = frappe.db.sql("""
+    # ---------- ACHIEVED (MONTH + DRILL) ----------
+    achieved_rows = frappe.db.sql("""
         SELECT
             st.sales_person,
-            SUM(si.base_net_total) AS achieved
+            si.name AS invoice,
+            si.posting_date,
+            si.base_net_total
         FROM `tabSales Invoice` si
         JOIN `tabSales Team` st ON st.parent = si.name
         WHERE si.docstatus = 1
           AND MONTH(si.posting_date) = %s
           AND YEAR(si.posting_date) = %s
-        GROUP BY st.sales_person
     """, (month, year), as_dict=True)
 
-    achieved_map = {a.sales_person: flt(a.achieved) for a in achieved}
+    achieved_map = {}
+    achieved_drill = {}
+
+    for r in achieved_rows:
+        achieved_map.setdefault(r.sales_person, 0)
+        achieved_map[r.sales_person] += flt(r.base_net_total)
+
+        achieved_drill.setdefault(r.sales_person, []).append({
+            "invoice": r.invoice,
+            "date": str(r.posting_date),
+            "amount": flt(r.base_net_total),
+        })
 
     # ---------- TOTAL ACHIEVED ----------
     total_achieved = frappe.db.sql("""
@@ -129,7 +146,13 @@ def get_data(filters):
             "total_target": tot_target,
             "total_achieved": tot_ach,
             "total_pct": tot_pct,
+
+            # 🔥 popup data
+            "achieved_drill": frappe.as_json(
+                achieved_drill.get(t.sales_person, [])
+            ),
         })
+
         sr_no += 1
 
     return result

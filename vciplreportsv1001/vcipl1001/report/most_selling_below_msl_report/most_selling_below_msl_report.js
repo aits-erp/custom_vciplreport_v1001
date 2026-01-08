@@ -63,7 +63,6 @@
 //         }
 //     });
 // });
-
 frappe.query_reports["Most Selling Below MSL Report"] = {
     onload: function (report) {
         report.set_filter_value("custom_item_type", "Finished Goods");
@@ -82,9 +81,11 @@ frappe.query_reports["Most Selling Below MSL Report"] = {
         value = default_formatter(value, row, column, data);
 
         if (column.fieldname === "details" && data.item_code) {
-            value = `<a href="#" class="view-warehouses" data-item="${data.item_code}">
-                        View Warehouses
-                     </a>`;
+            value = `
+                <a href="#" class="view-warehouses"
+                   data-item="${data.item_code}">
+                   View Warehouses
+                </a>`;
         }
 
         return value;
@@ -92,7 +93,7 @@ frappe.query_reports["Most Selling Below MSL Report"] = {
 };
 
 
-// ---------------- WAREHOUSE POPUP ----------------
+// -------- WAREHOUSE POPUP --------
 $(document).on("click", ".view-warehouses", function (e) {
     e.preventDefault();
 
@@ -113,16 +114,14 @@ $(document).on("click", ".view-warehouses", function (e) {
                     <tr>
                         <th>Warehouse</th>
                         <th>Stock Qty</th>
-                    </tr>
-            `;
+                    </tr>`;
 
             rows.forEach(row => {
                 html += `
                     <tr>
                         <td>${row.warehouse}</td>
                         <td>${row.actual_qty}</td>
-                    </tr>
-                `;
+                    </tr>`;
             });
 
             html += "</table>";

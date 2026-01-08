@@ -28,6 +28,18 @@
             <div class="dashboard-title">Top Selling (Below MSL)</div>
         </div>
 
+                <!-- Top Selling -->
+        <div class="dashboard-card report-card" data-report="Top Most Selling Items">
+            <div class="icon-box g-green">
+                <!-- Trending Up -->
+                <svg viewBox="0 0 24 24">
+                    <polyline points="3 17 9 11 13 15 21 7"/>
+                    <polyline points="14 7 21 7 21 14"/>
+                </svg>
+            </div>
+            <div class="dashboard-title">Top 50 Selling Items</div>
+        </div>
+
         <!-- Bottom Selling -->
         <div class="dashboard-card report-card" data-report="Bottom 100 Most selling Item">
             <div class="icon-box g-red">
@@ -120,7 +132,9 @@ const REPORT_PATHS = {
     "Sales Analytics Report": "/app/query-report/Sales%20Analytics%20Report?tree_type=Customer&doc_type=Sales+Invoice&value_quantity=Value&from_date=2025-04-01&to_date=2026-03-31&company=Vinod+Cookware+India+Private+Limited&range=Monthly",
     "Monthwise Sales Report": "/app/query-report/Monthwise%20Sales%20Report",
     "Monthwises Purchase": "/app/query-report/Monthwises%20Purchase",
-    "Sales Person Target Report": "/app/query-report/Sales%20Person%20Target%20Report"
+    "Sales Person Target Report": "/app/query-report/Sales%20Person%20Target%20Report",
+    "Top Most Selling Items": "/app/query-report/Top%20Most%20Selling%20Items"
+
 };
 
 document.querySelectorAll(".report-card").forEach(card => {

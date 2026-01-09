@@ -2,73 +2,76 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
     filters: [
         {
-            fieldname: "customer_group",
-            label: "Customer Group",
-            fieldtype: "Link",
-            options: "Customer Group"
-        },
-        {
             fieldname: "month",
-            label: "Month",
+            label: __("Month"),
             fieldtype: "Select",
-            reqd: 1,
             options: [
                 "Jan","Feb","Mar","Apr","May","Jun",
                 "Jul","Aug","Sep","Oct","Nov","Dec"
-            ]
+            ],
+            default: moment().format("MMM"),
+            reqd: 1
         }
     ],
 
-    after_datatable_render: function (report) {
-        render_main_bar_chart(report);
+    formatter(value, row, column, data, default_formatter) {
+
+        value = default_formatter(value, row, column, data);
+
+        if (column.fieldname === "month_amount" && data.month_drill) {
+            return this.make_link(value, data.month_drill, "Sales Invoices");
+        }
+
+        return value;
+    },
+
+    make_link(value, data, title) {
+        return `<a style="font-weight:bold;cursor:pointer;color:#1674E0"
+            onclick='frappe.query_reports["Monthwise Sales Report"]
+            .show_popup(${data}, "${title}")'>
+            ${value}
+        </a>`;
+    },
+
+    show_popup(rows, title) {
+
+        if (!rows || rows.length === 0) {
+            frappe.msgprint(__("No data available"));
+            return;
+        }
+
+        let html = `
+        <div style="max-height:500px;overflow:auto">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Invoice</th>
+                    <th>Posting Date</th>
+                    <th>Amount</th>
+                </tr>
+            </thead><tbody>`;
+
+        rows.forEach(r => {
+            html += `
+            <tr>
+                <td>
+                    <a href="/app/sales-invoice/${r.invoice}"
+                       target="_blank"
+                       style="font-weight:bold">
+                        ${r.invoice}
+                    </a>
+                </td>
+                <td>${r.posting_date}</td>
+                <td>${format_currency(r.amount)}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+
+        frappe.msgprint({
+            title: title,
+            message: html,
+            wide: true
+        });
     }
 };
-
-
-// ✅ EVENT DELEGATION (IMPORTANT FIX)
-$(document).on("click", ".month-amount", function (e) {
-    e.preventDefault();
-
-    const customer = $(this).data("customer");
-    const month = frappe.query_report.get_filter_value("month");
-    const customer_group = frappe.query_report.get_filter_value("customer_group");
-
-    frappe.call({
-        method: "vciplreports_v01.vciplreports_v01.vcipl.report.monthwise_sales_report.monthwise_sales_report.get_invoice_drilldown",
-        args: {
-            customer: customer,
-            month: month,
-            customer_group: customer_group
-        },
-        callback: function (r) {
-            frappe.msgprint({
-                title: `Sales Invoices - ${customer} (${month})`,
-                message: r.message,
-                wide: true
-            });
-        }
-    });
-});
-
-
-// ------------------------------
-// MAIN BAR CHART
-// ------------------------------
-function render_main_bar_chart(report) {
-
-    if (!report.data || !report.data.length) return;
-
-    let total = report.data.reduce((sum, r) => sum + flt(r.month_amount_raw || 0), 0);
-
-    report.chart = {
-        data: {
-            labels: [report.get_values().month],
-            datasets: [{
-                name: "Total Sales",
-                values: [total]
-            }]
-        },
-        type: "bar",
-        height: 250
-    };
-}

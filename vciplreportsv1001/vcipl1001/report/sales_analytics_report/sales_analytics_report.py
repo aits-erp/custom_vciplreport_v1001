@@ -1,217 +1,268 @@
 import frappe
-from frappe.utils import flt
+from frappe.utils import flt, year_start, year_end
 
 
+# ======================================================
+# ENTRY POINT
+# ======================================================
 def execute(filters=None):
     filters = frappe._dict(filters or {})
-    mode = filters.get("mode", "Customer")
-    level = filters.get("level", "root")
-    metric = filters.get("metric", "Value")
 
-    columns = get_columns(level)
-    data = get_data(mode, level, metric, filters)
+    # ---------------- SAFE DEFAULTS ----------------
+    if not filters.get("from_date"):
+        filters.from_date = year_start()
+
+    if not filters.get("to_date"):
+        filters.to_date = year_end()
+
+    if not filters.get("mode"):
+        filters.mode = "Customer"   # Customer | Item
+
+    if not filters.get("metric"):
+        filters.metric = "Value"    # Value | Qty
+
+    if not filters.get("level"):
+        filters.level = "root"      # root, sub, customer, item, invoice
+
+    columns = get_columns(filters.level)
+    data = get_data(filters)
 
     return columns, data
 
 
-# --------------------------------------------------
+# ======================================================
 # COLUMNS
-# --------------------------------------------------
+# ======================================================
 def get_columns(level):
-
-    base = [
-        {"label": "Name", "fieldname": "name", "width": 300},
-        {"label": "Amount", "fieldname": "amount",
-         "fieldtype": "Float", "width": 160},
-        {"label": "drill", "fieldname": "drill", "hidden": 1},
-    ]
 
     if level == "invoice":
         return [
             {"label": "Invoice", "fieldname": "invoice", "width": 160},
             {"label": "Posting Date", "fieldname": "posting_date", "width": 120},
-            {"label": "Amount", "fieldname": "amount",
-             "fieldtype": "Float", "width": 140},
+            {"label": "Amount", "fieldname": "amount", "fieldtype": "Currency", "width": 140},
         ]
 
-    return base
+    return [
+        {"label": "Name", "fieldname": "name", "width": 320},
+        {"label": "Amount", "fieldname": "amount", "fieldtype": "Currency", "width": 160},
+        {"label": "drill", "fieldname": "drill", "hidden": 1},
+    ]
 
 
-# --------------------------------------------------
+# ======================================================
 # DATA ROUTER
-# --------------------------------------------------
-def get_data(mode, level, metric, f):
-
-    if mode == "Customer":
-        return customer_flow(level, metric, f)
+# ======================================================
+def get_data(f):
+    if f.mode == "Customer":
+        return customer_flow(f)
     else:
-        return item_flow(level, metric, f)
+        return item_flow(f)
 
 
-# ==================================================
+# ======================================================
 # CUSTOMER FLOW
-# ==================================================
-def customer_flow(level, metric, f):
+# Customer Group → Sub Group → Customer → Invoice
+# ======================================================
+def customer_flow(f):
 
-    value_field = "base_net_amount" if metric == "Value" else "qty"
+    value_field = "base_net_total" if f.metric == "Value" else "total_qty"
 
-    if level == "root":
+    # ---------------- ROOT : CUSTOMER GROUP ----------------
+    if f.level == "root":
         rows = frappe.db.sql(f"""
-            SELECT customer_group AS name,
-                   SUM({value_field}) AS amount
+            SELECT
+                customer_group AS name,
+                SUM({value_field}) AS amount
             FROM `tabSales Invoice`
-            WHERE docstatus=1
+            WHERE docstatus = 1
               AND posting_date BETWEEN %(from_date)s AND %(to_date)s
             GROUP BY customer_group
         """, f, as_dict=True)
 
-        return build(rows, "sub_group")
+        return build(rows, "sub")
 
-    if level == "sub_group":
+    # ---------------- SUB GROUP ----------------
+    if f.level == "sub":
         rows = frappe.db.sql(f"""
-            SELECT c.custom_sub_group AS name,
-                   SUM(si.{value_field}) AS amount
+            SELECT
+                c.custom_sub_group AS name,
+                SUM(si.{value_field}) AS amount
             FROM `tabSales Invoice` si
             JOIN `tabCustomer` c ON c.name = si.customer
-            WHERE si.customer_group=%(value)s
+            WHERE si.customer_group = %(value)s
+              AND si.docstatus = 1
               AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
             GROUP BY c.custom_sub_group
         """, f, as_dict=True)
 
         return build(rows, "customer")
 
-    if level == "customer":
+    # ---------------- CUSTOMER ----------------
+    if f.level == "customer":
         rows = frappe.db.sql(f"""
-            SELECT si.customer_name AS name,
-                   SUM(si.{value_field}) AS amount,
-                   si.customer AS customer
+            SELECT
+                si.customer_name AS name,
+                si.customer,
+                SUM(si.{value_field}) AS amount
             FROM `tabSales Invoice` si
             JOIN `tabCustomer` c ON c.name = si.customer
-            WHERE c.custom_sub_group=%(value)s
+            WHERE c.custom_sub_group = %(value)s
+              AND si.docstatus = 1
               AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
             GROUP BY si.customer
         """, f, as_dict=True)
 
+        out = []
         for r in rows:
-            r["drill"] = frappe.as_json({
-                "level": "invoice",
-                "customer": r["customer"]
+            out.append({
+                "name": r.name,
+                "amount": flt(r.amount),
+                "drill": frappe.as_json({
+                    "level": "invoice",
+                    "customer": r.customer
+                })
             })
+        return out
 
-        return rows
-
-    if level == "invoice":
+    # ---------------- INVOICE ----------------
+    if f.level == "invoice":
         return frappe.db.sql(f"""
-            SELECT name AS invoice,
-                   posting_date,
-                   {value_field} AS amount
+            SELECT
+                name AS invoice,
+                posting_date,
+                {value_field} AS amount
             FROM `tabSales Invoice`
-            WHERE customer=%(customer)s
+            WHERE customer = %(customer)s
+              AND docstatus = 1
               AND posting_date BETWEEN %(from_date)s AND %(to_date)s
         """, f, as_dict=True)
 
     return []
 
 
-# ==================================================
+# ======================================================
 # ITEM FLOW
-# ==================================================
-def item_flow(level, metric, f):
+# Item Group → Main → Sub → Sub1 → Item → Invoice
+# ======================================================
+def item_flow(f):
 
-    value_field = "base_net_amount" if metric == "Value" else "qty"
+    value_field = "base_net_amount" if f.metric == "Value" else "qty"
 
-    if level == "root":
+    # ---------------- ROOT : ITEM GROUP ----------------
+    if f.level == "root":
         rows = frappe.db.sql(f"""
-            SELECT i.item_group AS name,
-                   SUM(sii.{value_field}) AS amount
+            SELECT
+                i.item_group AS name,
+                SUM(sii.{value_field}) AS amount
             FROM `tabSales Invoice Item` sii
             JOIN `tabSales Invoice` si ON si.name = sii.parent
             JOIN `tabItem` i ON i.name = sii.item_code
-            WHERE si.docstatus=1
+            WHERE si.docstatus = 1
               AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
             GROUP BY i.item_group
         """, f, as_dict=True)
 
-        return build(rows, "main_group")
+        return build(rows, "main")
 
-    if level == "main_group":
+    # ---------------- MAIN GROUP ----------------
+    if f.level == "main":
         rows = frappe.db.sql(f"""
-            SELECT i.custom_main_group AS name,
-                   SUM(sii.{value_field}) AS amount
+            SELECT
+                i.custom_main_group AS name,
+                SUM(sii.{value_field}) AS amount
             FROM `tabSales Invoice Item` sii
-            JOIN `tabItem` i ON i.name = sii.item_code
             JOIN `tabSales Invoice` si ON si.name = sii.parent
-            WHERE i.item_group=%(value)s
+            JOIN `tabItem` i ON i.name = sii.item_code
+            WHERE i.item_group = %(value)s
+              AND si.docstatus = 1
               AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
             GROUP BY i.custom_main_group
         """, f, as_dict=True)
 
-        return build(rows, "sub_group")
+        return build(rows, "sub")
 
-    if level == "sub_group":
+    # ---------------- SUB GROUP ----------------
+    if f.level == "sub":
         rows = frappe.db.sql(f"""
-            SELECT i.custom_sub_group AS name,
-                   SUM(sii.{value_field}) AS amount
+            SELECT
+                i.custom_sub_group AS name,
+                SUM(sii.{value_field}) AS amount
             FROM `tabSales Invoice Item` sii
-            JOIN `tabItem` i ON i.name = sii.item_code
             JOIN `tabSales Invoice` si ON si.name = sii.parent
-            WHERE i.custom_main_group=%(value)s
+            JOIN `tabItem` i ON i.name = sii.item_code
+            WHERE i.custom_main_group = %(value)s
+              AND si.docstatus = 1
               AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
             GROUP BY i.custom_sub_group
         """, f, as_dict=True)
 
-        return build(rows, "sub_group1")
+        return build(rows, "sub1")
 
-    if level == "sub_group1":
+    # ---------------- SUB GROUP 1 ----------------
+    if f.level == "sub1":
         rows = frappe.db.sql(f"""
-            SELECT i.custom_sub_group1 AS name,
-                   SUM(sii.{value_field}) AS amount
+            SELECT
+                i.custom_sub_group1 AS name,
+                SUM(sii.{value_field}) AS amount
             FROM `tabSales Invoice Item` sii
-            JOIN `tabItem` i ON i.name = sii.item_code
             JOIN `tabSales Invoice` si ON si.name = sii.parent
-            WHERE i.custom_sub_group=%(value)s
+            JOIN `tabItem` i ON i.name = sii.item_code
+            WHERE i.custom_sub_group = %(value)s
+              AND si.docstatus = 1
               AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
             GROUP BY i.custom_sub_group1
         """, f, as_dict=True)
 
         return build(rows, "item")
 
-    if level == "item":
+    # ---------------- ITEM ----------------
+    if f.level == "item":
         rows = frappe.db.sql(f"""
-            SELECT i.item_name AS name,
-                   SUM(sii.{value_field}) AS amount,
-                   sii.item_code
+            SELECT
+                i.item_name AS name,
+                sii.item_code,
+                SUM(sii.{value_field}) AS amount
             FROM `tabSales Invoice Item` sii
-            JOIN `tabItem` i ON i.name = sii.item_code
             JOIN `tabSales Invoice` si ON si.name = sii.parent
-            WHERE i.custom_sub_group1=%(value)s
+            JOIN `tabItem` i ON i.name = sii.item_code
+            WHERE i.custom_sub_group1 = %(value)s
+              AND si.docstatus = 1
               AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
             GROUP BY sii.item_code
         """, f, as_dict=True)
 
+        out = []
         for r in rows:
-            r["drill"] = frappe.as_json({
-                "level": "invoice",
-                "item_code": r["item_code"]
+            out.append({
+                "name": r.name,
+                "amount": flt(r.amount),
+                "drill": frappe.as_json({
+                    "level": "invoice",
+                    "item_code": r.item_code
+                })
             })
+        return out
 
-        return rows
-
-    if level == "invoice":
+    # ---------------- INVOICE ----------------
+    if f.level == "invoice":
         return frappe.db.sql(f"""
-            SELECT si.name AS invoice,
-                   si.posting_date,
-                   sii.{value_field} AS amount
+            SELECT
+                si.name AS invoice,
+                si.posting_date,
+                sii.{value_field} AS amount
             FROM `tabSales Invoice Item` sii
             JOIN `tabSales Invoice` si ON si.name = sii.parent
-            WHERE sii.item_code=%(item_code)s
+            WHERE sii.item_code = %(item_code)s
+              AND si.docstatus = 1
               AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
         """, f, as_dict=True)
 
     return []
 
 
-# --------------------------------------------------
+# ======================================================
+# HELPER
+# ======================================================
 def build(rows, next_level):
     out = []
     for r in rows:

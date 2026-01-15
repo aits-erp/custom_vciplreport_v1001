@@ -1,4 +1,4 @@
-frappe.query_reports["Sales Analytics – Drill Down"] = {
+frappe.query_reports["Sales Analytics Report"] = {
 
     filters: [
         {
@@ -35,7 +35,7 @@ frappe.query_reports["Sales Analytics – Drill Down"] = {
 
         if (column.fieldname === "name" && data.drill) {
             return `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
-                onclick='frappe.query_reports["Sales Analytics – Drill Down"]
+                onclick='frappe.query_reports["Sales Analytics Report"]
                 .drill(${data.drill})'>${value}</a>`;
         }
 
@@ -49,6 +49,7 @@ frappe.query_reports["Sales Analytics – Drill Down"] = {
     },
 
     drill(args) {
+
         frappe.query_report.set_filter_value("level", args.level);
 
         if (args.value)

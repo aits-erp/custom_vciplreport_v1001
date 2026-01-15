@@ -1,5 +1,6 @@
 import frappe
-from frappe.utils import flt, year_start, year_end
+from frappe.utils import flt, getdate, nowdate
+from erpnext.accounts.utils import get_fiscal_year
 
 
 # ======================================================
@@ -9,11 +10,10 @@ def execute(filters=None):
     filters = frappe._dict(filters or {})
 
     # ---------------- SAFE DEFAULTS ----------------
-    if not filters.get("from_date"):
-        filters.from_date = year_start()
-
-    if not filters.get("to_date"):
-        filters.to_date = year_end()
+    if not filters.get("from_date") or not filters.get("to_date"):
+        fy = get_fiscal_year(nowdate())
+        filters.from_date = fy[1]
+        filters.to_date = fy[2]
 
     if not filters.get("mode"):
         filters.mode = "Customer"   # Customer | Item
@@ -22,7 +22,7 @@ def execute(filters=None):
         filters.metric = "Value"    # Value | Qty
 
     if not filters.get("level"):
-        filters.level = "root"      # root, sub, customer, item, invoice
+        filters.level = "root"
 
     columns = get_columns(filters.level)
     data = get_data(filters)
@@ -67,7 +67,7 @@ def customer_flow(f):
 
     value_field = "base_net_total" if f.metric == "Value" else "total_qty"
 
-    # ---------------- ROOT : CUSTOMER GROUP ----------------
+    # ROOT – CUSTOMER GROUP
     if f.level == "root":
         rows = frappe.db.sql(f"""
             SELECT
@@ -81,7 +81,7 @@ def customer_flow(f):
 
         return build(rows, "sub")
 
-    # ---------------- SUB GROUP ----------------
+    # SUB GROUP
     if f.level == "sub":
         rows = frappe.db.sql(f"""
             SELECT
@@ -97,7 +97,7 @@ def customer_flow(f):
 
         return build(rows, "customer")
 
-    # ---------------- CUSTOMER ----------------
+    # CUSTOMER
     if f.level == "customer":
         rows = frappe.db.sql(f"""
             SELECT
@@ -124,7 +124,7 @@ def customer_flow(f):
             })
         return out
 
-    # ---------------- INVOICE ----------------
+    # INVOICE
     if f.level == "invoice":
         return frappe.db.sql(f"""
             SELECT
@@ -148,7 +148,7 @@ def item_flow(f):
 
     value_field = "base_net_amount" if f.metric == "Value" else "qty"
 
-    # ---------------- ROOT : ITEM GROUP ----------------
+    # ROOT – ITEM GROUP
     if f.level == "root":
         rows = frappe.db.sql(f"""
             SELECT
@@ -164,7 +164,7 @@ def item_flow(f):
 
         return build(rows, "main")
 
-    # ---------------- MAIN GROUP ----------------
+    # MAIN GROUP
     if f.level == "main":
         rows = frappe.db.sql(f"""
             SELECT
@@ -181,7 +181,7 @@ def item_flow(f):
 
         return build(rows, "sub")
 
-    # ---------------- SUB GROUP ----------------
+    # SUB GROUP
     if f.level == "sub":
         rows = frappe.db.sql(f"""
             SELECT
@@ -198,7 +198,7 @@ def item_flow(f):
 
         return build(rows, "sub1")
 
-    # ---------------- SUB GROUP 1 ----------------
+    # SUB GROUP 1
     if f.level == "sub1":
         rows = frappe.db.sql(f"""
             SELECT
@@ -215,7 +215,7 @@ def item_flow(f):
 
         return build(rows, "item")
 
-    # ---------------- ITEM ----------------
+    # ITEM
     if f.level == "item":
         rows = frappe.db.sql(f"""
             SELECT
@@ -243,7 +243,7 @@ def item_flow(f):
             })
         return out
 
-    # ---------------- INVOICE ----------------
+    # INVOICE
     if f.level == "invoice":
         return frappe.db.sql(f"""
             SELECT

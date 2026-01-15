@@ -4,7 +4,6 @@
 import frappe
 from frappe import _, scrub
 from frappe.query_builder import DocType
-from frappe.query_builder.functions import IfNull
 from frappe.utils import add_days, add_to_date, flt, getdate
 from erpnext.accounts.utils import get_fiscal_year
 
@@ -27,9 +26,9 @@ class Analytics:
         ]
         self.get_period_date_ranges()
 
-    # ------------------------------------------------------------------
+    # =====================================================
     # RUN
-    # ------------------------------------------------------------------
+    # =====================================================
 
     def run(self):
         self.get_columns()
@@ -37,16 +36,16 @@ class Analytics:
         self.get_chart_data()
         return self.columns, self.data, None, self.chart, None, 0
 
-    # ------------------------------------------------------------------
+    # =====================================================
     # COLUMNS
-    # ------------------------------------------------------------------
+    # =====================================================
 
     def get_columns(self):
         self.columns = [{
             "label": _(self.filters.tree_type),
             "fieldname": "entity",
-            "fieldtype": "Data",   # 👈 Data, not Link (important)
-            "width": 220,
+            "fieldtype": "Data",
+            "width": 260,
         }]
 
         for d in self.periodic_daterange:
@@ -65,64 +64,45 @@ class Analytics:
             "width": 120,
         })
 
-    # ------------------------------------------------------------------
+    # =====================================================
     # DATA ROUTER
-    # ------------------------------------------------------------------
+    # =====================================================
 
     def get_data(self):
-        if self.filters.tree_type == "Customer":
-            self.data = []
-            return
-
-        if self.filters.tree_type == "Supplier":
-            self.get_supplier_data()
-            self.get_rows()
-
-        elif self.filters.tree_type in ["Customer Group", "Supplier Group", "Territory"]:
-            self.get_group_data()
-            self.get_rows_by_group()
-
-        elif self.filters.tree_type == "Item":
-            self.get_item_data()
-            self.get_rows()
-
+        if self.filters.tree_type == "Customer Group":
+            self.get_customer_group_data()
+            self.build_rows()
         elif self.filters.tree_type == "Item Group":
             self.get_item_group_data()
-            self.get_rows_by_group()
-
-        elif self.filters.tree_type == "Project":
-            self.get_project_data()
-            self.get_rows()
-
-        elif self.filters.tree_type == "Order Type":
-            self.get_order_type_data()
-            self.get_rows_by_group()
-
+            self.build_rows()
         else:
             self.data = []
 
-    # ------------------------------------------------------------------
-    # CUSTOMER GROUP DATA (CUSTOMER NAME ONLY)
-    # ------------------------------------------------------------------
+    # =====================================================
+    # CUSTOMER GROUP DATA (SAFE)
+    # =====================================================
 
-    def get_group_data(self):
-        value_field = "base_net_total" if self.filters.value_quantity == "Value" else "total_qty"
-
+    def get_customer_group_data(self):
         doctype = DocType(self.filters.doc_type)
         customer = DocType("Customer")
 
-        entries = (
+        has_sub = frappe.db.has_column("Customer", "custom_sub_group")
+
+        fields = [
+            customer.customer_group.as_("group"),
+            customer.name.as_("customer"),
+            customer.customer_name.as_("customer_name"),
+            doctype.base_net_total.as_("value_field"),
+            doctype[self.date_field],
+        ]
+
+        if has_sub:
+            fields.insert(1, customer.custom_sub_group.as_("sub_group"))
+
+        rows = (
             frappe.qb.from_(doctype)
-            .join(customer)
-            .on(doctype.customer == customer.name)
-            .select(
-                customer.customer_group.as_("entity_group"),
-                customer.custom_sub_group.as_("custom_sub_group"),
-                customer.name.as_("customer"),
-                customer.customer_name.as_("customer_name"),
-                doctype[value_field].as_("value_field"),
-                doctype[self.date_field],
-            )
+            .join(customer).on(doctype.customer == customer.name)
+            .select(*fields)
             .where(
                 (doctype.docstatus == 1)
                 & (doctype.company == self.filters.company)
@@ -131,124 +111,133 @@ class Analytics:
         ).run(as_dict=True)
 
         self.entries = []
-        self.sub_group_map = {}
-        self.customer_map = {}
-        self.customer_labels = {}
+        self.labels = {}
 
-        for e in entries:
-            grp = e.entity_group
-            sg = e.custom_sub_group
-            cust = e.customer
-            cname = e.customer_name
-
-            node = f"{grp}::SUB::{sg}" if sg else grp
-            if sg:
-                self.sub_group_map.setdefault(grp, set()).add(sg)
+        for r in rows:
+            node = r.group
+            if has_sub and r.get("sub_group"):
+                node = f"{node}::SUB::{r.sub_group}"
 
             self.entries.append({
                 "entity": node,
-                "customer": cust,
-                self.date_field: e[self.date_field],
-                "value_field": e.value_field,
+                "leaf": r.customer,
+                "date": r[self.date_field],
+                "value": r.value_field,
             })
 
-            if cust:
-                self.customer_map.setdefault(node, set()).add(cust)
-                # 🔥 KEY FIX: ONLY CUSTOMER NAME
-                self.customer_labels[cust] = cname or cust
+            # NAME ONLY
+            self.labels[r.customer] = r.customer_name
 
-        self.get_groups()
+    # =====================================================
+    # ITEM GROUP DATA (SAFE + CUSTOM FIELDS)
+    # =====================================================
 
-    # ------------------------------------------------------------------
-    # ROW BUILDING
-    # ------------------------------------------------------------------
+    def get_item_group_data(self):
+        item = DocType("Item")
+        item_row = DocType(f"{self.filters.doc_type} Item")
+        doc = DocType(self.filters.doc_type)
 
-    def get_rows_by_group(self):
+        has_main = frappe.db.has_column("Item", "custom_main_group")
+        has_sub = frappe.db.has_column("Item", "custom_sub_group")
+        has_sub1 = frappe.db.has_column("Item", "custom_sub_group1")
+
+        fields = [
+            item.item_group.as_("group"),
+            item.name.as_("item"),
+            item.item_name.as_("item_name"),
+            item_row.base_net_amount.as_("value_field"),
+            doc.posting_date,
+        ]
+
+        if has_main:
+            fields.insert(1, item.custom_main_group.as_("main_group"))
+        if has_sub:
+            fields.insert(2, item.custom_sub_group.as_("sub_group"))
+        if has_sub1:
+            fields.insert(3, item.custom_sub_group1.as_("sub_group1"))
+
+        rows = (
+            frappe.qb.from_(item_row)
+            .join(doc).on(item_row.parent == doc.name)
+            .join(item).on(item_row.item_code == item.name)
+            .select(*fields)
+            .where(
+                (doc.docstatus == 1)
+                & (doc.company == self.filters.company)
+                & (doc.posting_date.between(self.filters.from_date, self.filters.to_date))
+            )
+        ).run(as_dict=True)
+
+        self.entries = []
+        self.labels = {}
+
+        for r in rows:
+            node = r.group
+
+            if has_main and r.get("main_group"):
+                node = f"{node}::MAIN::{r.main_group}"
+            if has_sub and r.get("sub_group"):
+                node = f"{node}::SUB::{r.sub_group}"
+            if has_sub1 and r.get("sub_group1"):
+                node = f"{node}::SUB1::{r.sub_group1}"
+
+            self.entries.append({
+                "entity": node,
+                "leaf": r.item,
+                "date": r.posting_date,
+                "value": r.value_field,
+            })
+
+            # ITEM NAME ONLY
+            self.labels[r.item] = r.item_name
+
+    # =====================================================
+    # BUILD ROWS (COMMON)
+    # =====================================================
+
+    def build_rows(self):
         self.build_periodic_data()
         out = []
 
-        for g in reversed(self.group_entries):
-            base_indent = self.depth_map.get(g.name, 0)
-            block = []
-
-            row = {"entity": g.name, "indent": base_indent}
+        for entity, pdata in self.periodic.items():
+            row = {"entity": entity}
             total = 0
 
             for d in self.periodic_daterange:
                 p = scrub(self.get_period(d))
-                val = flt(self.entity_periodic_data.get(g.name, {}).get(p))
+                val = flt(pdata.get(p))
                 row[p] = val
                 total += val
 
             row["total"] = total
-            block.append(row)
-
-            # Subgroups
-            for sg in sorted(self.sub_group_map.get(g.name, [])):
-                node = f"{g.name}::SUB::{sg}"
-                sg_row = {"entity": sg, "indent": base_indent + 1}
-                total_sg = 0
-
-                for d in self.periodic_daterange:
-                    p = scrub(self.get_period(d))
-                    v = flt(self.entity_periodic_data.get(node, {}).get(p))
-                    sg_row[p] = v
-                    total_sg += v
-
-                sg_row["total"] = total_sg
-                block.append(sg_row)
-
-                # Customers (NAME ONLY)
-                for cust in sorted(self.customer_map.get(node, [])):
-                    cname = self.customer_labels.get(cust)
-                    c_row = {"entity": cname, "indent": base_indent + 2}
-                    total_c = 0
-
-                    for d in self.periodic_daterange:
-                        p = scrub(self.get_period(d))
-                        v = flt(self.entity_periodic_data.get(cust, {}).get(p))
-                        c_row[p] = v
-                        total_c += v
-
-                    c_row["total"] = total_c
-                    block.append(c_row)
-
-            out = block + out
+            out.append(row)
 
         self.data = out
 
-    # ------------------------------------------------------------------
-    # PERIODIC HELPERS
-    # ------------------------------------------------------------------
-
     def build_periodic_data(self):
-        self.entity_periodic_data = {}
+        self.periodic = {}
 
-        for d in self.entries:
-            entity = d.get("entity")
-            date = d.get(self.date_field)
-            if not entity or not date:
-                continue
+        for e in self.entries:
+            p = scrub(self.get_period(e["date"]))
 
-            p = scrub(self.get_period(date))
-            self.entity_periodic_data.setdefault(entity, {}).setdefault(p, 0)
-            self.entity_periodic_data[entity][p] += flt(d.get("value_field"))
+            self.periodic.setdefault(e["entity"], {}).setdefault(p, 0)
+            self.periodic[e["entity"]][p] += flt(e["value"])
 
-            cust = d.get("customer")
-            if cust:
-                self.entity_periodic_data.setdefault(cust, {}).setdefault(p, 0)
-                self.entity_periodic_data[cust][p] += flt(d.get("value_field"))
+            leaf = e.get("leaf")
+            if leaf:
+                self.periodic.setdefault(self.labels[leaf], {}).setdefault(p, 0)
+                self.periodic[self.labels[leaf]][p] += flt(e["value"])
 
-    # ------------------------------------------------------------------
+    # =====================================================
     # PERIOD
-    # ------------------------------------------------------------------
+    # =====================================================
 
-    def get_period(self, date):
+    def get_period(self, d):
         if self.filters.range == "Monthly":
-            return f"{self.months[date.month - 1]} {date.year}"
+            return f"{self.months[d.month - 1]} {d.year}"
         if self.filters.range == "Quarterly":
-            return f"Q{((date.month - 1)//3) + 1} {date.year}"
-        return str(get_fiscal_year(date)[0])
+            return f"Q{((d.month - 1)//3)+1} {d.year}"
+        return str(get_fiscal_year(d)[0])
 
     def get_period_date_ranges(self):
         from_date = getdate(self.filters.from_date)
@@ -262,27 +251,9 @@ class Analytics:
             self.periodic_daterange.append(min(end, to_date))
             from_date = add_days(end, 1)
 
-    # ------------------------------------------------------------------
-    # GROUP TREE
-    # ------------------------------------------------------------------
-
-    def get_groups(self):
-        parent_field = "parent_customer_group"
-        self.depth_map = {}
-
-        self.group_entries = frappe.db.sql(
-            f"""SELECT name, {parent_field} AS parent, lft, rgt
-                FROM `tabCustomer Group`
-                ORDER BY lft""",
-            as_dict=True,
-        )
-
-        for g in self.group_entries:
-            self.depth_map[g.name] = self.depth_map.get(g.parent, -1) + 1
-
-    # ------------------------------------------------------------------
+    # =====================================================
     # CHART
-    # ------------------------------------------------------------------
+    # =====================================================
 
     def get_chart_data(self):
         self.chart = {

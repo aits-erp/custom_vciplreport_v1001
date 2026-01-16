@@ -94,6 +94,7 @@
 //         });
 //     }
 // };
+
 frappe.query_reports["Sales Person Target Report"] = {
 
     filters: [
@@ -120,7 +121,7 @@ frappe.query_reports["Sales Person Target Report"] = {
                 { label: "September", value: 9 },
                 { label: "October", value: 10 },
                 { label: "November", value: 11 },
-                { label: "December", value: 12 },
+                { label: "December", value: 12 }
             ],
             default: new Date().getMonth() + 1
         }
@@ -130,10 +131,10 @@ frappe.query_reports["Sales Person Target Report"] = {
 
         value = default_formatter(value, row, column, data);
 
-        if (column.fieldname === "month_achieved" && data.achieved_drill) {
+        if (column.fieldname === "achieved" && data.achieved_drill) {
             return `
                 <a style="font-weight:bold;color:#1674E0;cursor:pointer"
-                   onclick='frappe.query_reports["Distributors Sales Target Report"]
+                   onclick='frappe.query_reports["Sales Person Target Report"]
                    .show_popup(${data.achieved_drill}, "Achievement Invoices")'>
                     ${value}
                 </a>`;

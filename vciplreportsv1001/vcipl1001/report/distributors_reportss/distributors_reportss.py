@@ -28,10 +28,11 @@ def get_columns():
 
 
 # --------------------------------------------------
-# HELPERS
+# HELPERS (✅ FIXED)
 # --------------------------------------------------
 def column_exists(doctype, fieldname):
-    return frappe.db.has_column(f"tab{doctype}", fieldname)
+    # IMPORTANT: pass DOCTYPE name, not table name
+    return frappe.db.has_column(doctype, fieldname)
 
 
 # --------------------------------------------------
@@ -39,26 +40,22 @@ def column_exists(doctype, fieldname):
 # --------------------------------------------------
 def get_data(filters):
 
-    # ✅ SAFE FIELD DETECTION
+    # ✅ SAFE FIELD CHECKS
     has_region = column_exists("Sales Person", "custom_region")
     has_location = column_exists("Sales Person", "custom_location")
     has_territory = column_exists("Sales Person", "custom_territory")
 
     # ---------------- SALES PERSON MASTER ----------------
-    sales_persons = frappe.db.sql("""
+    sales_persons = frappe.db.sql(f"""
         SELECT
             name,
             parent_sales_person
-            {region}
-            {location}
-            {territory}
+            {", custom_region" if has_region else ""}
+            {", custom_location" if has_location else ""}
+            {", custom_territory" if has_territory else ""}
         FROM `tabSales Person`
         WHERE enabled = 1
-    """.format(
-        region=", custom_region" if has_region else "",
-        location=", custom_location" if has_location else "",
-        territory=", custom_territory" if has_territory else ""
-    ), as_dict=True)
+    """, as_dict=True)
 
     if not sales_persons:
         return []

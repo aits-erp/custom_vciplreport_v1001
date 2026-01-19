@@ -1,4 +1,4 @@
-frappe.query_reports["Region Location Territory TSO Sales Report"] = {
+frappe.query_reports["Distributors Reportss"] = {
 
     tree: true,
     initial_depth: 1,

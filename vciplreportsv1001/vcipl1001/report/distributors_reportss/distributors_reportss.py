@@ -4,13 +4,11 @@ from frappe.utils import flt
 
 def execute(filters=None):
     filters = frappe._dict(filters or {})
-    columns = get_columns()
-    data = get_data(filters)
-    return columns, data
+    return get_columns(), get_data(filters)
 
 
 # --------------------------------------------------
-# COLUMNS (TREE USES ONLY ONE NAME COLUMN)
+# COLUMNS
 # --------------------------------------------------
 def get_columns():
     return [
@@ -30,28 +28,42 @@ def get_columns():
 
 
 # --------------------------------------------------
-# MAIN DATA
+# HELPERS
+# --------------------------------------------------
+def column_exists(doctype, fieldname):
+    return frappe.db.has_column(f"tab{doctype}", fieldname)
+
+
+# --------------------------------------------------
+# DATA
 # --------------------------------------------------
 def get_data(filters):
 
-    result = []
+    # ✅ SAFE FIELD DETECTION
+    has_region = column_exists("Sales Person", "custom_region")
+    has_location = column_exists("Sales Person", "custom_location")
+    has_territory = column_exists("Sales Person", "custom_territory")
 
     # ---------------- SALES PERSON MASTER ----------------
     sales_persons = frappe.db.sql("""
         SELECT
             name,
-            parent_sales_person,
-            custom_region,
-            custom_location,
-            custom_territory
+            parent_sales_person
+            {region}
+            {location}
+            {territory}
         FROM `tabSales Person`
         WHERE enabled = 1
-    """, as_dict=True)
+    """.format(
+        region=", custom_region" if has_region else "",
+        location=", custom_location" if has_location else "",
+        territory=", custom_territory" if has_territory else ""
+    ), as_dict=True)
 
     if not sales_persons:
         return []
 
-    # ---------------- INVOICE TOTALS (TSO LEVEL) ----------------
+    # ---------------- INVOICE TOTAL (TSO LEVEL) ----------------
     invoice_totals = frappe.db.sql("""
         SELECT
             st.sales_person,
@@ -64,22 +76,23 @@ def get_data(filters):
 
     amount_map = {i.sales_person: flt(i.amount) for i in invoice_totals}
 
-    # ---------------- BUILD HIERARCHY MAP ----------------
+    # ---------------- BUILD HIERARCHY ----------------
     hierarchy = {}
 
     for sp in sales_persons:
-        region = sp.custom_region or "Undefined Region"
-        location = sp.custom_location or "Undefined Location"
-        territory = sp.custom_territory or "Undefined Territory"
+        region = sp.custom_region if has_region and sp.custom_region else "No Region"
+        location = sp.custom_location if has_location and sp.custom_location else "No Location"
+        territory = sp.custom_territory if has_territory and sp.custom_territory else "No Territory"
 
         hierarchy.setdefault(region, {})
         hierarchy[region].setdefault(location, {})
         hierarchy[region][location].setdefault(territory, [])
         hierarchy[region][location][territory].append(sp.name)
 
-    # ---------------- TREE BUILDING ----------------
+    # ---------------- TREE RESULT ----------------
+    result = []
+
     for region in hierarchy:
-        region_id = f"REGION::{region}"
         result.append({
             "name": region,
             "parent": None,
@@ -88,7 +101,6 @@ def get_data(filters):
         })
 
         for location in hierarchy[region]:
-            location_id = f"{region_id}::LOC::{location}"
             result.append({
                 "name": location,
                 "parent": region,
@@ -97,7 +109,6 @@ def get_data(filters):
             })
 
             for territory in hierarchy[region][location]:
-                territory_id = f"{location_id}::TER::{territory}"
                 result.append({
                     "name": territory,
                     "parent": location,

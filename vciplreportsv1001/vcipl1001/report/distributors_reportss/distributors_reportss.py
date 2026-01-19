@@ -1,83 +1,31 @@
 import frappe
-from frappe.utils import today, getdate, date_diff
+from frappe.utils import flt
 
 
 def execute(filters=None):
+    filters = frappe._dict(filters or {})
     columns = get_columns()
-    data = get_data(filters or {})
+    data = get_data(filters)
     return columns, data
 
 
 # --------------------------------------------------
-# COLUMNS
+# COLUMNS (TREE USES ONLY ONE NAME COLUMN)
 # --------------------------------------------------
 def get_columns():
     return [
         {
-            "label": "Distributor",
-            "fieldname": "customer",
-            "fieldtype": "Link",
-            "options": "Customer",
-            "width": 220,
-        },
-        {
-            "label": "Customer Group",
-            "fieldname": "customer_group",
-            "fieldtype": "Link",
-            "options": "Customer Group",
-            "width": 140,
-        },
-        {
-            "label": "RSM",
-            "fieldname": "rsm",
-            "fieldtype": "Link",
-            "options": "Sales Person",
-            "width": 140,
-        },
-        {
-            "label": "ASM",
-            "fieldname": "asm",
-            "fieldtype": "Link",
-            "options": "Sales Person",
-            "width": 140,
-        },
-        {
-            "label": "TSO",
-            "fieldname": "tso",
-            "fieldtype": "Link",
-            "options": "Sales Person",
-            "width": 140,
-        },
-        {
-            "label": "Region",
-            "fieldname": "region",
+            "label": "Sales Geography",
+            "fieldname": "name",
             "fieldtype": "Data",
-            "width": 120,
+            "width": 350
         },
         {
-            "label": "Territory",
-            "fieldname": "territory",
-            "fieldtype": "Data",
-            "width": 120,
-        },
-        {
-            "label": "Location",
-            "fieldname": "location",
-            "fieldtype": "Data",
-            "width": 120,
-        },
-        {
-            "label": "Total Outstanding",
-            "fieldname": "total_outstanding",
+            "label": "Total Invoice Amount",
+            "fieldname": "amount",
             "fieldtype": "Currency",
-            "width": 160,
-        },
-        {
-            "label": "Total Overdue",
-            "fieldname": "total_overdue",
-            "fieldtype": "Currency",
-            "width": 160,
-        },
+            "width": 180
+        }
     ]
 
 
@@ -86,9 +34,7 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters):
 
-    customer_group = filters.get("customer_group")
-    region_filter = filters.get("region")
-    tso_filter = filters.get("tso")
+    result = []
 
     # ---------------- SALES PERSON MASTER ----------------
     sales_persons = frappe.db.sql("""
@@ -96,94 +42,75 @@ def get_data(filters):
             name,
             parent_sales_person,
             custom_region,
-            custom_territory,
-            custom_location
+            custom_location,
+            custom_territory
         FROM `tabSales Person`
         WHERE enabled = 1
     """, as_dict=True)
 
-    sp_map = {}
-    for sp in sales_persons:
-        sp_map[sp.name] = sp
-
-    # ---------------- CUSTOMER + SALES TEAM ----------------
-    customers = frappe.db.sql("""
-        SELECT
-            c.name AS customer,
-            c.customer_group,
-            st.sales_person
-        FROM `tabCustomer` c
-        JOIN `tabSales Team` st
-            ON st.parent = c.name
-            AND st.parenttype = 'Customer'
-        WHERE c.disabled = 0
-          AND (%(customer_group)s IS NULL
-               OR c.customer_group = %(customer_group)s)
-    """, {
-        "customer_group": customer_group
-    }, as_dict=True)
-
-    if not customers:
+    if not sales_persons:
         return []
 
-    # ---------------- OUTSTANDING ----------------
-    invoices = frappe.db.sql("""
+    # ---------------- INVOICE TOTALS (TSO LEVEL) ----------------
+    invoice_totals = frappe.db.sql("""
         SELECT
-            customer,
-            outstanding_amount,
-            posting_date,
-            due_date
-        FROM `tabSales Invoice`
-        WHERE docstatus = 1
-          AND outstanding_amount > 0
+            st.sales_person,
+            SUM(si.base_net_total) AS amount
+        FROM `tabSales Invoice` si
+        JOIN `tabSales Team` st ON st.parent = si.name
+        WHERE si.docstatus = 1
+        GROUP BY st.sales_person
     """, as_dict=True)
 
-    outstanding_map = {}
-    overdue_map = {}
+    amount_map = {i.sales_person: flt(i.amount) for i in invoice_totals}
 
-    for inv in invoices:
-        outstanding_map.setdefault(inv.customer, 0)
-        overdue_map.setdefault(inv.customer, 0)
+    # ---------------- BUILD HIERARCHY MAP ----------------
+    hierarchy = {}
 
-        outstanding_map[inv.customer] += inv.outstanding_amount
+    for sp in sales_persons:
+        region = sp.custom_region or "Undefined Region"
+        location = sp.custom_location or "Undefined Location"
+        territory = sp.custom_territory or "Undefined Territory"
 
-        if inv.due_date and getdate(inv.due_date) < getdate(today()):
-            overdue_map[inv.customer] += inv.outstanding_amount
+        hierarchy.setdefault(region, {})
+        hierarchy[region].setdefault(location, {})
+        hierarchy[region][location].setdefault(territory, [])
+        hierarchy[region][location][territory].append(sp.name)
 
-    # ---------------- FINAL RESULT ----------------
-    result = []
-
-    for row in customers:
-
-        tso = row.sales_person
-        if tso not in sp_map:
-            continue
-
-        asm = sp_map[tso].parent_sales_person
-        rsm = sp_map.get(asm, {}).get("parent_sales_person") if asm else None
-
-        region = sp_map[tso].custom_region
-        territory = sp_map[tso].custom_territory
-        location = sp_map[tso].custom_location
-
-        # Filters
-        if region_filter and region != region_filter:
-            continue
-
-        if tso_filter and tso != tso_filter:
-            continue
-
+    # ---------------- TREE BUILDING ----------------
+    for region in hierarchy:
+        region_id = f"REGION::{region}"
         result.append({
-            "customer": row.customer,
-            "customer_group": row.customer_group,
-            "rsm": rsm,
-            "asm": asm,
-            "tso": tso,
-            "region": region,
-            "territory": territory,
-            "location": location,
-            "total_outstanding": outstanding_map.get(row.customer, 0),
-            "total_overdue": overdue_map.get(row.customer, 0),
+            "name": region,
+            "parent": None,
+            "indent": 0,
+            "amount": None
         })
+
+        for location in hierarchy[region]:
+            location_id = f"{region_id}::LOC::{location}"
+            result.append({
+                "name": location,
+                "parent": region,
+                "indent": 1,
+                "amount": None
+            })
+
+            for territory in hierarchy[region][location]:
+                territory_id = f"{location_id}::TER::{territory}"
+                result.append({
+                    "name": territory,
+                    "parent": location,
+                    "indent": 2,
+                    "amount": None
+                })
+
+                for tso in hierarchy[region][location][territory]:
+                    result.append({
+                        "name": tso,
+                        "parent": territory,
+                        "indent": 3,
+                        "amount": amount_map.get(tso, 0)
+                    })
 
     return result

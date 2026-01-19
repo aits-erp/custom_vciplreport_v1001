@@ -96,7 +96,7 @@
 // };
 
 frappe.query_reports["Sales Person Target Report"] = {
-
+   
     filters: [
         {
             fieldname: "year",

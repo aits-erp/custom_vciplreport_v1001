@@ -16,7 +16,7 @@ def get_columns():
             "label": "Sales Geography",
             "fieldname": "name",
             "fieldtype": "Data",
-            "width": 350
+            "width": 380
         },
         {
             "label": "Total Invoice Amount",
@@ -28,22 +28,14 @@ def get_columns():
 
 
 # --------------------------------------------------
-# HELPERS (✅ FIXED)
-# --------------------------------------------------
-def column_exists(doctype, fieldname):
-    # IMPORTANT: pass DOCTYPE name, not table name
-    return frappe.db.has_column(doctype, fieldname)
-
-
-# --------------------------------------------------
 # DATA
 # --------------------------------------------------
 def get_data(filters):
 
-    # ✅ SAFE FIELD CHECKS
-    has_region = column_exists("Sales Person", "custom_region")
-    has_location = column_exists("Sales Person", "custom_location")
-    has_territory = column_exists("Sales Person", "custom_territory")
+    # ---------------- CHECK CUSTOM FIELDS SAFELY ----------------
+    has_region = frappe.db.has_column("Sales Person", "custom_region")
+    has_location = frappe.db.has_column("Sales Person", "custom_location")
+    has_territory = frappe.db.has_column("Sales Person", "custom_territory")
 
     # ---------------- SALES PERSON MASTER ----------------
     sales_persons = frappe.db.sql(f"""
@@ -60,18 +52,32 @@ def get_data(filters):
     if not sales_persons:
         return []
 
-    # ---------------- INVOICE TOTAL (TSO LEVEL) ----------------
-    invoice_totals = frappe.db.sql("""
+    # ---------------- CUSTOMER MAPPING (TSO → CUSTOMER) ----------------
+    customer_map = frappe.db.sql("""
         SELECT
             st.sales_person,
-            SUM(si.base_net_total) AS amount
-        FROM `tabSales Invoice` si
-        JOIN `tabSales Team` st ON st.parent = si.name
-        WHERE si.docstatus = 1
-        GROUP BY st.sales_person
+            c.name AS customer
+        FROM `tabCustomer` c
+        JOIN `tabSales Team` st
+            ON st.parent = c.name
+           AND st.parenttype = 'Customer'
     """, as_dict=True)
 
-    amount_map = {i.sales_person: flt(i.amount) for i in invoice_totals}
+    tso_customers = {}
+    for row in customer_map:
+        tso_customers.setdefault(row.sales_person, []).append(row.customer)
+
+    # ---------------- CUSTOMER INVOICE TOTALS ----------------
+    invoice_totals = frappe.db.sql("""
+        SELECT
+            si.customer,
+            SUM(si.base_net_total) AS amount
+        FROM `tabSales Invoice` si
+        WHERE si.docstatus = 1
+        GROUP BY si.customer
+    """, as_dict=True)
+
+    customer_amount = {i.customer: flt(i.amount) for i in invoice_totals}
 
     # ---------------- BUILD HIERARCHY ----------------
     hierarchy = {}
@@ -118,7 +124,16 @@ def get_data(filters):
                         "name": tso,
                         "parent": territory,
                         "indent": 3,
-                        "amount": amount_map.get(tso, 0)
+                        "amount": None
                     })
+
+                    # 🔥 CUSTOMER LEVEL (NEW)
+                    for customer in tso_customers.get(tso, []):
+                        result.append({
+                            "name": customer,
+                            "parent": tso,
+                            "indent": 4,
+                            "amount": customer_amount.get(customer, 0)
+                        })
 
     return result

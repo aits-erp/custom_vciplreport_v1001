@@ -1,58 +1,64 @@
-frappe.query_reports["Distributors Reportss"] = {
-    tree: true,
-    initial_depth: 1,
+frappe.query_reports["Distributor Sales Hierarchy"] = {
 
     filters: [
         {
+            fieldname: "parent_sales_person",
+            label: __("Parent Sales Person"),
+            fieldtype: "Link",
+            options: "Sales Person",
+            reqd: 1
+        },
+        {
             fieldname: "month",
-            label: "Month",
+            label: __("Month"),
             fieldtype: "Select",
             options: [
-                { label: "January", value: 1 },
-                { label: "February", value: 2 },
-                { label: "March", value: 3 },
-                { label: "April", value: 4 },
-                { label: "May", value: 5 },
-                { label: "June", value: 6 },
-                { label: "July", value: 7 },
-                { label: "August", value: 8 },
-                { label: "September", value: 9 },
-                { label: "October", value: 10 },
-                { label: "November", value: 11 },
-                { label: "December", value: 12 }
+                "",
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
             ],
-            default: new Date().getMonth() + 1
+            default: frappe.datetime.str_to_obj(frappe.datetime.get_today()).toLocaleString("default", { month: "long" })
         },
         {
             fieldname: "from_date",
-            label: "From Date",
-            fieldtype: "Date",
-            default: frappe.sys_defaults.year_start_date
+            label: __("From Date"),
+            fieldtype: "Date"
         },
         {
             fieldname: "to_date",
-            label: "To Date",
-            fieldtype: "Date",
-            default: frappe.sys_defaults.year_end_date
+            label: __("To Date"),
+            fieldtype: "Date"
         }
     ],
 
-    formatter(value, row, column, data, default_formatter) {
+    onload: function (report) {
+        // Optional: auto-refresh when parent sales person is selected
+        report.page.fields_dict.parent_sales_person.df.onchange = function () {
+            report.refresh();
+        };
+    },
+
+    formatter: function (value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
-        // Parent Sales Person
-        if (data.indent === 3 && column.fieldname === "name") {
+        // Bold Parent Sales Person
+        if (data && data.indent === 0) {
             value = `<b>${value}</b>`;
         }
 
-        // Customer highlight
-        if (data.indent === 5 && column.fieldname === "name") {
-            value = `<span style="color:#1674E0;font-weight:bold">${value}</span>`;
-        }
-
-        // Bold target & amount at customer level
-        if (data.indent === 5 && ["target", "amount"].includes(column.fieldname)) {
-            value = `<b>${value}</b>`;
+        // Italic Geography
+        if (data && data.indent === 1) {
+            value = `<i>${value}</i>`;
         }
 
         return value;

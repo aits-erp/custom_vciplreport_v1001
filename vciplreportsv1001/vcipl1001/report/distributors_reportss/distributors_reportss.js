@@ -40,13 +40,18 @@ frappe.query_reports["Distributors Reportss"] = {
     formatter(value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
-        // Highlight customer rows
-        if (data.indent === 4 && column.fieldname === "name") {
-            value = `<b style="color:#1674E0">${value}</b>`;
+        // Parent Sales Person
+        if (data.indent === 3 && column.fieldname === "name") {
+            value = `<b>${value}</b>`;
+        }
+
+        // Customer highlight
+        if (data.indent === 5 && column.fieldname === "name") {
+            value = `<span style="color:#1674E0;font-weight:bold">${value}</span>`;
         }
 
         // Bold target & amount at customer level
-        if (data.indent === 4 && ["target", "amount"].includes(column.fieldname)) {
+        if (data.indent === 5 && ["target", "amount"].includes(column.fieldname)) {
             value = `<b>${value}</b>`;
         }
 

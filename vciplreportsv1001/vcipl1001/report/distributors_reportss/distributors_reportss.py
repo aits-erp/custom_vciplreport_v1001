@@ -16,7 +16,7 @@ def get_columns():
             "label": "Sales Geography",
             "fieldname": "name",
             "fieldtype": "Data",
-            "width": 360
+            "width": 380
         },
         {
             "label": "Target",
@@ -38,13 +38,12 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters):
 
-    # ---------------- DATE RANGE (FY DEFAULT SAFE) ----------------
+    # ---------------- DATE FILTERS ----------------
     from_date = getdate(filters.get("from_date"))
     to_date = getdate(filters.get("to_date"))
-
     month = int(filters.get("month") or from_date.month)
 
-    # ---------------- CHECK CUSTOM FIELDS SAFELY ----------------
+    # ---------------- CHECK CUSTOM FIELDS ----------------
     has_region = frappe.db.has_column("Sales Person", "custom_region")
     has_location = frappe.db.has_column("Sales Person", "custom_location")
     has_territory = frappe.db.has_column("Sales Person", "custom_territory")
@@ -64,11 +63,11 @@ def get_data(filters):
     if not sales_persons:
         return []
 
-    # ---------------- CUSTOMER ↔ TSO + TARGET ----------------
-    customer_map = frappe.db.sql("""
+    # ---------------- CUSTOMER + TARGET (MONTH-WISE) ----------------
+    customer_rows = frappe.db.sql("""
         SELECT
             st.sales_person,
-            st.parent AS customer,
+            c.name AS customer_name,
 
             CASE %(month)s
                 WHEN 1 THEN st.custom_january
@@ -86,17 +85,18 @@ def get_data(filters):
             END AS target
 
         FROM `tabSales Team` st
+        JOIN `tabCustomer` c ON c.name = st.parent
         WHERE st.parenttype = 'Customer'
     """, {"month": month}, as_dict=True)
 
     tso_customers = {}
     customer_target = {}
 
-    for r in customer_map:
-        tso_customers.setdefault(r.sales_person, []).append(r.customer)
-        customer_target[r.customer] = flt(r.target)
+    for r in customer_rows:
+        tso_customers.setdefault(r.sales_person, []).append(r.customer_name)
+        customer_target[r.customer_name] = flt(r.target)
 
-    # ---------------- INVOICE TOTAL (DATE FILTERED) ----------------
+    # ---------------- CUSTOMER INVOICE TOTAL (DATE FILTERED) ----------------
     invoice_totals = frappe.db.sql("""
         SELECT
             customer,
@@ -112,7 +112,7 @@ def get_data(filters):
 
     customer_amount = {i.customer: flt(i.amount) for i in invoice_totals}
 
-    # ---------------- BUILD HIERARCHY ----------------
+    # ---------------- BUILD GEO HIERARCHY ----------------
     hierarchy = {}
 
     for sp in sales_persons:
@@ -123,54 +123,47 @@ def get_data(filters):
         hierarchy.setdefault(region, {})
         hierarchy[region].setdefault(location, {})
         hierarchy[region][location].setdefault(territory, [])
-        hierarchy[region][location][territory].append(sp.name)
+        hierarchy[region][location][territory].append(sp)
 
     # ---------------- TREE RESULT ----------------
     result = []
 
     for region in hierarchy:
-        result.append({
-            "name": region,
-            "parent": None,
-            "indent": 0,
-            "target": None,
-            "amount": None
-        })
+        result.append({"name": region, "parent": None, "indent": 0})
 
         for location in hierarchy[region]:
-            result.append({
-                "name": location,
-                "parent": region,
-                "indent": 1,
-                "target": None,
-                "amount": None
-            })
+            result.append({"name": location, "parent": region, "indent": 1})
 
             for territory in hierarchy[region][location]:
-                result.append({
-                    "name": territory,
-                    "parent": location,
-                    "indent": 2,
-                    "target": None,
-                    "amount": None
-                })
+                result.append({"name": territory, "parent": location, "indent": 2})
 
-                for tso in hierarchy[region][location][territory]:
+                # 🔹 GROUP BY PARENT SALES PERSON
+                parent_map = {}
+                for sp in hierarchy[region][location][territory]:
+                    parent = sp.parent_sales_person or "No Parent"
+                    parent_map.setdefault(parent, []).append(sp.name)
+
+                for parent_sp, tsos in parent_map.items():
                     result.append({
-                        "name": tso,
+                        "name": parent_sp,
                         "parent": territory,
-                        "indent": 3,
-                        "target": None,
-                        "amount": None
+                        "indent": 3
                     })
 
-                    for customer in tso_customers.get(tso, []):
+                    for tso in tsos:
                         result.append({
-                            "name": customer,
-                            "parent": tso,
-                            "indent": 4,
-                            "target": customer_target.get(customer, 0),
-                            "amount": customer_amount.get(customer, 0)
+                            "name": tso,
+                            "parent": parent_sp,
+                            "indent": 4
                         })
+
+                        for customer in tso_customers.get(tso, []):
+                            result.append({
+                                "name": customer,   # ✅ CUSTOMER NAME (NOT CODE)
+                                "parent": tso,
+                                "indent": 5,
+                                "target": customer_target.get(customer, 0),
+                                "amount": customer_amount.get(customer, 0)
+                            })
 
     return result

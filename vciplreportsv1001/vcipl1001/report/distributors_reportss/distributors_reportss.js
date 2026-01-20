@@ -1,5 +1,4 @@
 frappe.query_reports["Distributors Reportss"] = {
-
     filters: [
         {
             fieldname: "parent_sales_person",

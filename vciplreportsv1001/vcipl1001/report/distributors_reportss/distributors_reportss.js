@@ -22,13 +22,25 @@ frappe.query_reports["Distributors Reportss"] = {
                 { label: "December", value: 12 }
             ],
             default: new Date().getMonth() + 1
+        },
+        {
+            fieldname: "from_date",
+            label: "From Date",
+            fieldtype: "Date",
+            default: frappe.sys_defaults.year_start_date
+        },
+        {
+            fieldname: "to_date",
+            label: "To Date",
+            fieldtype: "Date",
+            default: frappe.sys_defaults.year_end_date
         }
     ],
 
     formatter(value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
-        // Highlight customer name
+        // Highlight customer rows
         if (data.indent === 4 && column.fieldname === "name") {
             value = `<b style="color:#1674E0">${value}</b>`;
         }

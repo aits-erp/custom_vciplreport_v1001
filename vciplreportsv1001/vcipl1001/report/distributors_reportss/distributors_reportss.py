@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import flt
+from frappe.utils import flt, getdate
 
 
 def execute(filters=None):
@@ -38,7 +38,11 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters):
 
-    month = int(filters.get("month") or frappe.utils.nowdate()[5:7])
+    # ---------------- DATE RANGE (FY DEFAULT SAFE) ----------------
+    from_date = getdate(filters.get("from_date"))
+    to_date = getdate(filters.get("to_date"))
+
+    month = int(filters.get("month") or from_date.month)
 
     # ---------------- CHECK CUSTOM FIELDS SAFELY ----------------
     has_region = frappe.db.has_column("Sales Person", "custom_region")
@@ -60,7 +64,7 @@ def get_data(filters):
     if not sales_persons:
         return []
 
-    # ---------------- CUSTOMER ↔ TSO MAP ----------------
+    # ---------------- CUSTOMER ↔ TSO + TARGET ----------------
     customer_map = frappe.db.sql("""
         SELECT
             st.sales_person,
@@ -92,15 +96,19 @@ def get_data(filters):
         tso_customers.setdefault(r.sales_person, []).append(r.customer)
         customer_target[r.customer] = flt(r.target)
 
-    # ---------------- CUSTOMER INVOICE TOTALS ----------------
+    # ---------------- INVOICE TOTAL (DATE FILTERED) ----------------
     invoice_totals = frappe.db.sql("""
         SELECT
             customer,
             SUM(base_net_total) AS amount
         FROM `tabSales Invoice`
         WHERE docstatus = 1
+          AND posting_date BETWEEN %(from_date)s AND %(to_date)s
         GROUP BY customer
-    """, as_dict=True)
+    """, {
+        "from_date": from_date,
+        "to_date": to_date
+    }, as_dict=True)
 
     customer_amount = {i.customer: flt(i.amount) for i in invoice_totals}
 
@@ -156,7 +164,6 @@ def get_data(filters):
                         "amount": None
                     })
 
-                    # 🔥 CUSTOMER LEVEL
                     for customer in tso_customers.get(tso, []):
                         result.append({
                             "name": customer,

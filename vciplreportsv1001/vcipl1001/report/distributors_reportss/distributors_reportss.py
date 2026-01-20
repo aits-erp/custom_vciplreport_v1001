@@ -16,7 +16,13 @@ def get_columns():
             "label": "Sales Geography",
             "fieldname": "name",
             "fieldtype": "Data",
-            "width": 380
+            "width": 360
+        },
+        {
+            "label": "Target",
+            "fieldname": "target",
+            "fieldtype": "Currency",
+            "width": 160
         },
         {
             "label": "Total Invoice Amount",
@@ -31,6 +37,8 @@ def get_columns():
 # DATA
 # --------------------------------------------------
 def get_data(filters):
+
+    month = int(filters.get("month") or frappe.utils.nowdate()[5:7])
 
     # ---------------- CHECK CUSTOM FIELDS SAFELY ----------------
     has_region = frappe.db.has_column("Sales Person", "custom_region")
@@ -52,29 +60,46 @@ def get_data(filters):
     if not sales_persons:
         return []
 
-    # ---------------- CUSTOMER MAPPING (TSO → CUSTOMER) ----------------
+    # ---------------- CUSTOMER ↔ TSO MAP ----------------
     customer_map = frappe.db.sql("""
         SELECT
             st.sales_person,
-            c.name AS customer
-        FROM `tabCustomer` c
-        JOIN `tabSales Team` st
-            ON st.parent = c.name
-           AND st.parenttype = 'Customer'
-    """, as_dict=True)
+            st.parent AS customer,
+
+            CASE %(month)s
+                WHEN 1 THEN st.custom_january
+                WHEN 2 THEN st.custom_february
+                WHEN 3 THEN st.custom_march
+                WHEN 4 THEN st.custom_april
+                WHEN 5 THEN st.custom_may_
+                WHEN 6 THEN st.custom_june
+                WHEN 7 THEN st.custom_july
+                WHEN 8 THEN st.custom_august
+                WHEN 9 THEN st.custom_september
+                WHEN 10 THEN st.custom_october
+                WHEN 11 THEN st.custom_november
+                WHEN 12 THEN st.custom_december
+            END AS target
+
+        FROM `tabSales Team` st
+        WHERE st.parenttype = 'Customer'
+    """, {"month": month}, as_dict=True)
 
     tso_customers = {}
-    for row in customer_map:
-        tso_customers.setdefault(row.sales_person, []).append(row.customer)
+    customer_target = {}
+
+    for r in customer_map:
+        tso_customers.setdefault(r.sales_person, []).append(r.customer)
+        customer_target[r.customer] = flt(r.target)
 
     # ---------------- CUSTOMER INVOICE TOTALS ----------------
     invoice_totals = frappe.db.sql("""
         SELECT
-            si.customer,
-            SUM(si.base_net_total) AS amount
-        FROM `tabSales Invoice` si
-        WHERE si.docstatus = 1
-        GROUP BY si.customer
+            customer,
+            SUM(base_net_total) AS amount
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1
+        GROUP BY customer
     """, as_dict=True)
 
     customer_amount = {i.customer: flt(i.amount) for i in invoice_totals}
@@ -100,6 +125,7 @@ def get_data(filters):
             "name": region,
             "parent": None,
             "indent": 0,
+            "target": None,
             "amount": None
         })
 
@@ -108,6 +134,7 @@ def get_data(filters):
                 "name": location,
                 "parent": region,
                 "indent": 1,
+                "target": None,
                 "amount": None
             })
 
@@ -116,6 +143,7 @@ def get_data(filters):
                     "name": territory,
                     "parent": location,
                     "indent": 2,
+                    "target": None,
                     "amount": None
                 })
 
@@ -124,15 +152,17 @@ def get_data(filters):
                         "name": tso,
                         "parent": territory,
                         "indent": 3,
+                        "target": None,
                         "amount": None
                     })
 
-                    # 🔥 CUSTOMER LEVEL (NEW)
+                    # 🔥 CUSTOMER LEVEL
                     for customer in tso_customers.get(tso, []):
                         result.append({
                             "name": customer,
                             "parent": tso,
                             "indent": 4,
+                            "target": customer_target.get(customer, 0),
                             "amount": customer_amount.get(customer, 0)
                         })
 

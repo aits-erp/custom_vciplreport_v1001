@@ -2,16 +2,39 @@ frappe.query_reports["Distributors Reportss"] = {
     tree: true,
     initial_depth: 1,
 
+    filters: [
+        {
+            fieldname: "month",
+            label: "Month",
+            fieldtype: "Select",
+            options: [
+                { label: "January", value: 1 },
+                { label: "February", value: 2 },
+                { label: "March", value: 3 },
+                { label: "April", value: 4 },
+                { label: "May", value: 5 },
+                { label: "June", value: 6 },
+                { label: "July", value: 7 },
+                { label: "August", value: 8 },
+                { label: "September", value: 9 },
+                { label: "October", value: 10 },
+                { label: "November", value: 11 },
+                { label: "December", value: 12 }
+            ],
+            default: new Date().getMonth() + 1
+        }
+    ],
+
     formatter(value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
-        // Highlight customer rows
+        // Highlight customer name
         if (data.indent === 4 && column.fieldname === "name") {
-            value = `<span style="color:#1674E0;font-weight:bold">${value}</span>`;
+            value = `<b style="color:#1674E0">${value}</b>`;
         }
 
-        // Bold amounts at customer level
-        if (data.indent === 4 && column.fieldname === "amount") {
+        // Bold target & amount at customer level
+        if (data.indent === 4 && ["target", "amount"].includes(column.fieldname)) {
             value = `<b>${value}</b>`;
         }
 

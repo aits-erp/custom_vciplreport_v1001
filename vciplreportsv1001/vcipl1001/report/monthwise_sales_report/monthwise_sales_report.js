@@ -1,42 +1,42 @@
-frappe.query_reports["Monthwise Sales Report"] = {
-
+frappe.query_reports["Monthwise Sales Order Pending"] = {
     filters: [
+        {
+            fieldname: "fiscal_year",
+            label: __("Fiscal Year"),
+            fieldtype: "Link",
+            options: "Fiscal Year",
+            reqd: 1
+        },
         {
             fieldname: "month",
             label: __("Month"),
             fieldtype: "Select",
             options: [
-                "Jan","Feb","Mar","Apr","May","Jun",
-                "Jul","Aug","Sep","Oct","Nov","Dec"
-            ],
-            default: moment().format("MMM"),
-            reqd: 1
+                "",
+                "April","May","June","July",
+                "August","September","October",
+                "November","December"
+            ]
         }
     ],
 
     formatter(value, row, column, data, default_formatter) {
-
         value = default_formatter(value, row, column, data);
 
-        if (column.fieldname === "month_amount" && data.month_drill) {
-            return this.make_link(value, data.month_drill, "Sales Invoices");
+        if (column.fieldtype === "Currency" && data && data[column.fieldname + "_drill"]) {
+            return `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
+                onclick='frappe.query_reports["Monthwise Sales Order Pending"]
+                .show_popup(${data[column.fieldname + "_drill"]}, "${column.label}")'>
+                ${value}
+            </a>`;
         }
 
         return value;
     },
 
-    make_link(value, data, title) {
-        return `<a style="font-weight:bold;cursor:pointer;color:#1674E0"
-            onclick='frappe.query_reports["Monthwise Sales Report"]
-            .show_popup(${data}, "${title}")'>
-            ${value}
-        </a>`;
-    },
-
     show_popup(rows, title) {
-
         if (!rows || rows.length === 0) {
-            frappe.msgprint(__("No data available"));
+            frappe.msgprint(__("No pending Sales Orders"));
             return;
         }
 
@@ -45,9 +45,9 @@ frappe.query_reports["Monthwise Sales Report"] = {
         <table class="table table-bordered">
             <thead>
                 <tr>
-                    <th>Invoice</th>
-                    <th>Posting Date</th>
-                    <th>Amount</th>
+                    <th>Sales Order</th>
+                    <th>Date</th>
+                    <th>Pending Amount</th>
                 </tr>
             </thead><tbody>`;
 
@@ -55,13 +55,13 @@ frappe.query_reports["Monthwise Sales Report"] = {
             html += `
             <tr>
                 <td>
-                    <a href="/app/sales-invoice/${r.invoice}"
+                    <a href="/app/sales-order/${r.so}"
                        target="_blank"
                        style="font-weight:bold">
-                        ${r.invoice}
+                       ${r.so}
                     </a>
                 </td>
-                <td>${r.posting_date}</td>
+                <td>${r.date}</td>
                 <td>${format_currency(r.amount)}</td>
             </tr>`;
         });

@@ -1,11 +1,17 @@
 import frappe
-from frappe.utils import formatdate, nowdate
+from frappe.utils import getdate
 
-MONTH_MAP = {
-    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4,
-    "May": 5, "Jun": 6, "Jul": 7, "Aug": 8,
-    "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
-}
+MONTHS = [
+    (4, "apr", "April"),
+    (5, "may", "May"),
+    (6, "jun", "June"),
+    (7, "jul", "July"),
+    (8, "aug", "August"),
+    (9, "sep", "September"),
+    (10, "oct", "October"),
+    (11, "nov", "November"),
+    (12, "dec", "December"),
+]
 
 
 def execute(filters=None):
@@ -13,80 +19,94 @@ def execute(filters=None):
     return get_columns(filters), get_data(filters)
 
 
+# --------------------------------------------------
+# COLUMNS
+# --------------------------------------------------
 def get_columns(filters):
-    month = filters.get("month") or formatdate(nowdate(), "MMM")
+    columns = [{
+        "label": "Customer",
+        "fieldname": "customer",
+        "width": 260
+    }]
 
-    return [
-        {
-            "label": "Customer",
-            "fieldname": "customer_name",
-            "width": 280
-        },
-        {
-            "label": f"{month} Sales",
-            "fieldname": "month_amount",
-            "fieldtype": "Currency",
-            "width": 160
-        },
-        {
-            "label": "Total",
-            "fieldname": "total",
-            "fieldtype": "Currency",
-            "width": 160
-        },
+    selected_month = filters.get("month")
 
-        # 🔒 hidden drill data
-        {"fieldname": "month_drill", "hidden": 1},
-    ]
+    for _, key, label in MONTHS:
+        if not selected_month or selected_month == label:
+            columns.append({
+                "label": label,
+                "fieldname": key,
+                "fieldtype": "Currency",
+                "width": 140
+            })
+
+    columns.append({
+        "label": "Total",
+        "fieldname": "total",
+        "fieldtype": "Currency",
+        "width": 160
+    })
+
+    return columns
 
 
+# --------------------------------------------------
+# DATA
+# --------------------------------------------------
 def get_data(filters):
-    month = filters.get("month") or formatdate(nowdate(), "MMM")
-    month_no = MONTH_MAP[month]
+    fiscal_year = filters.get("fiscal_year")
+    selected_month = filters.get("month")
 
-    invoices = frappe.db.sql("""
+    fy = frappe.db.get_value(
+        "Fiscal Year",
+        fiscal_year,
+        ["year_start_date", "year_end_date"],
+        as_dict=True
+    )
+
+    sales_orders = frappe.db.sql("""
         SELECT
-            si.name AS invoice,
-            si.customer AS customer_code,
-            si.customer_name,
-            si.posting_date,
-            si.grand_total
-        FROM `tabSales Invoice` si
-        WHERE si.docstatus = 1
-    """, as_dict=True)
+            so.name,
+            so.customer,
+            so.transaction_date,
+            (so.grand_total - so.billed_amount) AS pending
+        FROM `tabSales Order` so
+        WHERE so.docstatus = 1
+          AND so.status NOT IN ('Closed', 'Completed')
+          AND so.transaction_date BETWEEN %s AND %s
+    """, (fy.year_start_date, fy.year_end_date), as_dict=True)
 
     cust_map = {}
 
-    for inv in invoices:
-        code = inv.customer_code   # internal only
-        name = inv.customer_name   # UI only
+    for so in sales_orders:
+        customer = so.customer
+        month_no = getdate(so.transaction_date).month
+        pending = so.pending or 0
 
-        if code not in cust_map:
-            cust_map[code] = {
-                "customer_name": name,
-                "total": 0,
-                "month_amount": 0,
-                "month_list": []
+        if customer not in cust_map:
+            cust_map[customer] = {
+                "customer": customer,
+                "total": 0
             }
+            for _, key, _ in MONTHS:
+                cust_map[customer][key] = 0
+                cust_map[customer][key + "_drill"] = []
 
-        cust_map[code]["total"] += inv.grand_total
+        for m_no, key, label in MONTHS:
+            if month_no == m_no and (not selected_month or selected_month == label):
+                cust_map[customer][key] += pending
+                cust_map[customer]["total"] += pending
+                cust_map[customer][key + "_drill"].append({
+                    "so": so.name,
+                    "date": str(so.transaction_date),
+                    "amount": float(pending)
+                })
 
-        if inv.posting_date.month == month_no:
-            cust_map[code]["month_amount"] += inv.grand_total
-            cust_map[code]["month_list"].append({
-                "invoice": inv.invoice,
-                "posting_date": str(inv.posting_date),
-                "amount": float(inv.grand_total)
-            })
-
+    # serialize drill data
     result = []
-
     for row in cust_map.values():
-        result.append({
-            "customer_name": row["customer_name"],  # ✅ NAME ONLY
-            "month_amount": row["month_amount"],
-            "total": row["total"],
-            "month_drill": frappe.as_json(row["month_list"])
-        })
+        for _, key, _ in MONTHS:
+            row[key + "_drill"] = frappe.as_json(row[key + "_drill"])
+        result.append(row)
 
     return result

@@ -32,7 +32,6 @@ def get_columns():
         {
             "label": "Customer Name",
             "fieldname": "customer_name",
-            "fieldtype": "Data",
             "width": 240
         },
         {
@@ -152,6 +151,11 @@ def get_data(filters):
         if not sp:
             continue
 
+        # 🔴 IMPORTANT RULE:
+        # ❌ Skip if Parent Sales Person has NO region
+        if not sp.custom_region:
+            continue
+
         # APPLY FILTERS
         if f_region and sp.custom_region != f_region:
             continue
@@ -170,7 +174,7 @@ def get_data(filters):
             "location": sp.custom_location,
             "territory": sp.custom_territory,
             "sales_person": t.sales_person,
-            "customer_name": t.customer_name,   # ✅ CUSTOMER NAME ONLY
+            "customer_name": t.customer_name,
             "target": flt(t.target),
             "invoice_amount": current_map.get(t.customer, 0),
             "last_year_amount": last_year_map.get(t.customer, 0),

@@ -1,5 +1,4 @@
 frappe.query_reports["Sales Person Report"] = {
-
     filters: [
         {
             fieldname: "month",

@@ -20,40 +20,40 @@ def get_columns():
             "fieldname": "parent_sales_person",
             "fieldtype": "Link",
             "options": "Sales Person",
-            "width": 180,
+            "width": 180
         },
         {
             "label": "Sales Person",
             "fieldname": "sales_person",
             "fieldtype": "Link",
             "options": "Sales Person",
-            "width": 180,
+            "width": 180
         },
         {
             "label": "Customer",
             "fieldname": "customer",
             "fieldtype": "Link",
             "options": "Customer",
-            "width": 220,
+            "width": 240
         },
         {
             "label": "Target",
             "fieldname": "target",
             "fieldtype": "Currency",
-            "width": 140,
+            "width": 140
         },
         {
             "label": "Invoice Amount",
             "fieldname": "amount",
             "fieldtype": "Currency",
-            "width": 160,
+            "width": 160
         },
         {
             "label": "Last Year Achievement",
             "fieldname": "last_year_amount",
             "fieldtype": "Currency",
-            "width": 180,
-        },
+            "width": 180
+        }
     ]
 
 
@@ -66,12 +66,12 @@ def get_data(filters):
     from_date = getdate(filters.from_date)
     to_date = getdate(filters.to_date)
 
-    ly_from_date = add_years(from_date, -1)
-    ly_to_date = add_years(to_date, -1)
+    ly_from = add_years(from_date, -1)
+    ly_to = add_years(to_date, -1)
 
     month = int(filters.month or from_date.month)
 
-    # ---------------- OPTIONAL FILTERS ----------------
+    # ---------------- FILTER VALUES ----------------
     f_region = filters.get("custom_region")
     f_location = filters.get("custom_location")
     f_territory = filters.get("custom_territory")
@@ -116,29 +116,29 @@ def get_data(filters):
         WHERE st.parenttype = 'Customer'
     """, {"month": month}, as_dict=True)
 
-    # ---------------- CURRENT YEAR INVOICE ----------------
+    # ---------------- CURRENT FY INVOICE ----------------
     current_rows = frappe.db.sql("""
         SELECT
             customer,
             SUM(base_net_total) AS amount
         FROM `tabSales Invoice`
         WHERE docstatus = 1
-          AND posting_date BETWEEN %(from)s AND %(to)s
+          AND posting_date BETWEEN %(f)s AND %(t)s
         GROUP BY customer
-    """, {"from": from_date, "to": to_date}, as_dict=True)
+    """, {"f": from_date, "t": to_date}, as_dict=True)
 
     current_map = {r.customer: flt(r.amount) for r in current_rows}
 
-    # ---------------- LAST YEAR INVOICE ----------------
+    # ---------------- LAST FY INVOICE ----------------
     last_year_rows = frappe.db.sql("""
         SELECT
             customer,
             SUM(base_net_total) AS amount
         FROM `tabSales Invoice`
         WHERE docstatus = 1
-          AND posting_date BETWEEN %(from)s AND %(to)s
+          AND posting_date BETWEEN %(f)s AND %(t)s
         GROUP BY customer
-    """, {"from": ly_from_date, "to": ly_to_date}, as_dict=True)
+    """, {"f": ly_from, "t": ly_to}, as_dict=True)
 
     last_year_map = {r.customer: flt(r.amount) for r in last_year_rows}
 
@@ -150,7 +150,7 @@ def get_data(filters):
         if not sp:
             continue
 
-        # TREE-LIKE FILTERING
+        # ---------------- APPLY FILTERS (IMPORTANT) ----------------
         if f_region and sp.custom_region != f_region:
             continue
         if f_location and sp.custom_location != f_location:
@@ -168,10 +168,10 @@ def get_data(filters):
             "territory": sp.custom_territory,
             "parent_sales_person": sp.parent_sales_person,
             "sales_person": t.sales_person,
-            "customer": t.customer,  # ✅ CUSTOMER NAME ONLY
+            "customer": t.customer,  # CUSTOMER NAME ONLY
             "target": flt(t.target),
             "amount": current_map.get(t.customer, 0),
-            "last_year_amount": last_year_map.get(t.customer, 0),
+            "last_year_amount": last_year_map.get(t.customer, 0)
         })
 
     return data

@@ -1,6 +1,4 @@
 frappe.query_reports["Distributors Reportss"] = {
-    tree: true,
-    initial_depth: 1,
 
     filters: [
         {
@@ -34,27 +32,33 @@ frappe.query_reports["Distributors Reportss"] = {
             label: "To Date",
             fieldtype: "Date",
             default: frappe.sys_defaults.year_end_date
+        },
+        {
+            fieldname: "custom_region",
+            label: "Region",
+            fieldtype: "Data"
+        },
+        {
+            fieldname: "custom_location",
+            label: "Location",
+            fieldtype: "Data"
+        },
+        {
+            fieldname: "custom_territory",
+            label: "Territory",
+            fieldtype: "Data"
+        },
+        {
+            fieldname: "parent_sales_person",
+            label: "Parent Sales Person",
+            fieldtype: "Link",
+            options: "Sales Person"
+        },
+        {
+            fieldname: "customer",
+            label: "Customer",
+            fieldtype: "Link",
+            options: "Customer"
         }
-    ],
-
-    formatter(value, row, column, data, default_formatter) {
-        value = default_formatter(value, row, column, data);
-
-        // Parent Sales Person
-        if (data.indent === 3 && column.fieldname === "name") {
-            value = `<b>${value}</b>`;
-        }
-
-        // Customer highlight
-        if (data.indent === 5 && column.fieldname === "name") {
-            value = `<span style="color:#1674E0;font-weight:bold">${value}</span>`;
-        }
-
-        // Bold target & amount at customer level
-        if (data.indent === 5 && ["target", "amount"].includes(column.fieldname)) {
-            value = `<b>${value}</b>`;
-        }
-
-        return value;
-    }
+    ]
 };

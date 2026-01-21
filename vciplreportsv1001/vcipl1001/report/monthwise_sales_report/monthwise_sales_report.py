@@ -1,7 +1,10 @@
 import frappe
-from frappe.utils import getdate, today
+from frappe.utils import getdate
 
 MONTHS = [
+    (1, "jan", "January"),
+    (2, "feb", "February"),
+    (3, "mar", "March"),
     (4, "apr", "April"),
     (5, "may", "May"),
     (6, "jun", "June"),
@@ -19,9 +22,9 @@ def execute(filters=None):
     return get_columns(filters), get_data(filters)
 
 
-# -------------------------------
+# --------------------------------------------------
 # COLUMNS
-# -------------------------------
+# --------------------------------------------------
 def get_columns(filters):
     columns = [{
         "label": "Customer",
@@ -37,7 +40,7 @@ def get_columns(filters):
                 "label": label,
                 "fieldname": key,
                 "fieldtype": "Currency",
-                "width": 140
+                "width": 130
             })
 
     columns.append({
@@ -50,15 +53,11 @@ def get_columns(filters):
     return columns
 
 
-# -------------------------------
-# DATA
-# -------------------------------
+# --------------------------------------------------
+# DATA (Sales Invoice BASE)
+# --------------------------------------------------
 def get_data(filters):
     selected_month = filters.get("month")
-
-    year = getdate(today()).year
-    from_date = f"{year}-04-01"
-    to_date = f"{year}-12-31"
 
     invoices = frappe.db.sql("""
         SELECT
@@ -68,8 +67,7 @@ def get_data(filters):
             si.grand_total
         FROM `tabSales Invoice` si
         WHERE si.docstatus = 1
-          AND si.posting_date BETWEEN %s AND %s
-    """, (from_date, to_date), as_dict=True)
+    """, as_dict=True)
 
     customer_map = {}
 

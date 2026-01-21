@@ -6,9 +6,10 @@ frappe.query_reports["Monthwise Sales Report"] = {
             fieldtype: "Select",
             options: [
                 "",
-                "April","May","June","July",
-                "August","September","October",
-                "November","December"
+                "January","February","March",
+                "April","May","June",
+                "July","August","September",
+                "October","November","December"
             ]
         }
     ],

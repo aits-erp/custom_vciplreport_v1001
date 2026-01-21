@@ -1,40 +1,43 @@
 <div class="dashboard-container">
 
     <div class="section-title">📊 Sales Reports</div>
+
     <div class="dashboard-grid">
 
-        <!-- Distributor -->
+        <!-- Distributor Report -->
         <div class="dashboard-card report-card" data-report="Distributor Report">
             <div class="icon-box g-blue">
-                <!-- Users -->
                 <svg viewBox="0 0 24 24">
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/>
-                    <circle cx="17" cy="8" r="3"/>
+                    <circle cx="12" cy="4" r="2"/>
+                    <circle cx="6" cy="14" r="2"/>
+                    <circle cx="18" cy="14" r="2"/>
+                    <line x1="12" y1="6" x2="6" y2="12"/>
+                    <line x1="12" y1="6" x2="18" y2="12"/>
                 </svg>
             </div>
             <div class="dashboard-title">Distributor Report</div>
         </div>
 
-        <!-- Top Selling -->
+        <!-- Top Selling Below MSL -->
         <div class="dashboard-card report-card" data-report="Top selling below MSL report">
             <div class="icon-box g-green">
-                <!-- Trending Up -->
                 <svg viewBox="0 0 24 24">
                     <polyline points="3 17 9 11 13 15 21 7"/>
-                    <polyline points="14 7 21 7 21 14"/>
+                    <line x1="21" y1="7" x2="21" y2="14"/>
                 </svg>
             </div>
             <div class="dashboard-title">Top Selling (Below MSL)</div>
         </div>
 
-                <!-- Top Selling -->
+        <!-- Top 50 Selling -->
         <div class="dashboard-card report-card" data-report="Top Most Selling Items">
             <div class="icon-box g-green">
-                <!-- Trending Up -->
                 <svg viewBox="0 0 24 24">
-                    <polyline points="3 17 9 11 13 15 21 7"/>
-                    <polyline points="14 7 21 7 21 14"/>
+                    <path d="M8 4h8v4a4 4 0 0 1-8 0z"/>
+                    <path d="M6 4h2v3a3 3 0 0 1-3-3z"/>
+                    <path d="M16 4h2a3 3 0 0 1-3 3z"/>
+                    <line x1="12" y1="12" x2="12" y2="16"/>
+                    <line x1="9" y1="20" x2="15" y2="20"/>
                 </svg>
             </div>
             <div class="dashboard-title">Top 50 Selling Items</div>
@@ -43,51 +46,45 @@
         <!-- Bottom Selling -->
         <div class="dashboard-card report-card" data-report="Bottom 100 Most selling Item">
             <div class="icon-box g-red">
-                <!-- Trending Down -->
                 <svg viewBox="0 0 24 24">
                     <polyline points="3 7 9 13 13 9 21 17"/>
-                    <polyline points="14 17 21 17 21 10"/>
+                    <line x1="21" y1="17" x2="21" y2="10"/>
                 </svg>
             </div>
             <div class="dashboard-title">Bottom 100 Most Selling</div>
         </div>
 
-        <!-- Outstanding -->
+        <!-- Outstanding Debtors -->
         <div class="dashboard-card report-card" data-report="Outstanding Debtors Monthwise">
             <div class="icon-box g-purple">
-                <!-- Shield -->
                 <svg viewBox="0 0 24 24">
-                    <path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/>
+                    <rect x="2" y="6" width="20" height="14" rx="2"/>
+                    <line x1="2" y1="10" x2="22" y2="10"/>
+                    <circle cx="17" cy="15" r="1"/>
                 </svg>
             </div>
             <div class="dashboard-title">Outstanding Debtors</div>
         </div>
 
-                <!-- Sales Person Target -->
         <!-- Sales Person -->
         <div class="dashboard-card report-card" data-report="Sales Person Report">
             <div class="icon-box g-blue">
                 <svg viewBox="0 0 24 24">
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/>
-                    <circle cx="17" cy="8" r="3"/>
+                    <circle cx="12" cy="7" r="4"/>
+                    <path d="M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/>
                 </svg>
             </div>
             <div class="dashboard-title">Sales Person Report</div>
         </div>
-    </div>
-
-    <div class="section-title"></div>
-    <div class="dashboard-grid">
 
         <!-- Sales Analytics -->
         <div class="dashboard-card report-card" data-report="Sales Analytics Report">
             <div class="icon-box g-blue">
-                <!-- Bar Chart -->
                 <svg viewBox="0 0 24 24">
-                    <line x1="6" y1="20" x2="6" y2="10"/>
-                    <line x1="12" y1="20" x2="12" y2="4"/>
-                    <line x1="18" y1="20" x2="18" y2="14"/>
+                    <line x1="4" y1="20" x2="4" y2="12"/>
+                    <line x1="10" y1="20" x2="10" y2="8"/>
+                    <line x1="16" y1="20" x2="16" y2="4"/>
+                    <polyline points="2 14 8 10 14 12 20 6"/>
                 </svg>
             </div>
             <div class="dashboard-title">Sales Analytics Report</div>
@@ -96,70 +93,51 @@
         <!-- Monthwise Sales -->
         <div class="dashboard-card report-card" data-report="Monthwise Sales Report">
             <div class="icon-box g-green">
-                <!-- Calendar -->
                 <svg viewBox="0 0 24 24">
                     <rect x="3" y="4" width="18" height="18" rx="2"/>
                     <line x1="3" y1="10" x2="21" y2="10"/>
-                    <line x1="8" y1="2" x2="8" y2="6"/>
-                    <line x1="16" y1="2" x2="16" y2="6"/>
+                    <polyline points="7 16 11 13 15 15 19 11"/>
                 </svg>
             </div>
             <div class="dashboard-title">Monthwise Sales Report</div>
         </div>
 
+        <!-- Pending Sales Order -->
+        <div class="dashboard-card report-card" data-report="Sales order - with available qtyss">
+            <div class="icon-box g-green">
+                <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9"/>
+                    <line x1="12" y1="7" x2="12" y2="12"/>
+                    <line x1="12" y1="12" x2="16" y2="14"/>
+                </svg>
+            </div>
+            <div class="dashboard-title">Pending Sales Order</div>
+        </div>
+
         <!-- Purchase -->
         <div class="dashboard-card report-card" data-report="Monthwises Purchase">
             <div class="icon-box g-orange">
-                <!-- Receipt -->
                 <svg viewBox="0 0 24 24">
-                    <path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/>
-                    <line x1="9" y1="6" x2="15" y2="6"/>
-                    <line x1="9" y1="10" x2="15" y2="10"/>
+                    <circle cx="9" cy="20" r="1"/>
+                    <circle cx="17" cy="20" r="1"/>
+                    <path d="M3 4h2l3 12h10l3-8H7"/>
                 </svg>
             </div>
             <div class="dashboard-title">Monthwises Purchase</div>
         </div>
 
-<!-- Item Category Wise -->
+        <!-- Item Category -->
         <div class="dashboard-card report-card" data-report="Item Category Wise - Report">
             <div class="icon-box g-orange">
                 <svg viewBox="0 0 24 24">
-                    <path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/>
-                    <line x1="9" y1="6" x2="15" y2="6"/>
-                    <line x1="9" y1="10" x2="15" y2="10"/>
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
                 </svg>
             </div>
             <div class="dashboard-title">Item Category Wise Report</div>
         </div>
 
-
     </div>
 </div>
-<script>
-const REPORT_PATHS = {
-    "Distributor Report": "/app/query-report/Distributors%20Report",
-    "Top selling below MSL report": "/app/query-report/Most%20Selling%20Below%20MSL%20Report?custom_item_type=Finished+Goods",
-    "Top 100 Most selling Item": "/app/query-report/Most%20Selling%20Below%20MSL%20Report?custom_item_type=Finished+Goods",
-    "Bottom 100 Most selling Item": "/app/query-report/Bottom%20100%20Most%20selling%20Item",
-    "Outstanding Debtors Monthwise": "/app/query-report/Outstanding%20Debtors%20Monthwise?customer_group=Debtors+Distributors&from_date=2025-08-01&to_date=2025-08-20",
-    "Sales Analytics Report": "/app/query-report/Sales%20Analytics%20Report?tree_type=Customer&doc_type=Sales+Invoice&value_quantity=Value&from_date=2025-04-01&to_date=2026-03-31&company=Vinod+Cookware+India+Private+Limited&range=Monthly",
-    "Monthwise Sales Report": "/app/query-report/Monthwise%20Sales%20Report",
-    "Monthwises Purchase": "/app/query-report/Monthwises%20Purchase",
-    "Sales Person Target Report": "/app/query-report/Sales%20Person%20Target%20Report",
-    "Top Most Selling Items": "/app/query-report/Top%20Most%20Selling%20Items",
-    "Sales Person Report": "/app/query-report/Sales%20Person%20Report",
-    "Item Category Wise - Report": "/app/query-report/Item%20Category%20Wise%20-%20Report",
-
-};
-
-document.querySelectorAll(".report-card").forEach(card => {
-    card.addEventListener("click", function () {
-        const report = this.getAttribute("data-report");
-        if (REPORT_PATHS[report]) {
-            window.location.href = REPORT_PATHS[report];
-        } else {
-            frappe.msgprint("Report path not found: " + report);
-        }
-    });
-});
-</script>

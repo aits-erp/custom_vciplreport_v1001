@@ -1,12 +1,5 @@
-frappe.query_reports["Monthwise Sales Order Pending"] = {
+frappe.query_reports["Monthwise Sales Report"] = {
     filters: [
-        {
-            fieldname: "fiscal_year",
-            label: __("Fiscal Year"),
-            fieldtype: "Link",
-            options: "Fiscal Year",
-            reqd: 1
-        },
         {
             fieldname: "month",
             label: __("Month"),
@@ -23,9 +16,14 @@ frappe.query_reports["Monthwise Sales Order Pending"] = {
     formatter(value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
-        if (column.fieldtype === "Currency" && data && data[column.fieldname + "_drill"]) {
+        if (
+            column.fieldtype === "Currency" &&
+            data &&
+            data[column.fieldname + "_drill"] &&
+            value
+        ) {
             return `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
-                onclick='frappe.query_reports["Monthwise Sales Order Pending"]
+                onclick='frappe.query_reports["Monthwise Sales Report"]
                 .show_popup(${data[column.fieldname + "_drill"]}, "${column.label}")'>
                 ${value}
             </a>`;

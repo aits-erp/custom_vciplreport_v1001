@@ -13,6 +13,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 26px;
+    align-items: stretch;
 }
 
 .dashboard-card {
@@ -23,29 +24,40 @@
     cursor: pointer;
     transition: all .35s ease;
     box-shadow: 0 10px 28px rgba(0,0,0,.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 210px;
 }
 
 .dashboard-card:hover {
-    transform: translateY(-10px);
+    transform: translateY(-8px);
     box-shadow: 0 22px 45px rgba(0,0,0,.18);
 }
 
 .icon-box {
     width: 90px;
     height: 90px;
-    margin: 0 auto 14px;
     border-radius: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 40px;
-    color: #fff;
+}
+
+.icon-box svg {
+    width: 42px;
+    height: 42px;
+    stroke: #fff;
+    stroke-width: 2;
+    fill: none;
 }
 
 .dashboard-title {
     font-weight: 600;
     font-size: 15.5px;
     color: #2d3436;
+    min-height: 40px;
 }
 
 /* Gradients */
@@ -54,10 +66,3 @@
 .g-red    { background: linear-gradient(135deg,#ff416c,#ff4b2b); }
 .g-purple { background: linear-gradient(135deg,#667eea,#764ba2); }
 .g-orange { background: linear-gradient(135deg,#f7971e,#ffd200); }
-.icon-box svg {
-    width: 42px;
-    height: 42px;
-    stroke: white;
-    stroke-width: 2;
-    fill: none;
-}

@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import getdate
+from frappe.utils import getdate, today
 
 MONTHS = [
     (4, "apr", "April"),
@@ -54,57 +54,56 @@ def get_columns(filters):
 # DATA
 # --------------------------------------------------
 def get_data(filters):
-    fiscal_year = filters.get("fiscal_year")
     selected_month = filters.get("month")
 
-    fy = frappe.db.get_value(
-        "Fiscal Year",
-        fiscal_year,
-        ["year_start_date", "year_end_date"],
-        as_dict=True
-    )
+    # Current year Apr–Dec
+    year = getdate(today()).year
+    from_date = f"{year}-04-01"
+    to_date = f"{year}-12-31"
 
     sales_orders = frappe.db.sql("""
         SELECT
             so.name,
             so.customer,
             so.transaction_date,
-            (so.grand_total - so.billed_amount) AS pending
+            (so.grand_total * (1 - IFNULL(so.per_billed, 0) / 100)) AS pending
         FROM `tabSales Order` so
         WHERE so.docstatus = 1
           AND so.status NOT IN ('Closed', 'Completed')
           AND so.transaction_date BETWEEN %s AND %s
-    """, (fy.year_start_date, fy.year_end_date), as_dict=True)
+    """, (from_date, to_date), as_dict=True)
 
-    cust_map = {}
+    customer_map = {}
 
     for so in sales_orders:
+        if not so.pending or so.pending <= 0:
+            continue
+
         customer = so.customer
         month_no = getdate(so.transaction_date).month
-        pending = so.pending or 0
+        pending = so.pending
 
-        if customer not in cust_map:
-            cust_map[customer] = {
+        if customer not in customer_map:
+            customer_map[customer] = {
                 "customer": customer,
                 "total": 0
             }
             for _, key, _ in MONTHS:
-                cust_map[customer][key] = 0
-                cust_map[customer][key + "_drill"] = []
+                customer_map[customer][key] = 0
+                customer_map[customer][key + "_drill"] = []
 
         for m_no, key, label in MONTHS:
             if month_no == m_no and (not selected_month or selected_month == label):
-                cust_map[customer][key] += pending
-                cust_map[customer]["total"] += pending
-                cust_map[customer][key + "_drill"].append({
+                customer_map[customer][key] += pending
+                customer_map[customer]["total"] += pending
+                customer_map[customer][key + "_drill"].append({
                     "so": so.name,
                     "date": str(so.transaction_date),
                     "amount": float(pending)
                 })
 
-    # serialize drill data
     result = []
-    for row in cust_map.values():
+    for row in customer_map.values():
         for _, key, _ in MONTHS:
             row[key + "_drill"] = frappe.as_json(row[key + "_drill"])
         result.append(row)

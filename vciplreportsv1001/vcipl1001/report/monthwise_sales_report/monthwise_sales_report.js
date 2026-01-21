@@ -34,7 +34,7 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
     show_popup(rows, title) {
         if (!rows || rows.length === 0) {
-            frappe.msgprint(__("No pending Sales Orders"));
+            frappe.msgprint(__("No Sales Invoices"));
             return;
         }
 
@@ -43,9 +43,9 @@ frappe.query_reports["Monthwise Sales Report"] = {
         <table class="table table-bordered">
             <thead>
                 <tr>
-                    <th>Sales Order</th>
+                    <th>Sales Invoice</th>
                     <th>Date</th>
-                    <th>Pending Amount</th>
+                    <th>Amount</th>
                 </tr>
             </thead><tbody>`;
 
@@ -53,10 +53,10 @@ frappe.query_reports["Monthwise Sales Report"] = {
             html += `
             <tr>
                 <td>
-                    <a href="/app/sales-order/${r.so}"
+                    <a href="/app/sales-invoice/${r.invoice}"
                        target="_blank"
                        style="font-weight:bold">
-                       ${r.so}
+                       ${r.invoice}
                     </a>
                 </td>
                 <td>${r.date}</td>

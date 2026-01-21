@@ -12,16 +12,16 @@ def execute(filters=None):
 # --------------------------------------------------
 def get_columns():
     return [
-        {"label": "Region", "fieldname": "region", "width": 140},
-        {"label": "Location", "fieldname": "location", "width": 160},
-        {"label": "Territory", "fieldname": "territory", "width": 160},
         {
             "label": "Parent Sales Person",
             "fieldname": "parent_sales_person",
             "fieldtype": "Link",
             "options": "Sales Person",
-            "width": 180
+            "width": 190
         },
+        {"label": "Region", "fieldname": "region", "width": 130},
+        {"label": "Location", "fieldname": "location", "width": 150},
+        {"label": "Territory", "fieldname": "territory", "width": 150},
         {
             "label": "Sales Person",
             "fieldname": "sales_person",
@@ -30,10 +30,9 @@ def get_columns():
             "width": 180
         },
         {
-            "label": "Customer",
-            "fieldname": "customer",
-            "fieldtype": "Link",
-            "options": "Customer",
+            "label": "Customer Name",
+            "fieldname": "customer_name",
+            "fieldtype": "Data",
             "width": 240
         },
         {
@@ -44,7 +43,7 @@ def get_columns():
         },
         {
             "label": "Invoice Amount",
-            "fieldname": "amount",
+            "fieldname": "invoice_amount",
             "fieldtype": "Currency",
             "width": 160
         },
@@ -62,14 +61,15 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters):
 
-    # ---------------- DATE LOGIC ----------------
+    # ---------------- DATE & MONTH ----------------
+    month = int(filters.get("month"))
+    year = int(filters.get("year") or getdate(filters.from_date).year)
+
     from_date = getdate(filters.from_date)
     to_date = getdate(filters.to_date)
 
     ly_from = add_years(from_date, -1)
     ly_to = add_years(to_date, -1)
-
-    month = int(filters.month or from_date.month)
 
     # ---------------- FILTER VALUES ----------------
     f_region = filters.get("custom_region")
@@ -97,6 +97,7 @@ def get_data(filters):
         SELECT
             st.sales_person,
             c.name AS customer,
+            c.customer_name,
             CASE %(month)s
                 WHEN 1 THEN st.custom_january
                 WHEN 2 THEN st.custom_february
@@ -116,21 +117,22 @@ def get_data(filters):
         WHERE st.parenttype = 'Customer'
     """, {"month": month}, as_dict=True)
 
-    # ---------------- CURRENT FY INVOICE ----------------
-    current_rows = frappe.db.sql("""
+    # ---------------- CURRENT MONTH INVOICE ----------------
+    current_invoice = frappe.db.sql("""
         SELECT
             customer,
             SUM(base_net_total) AS amount
         FROM `tabSales Invoice`
         WHERE docstatus = 1
-          AND posting_date BETWEEN %(f)s AND %(t)s
+          AND MONTH(posting_date) = %(month)s
+          AND YEAR(posting_date) = %(year)s
         GROUP BY customer
-    """, {"f": from_date, "t": to_date}, as_dict=True)
+    """, {"month": month, "year": year}, as_dict=True)
 
-    current_map = {r.customer: flt(r.amount) for r in current_rows}
+    current_map = {r.customer: flt(r.amount) for r in current_invoice}
 
-    # ---------------- LAST FY INVOICE ----------------
-    last_year_rows = frappe.db.sql("""
+    # ---------------- LAST YEAR SAME PERIOD ----------------
+    last_year_invoice = frappe.db.sql("""
         SELECT
             customer,
             SUM(base_net_total) AS amount
@@ -140,7 +142,7 @@ def get_data(filters):
         GROUP BY customer
     """, {"f": ly_from, "t": ly_to}, as_dict=True)
 
-    last_year_map = {r.customer: flt(r.amount) for r in last_year_rows}
+    last_year_map = {r.customer: flt(r.amount) for r in last_year_invoice}
 
     # ---------------- FINAL DATA ----------------
     data = []
@@ -150,7 +152,7 @@ def get_data(filters):
         if not sp:
             continue
 
-        # ---------------- APPLY FILTERS (IMPORTANT) ----------------
+        # APPLY FILTERS
         if f_region and sp.custom_region != f_region:
             continue
         if f_location and sp.custom_location != f_location:
@@ -163,15 +165,15 @@ def get_data(filters):
             continue
 
         data.append({
+            "parent_sales_person": sp.parent_sales_person,
             "region": sp.custom_region,
             "location": sp.custom_location,
             "territory": sp.custom_territory,
-            "parent_sales_person": sp.parent_sales_person,
             "sales_person": t.sales_person,
-            "customer": t.customer,  # CUSTOMER NAME ONLY
+            "customer_name": t.customer_name,   # ✅ CUSTOMER NAME ONLY
             "target": flt(t.target),
-            "amount": current_map.get(t.customer, 0),
-            "last_year_amount": last_year_map.get(t.customer, 0)
+            "invoice_amount": current_map.get(t.customer, 0),
+            "last_year_amount": last_year_map.get(t.customer, 0),
         })
 
     return data

@@ -22,6 +22,13 @@ frappe.query_reports["Distributors Reportss"] = {
             default: new Date().getMonth() + 1
         },
         {
+            fieldname: "year",
+            label: "Year",
+            fieldtype: "Select",
+            options: ["2023", "2024", "2025", "2026"],
+            default: new Date().getFullYear().toString()
+        },
+        {
             fieldname: "from_date",
             label: "From Date",
             fieldtype: "Date",

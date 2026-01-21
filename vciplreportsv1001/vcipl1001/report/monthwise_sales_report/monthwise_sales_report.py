@@ -28,8 +28,8 @@ def execute(filters=None):
 def get_columns(filters):
     columns = [{
         "label": "Customer",
-        "fieldname": "customer",
-        "width": 260
+        "fieldname": "customer_name",
+        "width": 280
     }]
 
     selected_month = filters.get("month")
@@ -62,7 +62,7 @@ def get_data(filters):
     invoices = frappe.db.sql("""
         SELECT
             si.name AS invoice,
-            si.customer,
+            si.customer_name,
             si.posting_date,
             si.grand_total
         FROM `tabSales Invoice` si
@@ -72,13 +72,13 @@ def get_data(filters):
     customer_map = {}
 
     for inv in invoices:
-        customer = inv.customer
+        customer = inv.customer_name   # ✅ CUSTOMER NAME
         month_no = getdate(inv.posting_date).month
         amount = inv.grand_total
 
         if customer not in customer_map:
             customer_map[customer] = {
-                "customer": customer,
+                "customer_name": customer,
                 "total": 0
             }
             for _, key, _ in MONTHS:

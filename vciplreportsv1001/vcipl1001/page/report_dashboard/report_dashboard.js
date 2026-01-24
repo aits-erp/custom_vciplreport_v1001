@@ -25,7 +25,7 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "Item Category Wise - Report": "/app/query-report/Item%20Category%20Wise%20-%20Report"
     };
 
-    // Click handler
+    // Click handlers
     page.body.on("click", ".report-card", function () {
 
         let report_name = $(this).data("report");

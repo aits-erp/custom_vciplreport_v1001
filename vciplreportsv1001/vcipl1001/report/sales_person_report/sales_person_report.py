@@ -116,17 +116,17 @@ def get_data(filters):
         WHERE st.parenttype = 'Customer'
     """, {"month": month}, as_dict=True)
 
-    # ---------------- CURRENT INVOICE ----------------
+    # ---------------- CURRENT INVOICE (FIXED) ----------------
+    # ❗ Use DATE RANGE instead of MONTH/YEAR so filters work correctly
     current_invoice = frappe.db.sql("""
         SELECT
             customer,
             SUM(base_net_total) AS amount
         FROM `tabSales Invoice`
         WHERE docstatus = 1
-          AND MONTH(posting_date) = %(month)s
-          AND YEAR(posting_date) = %(year)s
+          AND posting_date BETWEEN %(f)s AND %(t)s
         GROUP BY customer
-    """, {"month": month, "year": year}, as_dict=True)
+    """, {"f": from_date, "t": to_date}, as_dict=True)
 
     current_map = {r.customer: flt(r.amount) for r in current_invoice}
 
@@ -160,6 +160,7 @@ def get_data(filters):
         if not sp.custom_region:
             continue
 
+        # ---------------- APPLY FILTERS (WORKING) ----------------
         if f_region and sp.custom_region != f_region:
             continue
         if f_location and sp.custom_location != f_location:
@@ -174,6 +175,7 @@ def get_data(filters):
         target_val = flt(t.target)
         invoice_val = current_map.get(t.customer, 0)
 
+        # ✅ Totals calculated ONLY for filtered rows
         total_target += target_val
         total_invoice += invoice_val
 
@@ -190,11 +192,12 @@ def get_data(filters):
             "last_year_amount": last_year_map.get(t.customer, 0),
         })
 
-    # ---------------- TOTAL ROW ----------------
-    data.append({
-        "customer_name": "TOTAL",
-        "target": total_target,
-        "invoice_amount": total_invoice
-    })
+    # ---------------- TOTAL ROW (SAFE) ----------------
+    if data:
+        data.append({
+            "customer_name": "TOTAL",
+            "target": total_target,
+            "invoice_amount": total_invoice
+        })
 
     return data

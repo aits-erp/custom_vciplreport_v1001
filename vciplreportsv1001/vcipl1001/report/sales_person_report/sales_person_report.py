@@ -13,11 +13,16 @@ def execute(filters=None):
 def get_columns():
     return [
         {
-            "label": "Parent Sales Person",
-            "fieldname": "parent_sales_person",
+            "label": "Head Sales Person",
+            "fieldname": "head_sales_person",
             "fieldtype": "Link",
             "options": "Sales Person",
             "width": 190
+        },
+        {
+            "label": "Head Sales Code",
+            "fieldname": "custom_head_sales_code",
+            "width": 140
         },
         {"label": "Region", "fieldname": "region", "width": 130},
         {"label": "Location", "fieldname": "location", "width": 150},
@@ -60,7 +65,7 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters):
 
-    # ---------------- DATE & MONTH ----------------
+    # ---------------- DATE ----------------
     month = int(filters.get("month"))
     year = int(filters.get("year") or getdate(filters.from_date).year)
 
@@ -82,6 +87,7 @@ def get_data(filters):
         SELECT
             name,
             parent_sales_person,
+            custom_head_sales_code,
             custom_region,
             custom_location,
             custom_territory
@@ -151,8 +157,7 @@ def get_data(filters):
         if not sp:
             continue
 
-        # 🔴 IMPORTANT RULE:
-        # ❌ Skip if Parent Sales Person has NO region
+        # ❌ Skip if Head Sales Person has no region
         if not sp.custom_region:
             continue
 
@@ -169,7 +174,8 @@ def get_data(filters):
             continue
 
         data.append({
-            "parent_sales_person": sp.parent_sales_person,
+            "head_sales_person": sp.parent_sales_person,
+            "custom_head_sales_code": sp.custom_head_sales_code,
             "region": sp.custom_region,
             "location": sp.custom_location,
             "territory": sp.custom_territory,

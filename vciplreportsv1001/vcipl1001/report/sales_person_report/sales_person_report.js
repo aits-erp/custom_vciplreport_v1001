@@ -56,7 +56,7 @@ frappe.query_reports["Sales Person Report"] = {
         },
         {
             fieldname: "parent_sales_person",
-            label: "Parent Sales Person",
+            label: "Head Sales Person",
             fieldtype: "Link",
             options: "Sales Person"
         },

@@ -6,7 +6,7 @@ frappe.query_reports["Distributors Report"] = {
             label: "Customer Group",
             fieldtype: "Link",
             options: "Customer Group",
-            default: "Distributor"
+            default: "Debtors Distributors"
         },
         {
             fieldname: "rsm",

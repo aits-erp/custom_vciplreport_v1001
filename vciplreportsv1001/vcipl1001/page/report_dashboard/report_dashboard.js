@@ -12,7 +12,7 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
 
     // Central report path mapping
     const REPORT_PATHS = {
-        "Distributor Report": " ",
+        "Distributor Report": "/app/query-report/Outstanding%20Debtors%20Report?customer_group=Debtors+Distributors",
         "Top selling below MSL report": "/app/query-report/Most%20Selling%20Below%20MSL%20Report?custom_item_type=Finished+Goods",
         "Top Most Selling Items": "/app/query-report/Top%20Most%20Selling%20Items",
         "Bottom 100 Most selling Item": "/app/query-report/Bottom%20100%20Most%20selling%20Item",

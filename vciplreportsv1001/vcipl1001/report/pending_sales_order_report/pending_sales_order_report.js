@@ -23,7 +23,7 @@ frappe.query_reports["Pending Sales Order Report"] = {
 			label: __("Sales Order"),
 			fieldtype: "MultiSelectList",
 			options: "Sales Order",
-			get_data: function (txt) {
+			get_data(txt) {
 				return frappe.db.get_link_options("Sales Order", txt);
 			}
 		},
@@ -53,27 +53,27 @@ frappe.query_reports["Pending Sales Order Report"] = {
 		}
 	],
 
-	formatter: function (value, row, column, data, default_formatter) {
+	formatter(value, row, column, data, default_formatter) {
 		value = default_formatter(value, row, column, data);
 
-		if (column.fieldname === "pending_qty" && data && data.pending_qty > 0) {
+		if (column.fieldname === "pending_qty" && data?.pending_qty > 0) {
 			value = `<span style="color:#d9534f;font-weight:600">${value}</span>`;
 		}
 
-		if (column.fieldname === "delay" && data && data.delay > 0) {
+		if (column.fieldname === "delay" && data?.delay > 0) {
 			value = `<span style="color:#f0ad4e;font-weight:600">${value}</span>`;
 		}
 
 		return value;
 	},
 
-	onload: function (report) {
-		report.page.add_inner_button(__("Group by Sales Order"), function () {
+	onload(report) {
+		report.page.add_inner_button(__("Group by Sales Order"), () => {
 			report.set_filter_value("group_by_so", 1);
 			report.refresh();
 		});
 
-		report.page.add_inner_button(__("Item Wise"), function () {
+		report.page.add_inner_button(__("Item Wise"), () => {
 			report.set_filter_value("group_by_so", 0);
 			report.refresh();
 		});

@@ -1,6 +1,3 @@
-# Copyright (c)
-# For license information, please see license.txt
-
 import copy
 from collections import OrderedDict
 
@@ -27,31 +24,28 @@ def execute(filters=None):
 
 	data, chart_data, totals = prepare_data(data, so_elapsed_time, filters)
 
-	# 🔥 FOOTER TOTALS
+	# 🔹 FOOTER TOTALS (RENAMED)
 	report_summary = [
 		{"label": _("Delivered Qty"), "value": totals["delivered_qty"], "datatype": "Float"},
 		{"label": _("Qty to Deliver"), "value": totals["pending_qty"], "datatype": "Float"},
 		{"label": _("Billed Qty"), "value": totals["billed_qty"], "datatype": "Float"},
 		{"label": _("Qty to Bill"), "value": totals["qty_to_bill"], "datatype": "Float"},
-		{"label": _("Amount"), "value": totals["amount"], "datatype": "Currency"},
+		{"label": _("Order Amount"), "value": totals["amount"], "datatype": "Currency"},
 		{"label": _("Billed Amount"), "value": totals["billed_amount"], "datatype": "Currency"},
 		{"label": _("Pending Amount"), "value": totals["pending_amount"], "datatype": "Currency"},
-		{"label": _("Amount Delivered"), "value": totals["delivered_qty_amount"], "datatype": "Currency"},
+		{"label": _("Delivered Amount"), "value": totals["delivered_qty_amount"], "datatype": "Currency"},
 	]
 
 	return columns, data, None, chart_data, report_summary
 
 
 # --------------------------------------------------
-# VALIDATIONS
+# VALIDATION
 # --------------------------------------------------
 def validate_filters(filters):
-	from_date, to_date = filters.get("from_date"), filters.get("to_date")
-
-	if not from_date and to_date:
-		frappe.throw(_("From and To Dates are required."))
-	elif from_date and to_date and date_diff(to_date, from_date) < 0:
-		frappe.throw(_("To Date cannot be before From Date."))
+	if filters.get("from_date") and filters.get("to_date"):
+		if date_diff(filters.to_date, filters.from_date) < 0:
+			frappe.throw(_("To Date cannot be before From Date."))
 
 
 # --------------------------------------------------
@@ -79,14 +73,14 @@ def get_conditions(filters):
 
 
 # --------------------------------------------------
-# DATA QUERY
+# DATA
 # --------------------------------------------------
 def get_data(conditions, filters):
 	return frappe.db.sql(
 		f"""
 		SELECT
 			so.transaction_date AS date,
-			soi.delivery_date AS delivery_date,
+			soi.delivery_date,
 			so.name AS sales_order,
 			so.status,
 			so.customer,
@@ -108,15 +102,14 @@ def get_data(conditions, filters):
 		INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
 		LEFT JOIN `tabSales Invoice Item` sii
 			ON sii.so_detail = soi.name AND sii.docstatus = 1
-		WHERE
-			so.docstatus = 1
-			AND so.status NOT IN ('Stopped', 'On Hold')
-			{conditions}
+		WHERE so.docstatus = 1
+		AND so.status NOT IN ('Stopped', 'On Hold')
+		{conditions}
 		GROUP BY soi.name
-		ORDER BY so.transaction_date ASC
+		ORDER BY so.transaction_date
 		""",
 		filters,
-		as_dict=True,
+		as_dict=True
 	)
 
 
@@ -124,11 +117,9 @@ def get_data(conditions, filters):
 # ELAPSED TIME
 # --------------------------------------------------
 def get_so_elapsed_time(data):
-	so_elapsed_time = OrderedDict()
+	result = OrderedDict()
 	if not data:
-		return so_elapsed_time
-
-	sales_orders = list({d.sales_order for d in data})
+		return result
 
 	so = qb.DocType("Sales Order")
 	soi = qb.DocType("Sales Order Item")
@@ -143,27 +134,28 @@ def get_so_elapsed_time(data):
 		.left_join(dni).on(dni.so_detail == soi.name)
 		.left_join(dn).on(dni.parent == dn.name)
 		.select(
-			so.name.as_("sales_order"),
-			soi.item_code.as_("item_code"),
-			(to_seconds(Max(dn.posting_date)) - to_seconds(so.transaction_date)).as_("elapsed_seconds"),
+			so.name,
+			soi.item_code,
+			(to_seconds(Max(dn.posting_date)) - to_seconds(so.transaction_date)).as_("elapsed")
 		)
-		.where((so.name.isin(sales_orders)) & (dn.docstatus == 1))
+		.where(dn.docstatus == 1)
 		.groupby(soi.name)
 	)
 
 	for r in query.run(as_dict=True):
-		so_elapsed_time[(r.sales_order, r.item_code)] = r.elapsed_seconds
+		result[(r.name, r.item_code)] = r.elapsed
 
-	return so_elapsed_time
+	return result
 
 
 # --------------------------------------------------
-# PREPARE DATA + TOTALS
+# PREPARE DATA
 # --------------------------------------------------
 def prepare_data(data, so_elapsed_time, filters):
 	sales_order_map = {}
 
 	totals = {
+		"qty": 0,
 		"delivered_qty": 0,
 		"pending_qty": 0,
 		"billed_qty": 0,
@@ -176,15 +168,10 @@ def prepare_data(data, so_elapsed_time, filters):
 
 	for row in data:
 		row.qty_to_bill = flt(row.qty) - flt(row.billed_qty)
-		row.delay = 0 if row.delay and row.delay < 0 else row.delay
-		row.time_taken_to_deliver = (
-			so_elapsed_time.get((row.sales_order, row.item_code))
-			if row.status in ("Completed", "To Bill")
-			else 0
-		)
+		row.delay = max(row.delay or 0, 0)
 
-		for f in totals:
-			totals[f] += flt(row.get(f))
+		for k in totals:
+			totals[k] += flt(row.get(k))
 
 		if filters.get("group_by_so"):
 			so = row.sales_order
@@ -196,11 +183,17 @@ def prepare_data(data, so_elapsed_time, filters):
 				sales_order_map[so] = so_row
 			else:
 				so_row = sales_order_map[so]
-				so_row.delivery_date = max(getdate(so_row.delivery_date), getdate(row.delivery_date))
-				for f in totals:
-					so_row[f] = flt(so_row.get(f)) + flt(row.get(f))
+				for k in totals:
+					so_row[k] = flt(so_row.get(k)) + flt(row.get(k))
+				so_row.delivery_date = max(
+					getdate(so_row.delivery_date),
+					getdate(row.delivery_date)
+				)
 
-	chart_data = prepare_chart_data(totals["pending_amount"], totals["billed_amount"])
+	chart_data = prepare_chart_data(
+		totals["pending_amount"],
+		totals["billed_amount"]
+	)
 
 	if filters.get("group_by_so"):
 		return list(sales_order_map.values()), chart_data, totals
@@ -211,11 +204,11 @@ def prepare_data(data, so_elapsed_time, filters):
 # --------------------------------------------------
 # CHART
 # --------------------------------------------------
-def prepare_chart_data(pending, completed):
+def prepare_chart_data(pending, billed):
 	return {
 		"data": {
 			"labels": [_("Amount to Bill"), _("Billed Amount")],
-			"datasets": [{"values": [pending, completed]}],
+			"datasets": [{"values": [pending, billed]}],
 		},
 		"type": "donut",
 		"height": 300,
@@ -223,9 +216,11 @@ def prepare_chart_data(pending, completed):
 
 
 # --------------------------------------------------
-# COLUMNS
+# COLUMNS (RENAMED)
 # --------------------------------------------------
 def get_columns(filters):
+	qty_label = _("Ordered Qty") if filters.get("group_by_so") else _("Qty")
+
 	columns = [
 		{"label": _("Date"), "fieldname": "date", "fieldtype": "Date", "width": 90},
 		{"label": _("Sales Order"), "fieldname": "sales_order", "fieldtype": "Link", "options": "Sales Order", "width": 160},
@@ -234,29 +229,26 @@ def get_columns(filters):
 	]
 
 	if not filters.get("group_by_so"):
-		columns.extend([
+		columns += [
 			{"label": _("Item Code"), "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 100},
 			{"label": _("Description"), "fieldname": "description", "width": 150},
-		])
+		]
 
-	columns.extend([
-		{"label": _("Qty"), "fieldname": "qty", "fieldtype": "Float", "width": 100},
+	columns += [
+		{"label": qty_label, "fieldname": "qty", "fieldtype": "Float", "width": 110},
 		{"label": _("Delivered Qty"), "fieldname": "delivered_qty", "fieldtype": "Float", "width": 120},
 		{"label": _("Qty to Deliver"), "fieldname": "pending_qty", "fieldtype": "Float", "width": 120},
 		{"label": _("Billed Qty"), "fieldname": "billed_qty", "fieldtype": "Float", "width": 100},
 		{"label": _("Qty to Bill"), "fieldname": "qty_to_bill", "fieldtype": "Float", "width": 100},
-		{"label": _("Amount"), "fieldname": "amount", "fieldtype": "Currency", "width": 120, "options": "Company:company:default_currency"},
-		{"label": _("Billed Amount"), "fieldname": "billed_amount", "fieldtype": "Currency", "width": 120, "options": "Company:company:default_currency"},
-		{"label": _("Pending Amount"), "fieldname": "pending_amount", "fieldtype": "Currency", "width": 120, "options": "Company:company:default_currency"},
-		{"label": _("Amount Delivered"), "fieldname": "delivered_qty_amount", "fieldtype": "Currency", "width": 120, "options": "Company:company:default_currency"},
-		{"label": _("Delivery Date"), "fieldname": "delivery_date", "fieldtype": "Date", "width": 120},
-		{"label": _("Delay (Days)"), "fieldname": "delay", "width": 100},
-		{"label": _("Time Taken to Deliver"), "fieldname": "time_taken_to_deliver", "fieldtype": "Duration", "width": 120},
-	])
+		{"label": _("Order Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": "Company:company:default_currency"},
+		{"label": _("Billed Amount"), "fieldname": "billed_amount", "fieldtype": "Currency", "options": "Company:company:default_currency"},
+		{"label": _("Pending Amount"), "fieldname": "pending_amount", "fieldtype": "Currency", "options": "Company:company:default_currency"},
+		{"label": _("Delivered Amount"), "fieldname": "delivered_qty_amount", "fieldtype": "Currency", "options": "Company:company:default_currency"},
+	]
 
 	if not filters.get("group_by_so"):
-		columns.append({"label": _("Warehouse"), "fieldname": "warehouse", "fieldtype": "Link", "options": "Warehouse", "width": 120})
+		columns.append({"label": _("Warehouse"), "fieldname": "warehouse", "fieldtype": "Link", "options": "Warehouse"})
 
-	columns.append({"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company", "width": 120})
+	columns.append({"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"})
 
 	return columns

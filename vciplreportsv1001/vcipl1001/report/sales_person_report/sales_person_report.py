@@ -22,9 +22,9 @@ def get_columns():
         {
             "label": "Head Sales Code",
             "fieldname": "custom_head_sales_code",
-            "width": 140
+            "width": 150
         },
-        {"label": "Region", "fieldname": "region", "width": 130},
+        {"label": "Region", "fieldname": "region", "width": 120},
         {"label": "Location", "fieldname": "location", "width": 150},
         {"label": "Territory", "fieldname": "territory", "width": 150},
         {
@@ -34,11 +34,7 @@ def get_columns():
             "options": "Sales Person",
             "width": 180
         },
-        {
-            "label": "Customer Name",
-            "fieldname": "customer_name",
-            "width": 240
-        },
+        {"label": "Customer Name", "fieldname": "customer_name", "width": 240},
         {
             "label": "Target",
             "fieldname": "target",
@@ -157,7 +153,14 @@ def get_data(filters):
         if not sp:
             continue
 
-        # ❌ Skip if Head Sales Person has no region
+        # 1️⃣ First column → parent_sales_person (child)
+        head_sales_person = sp.parent_sales_person
+
+        # 2️⃣ Second column → custom_head_sales_code (from parent record)
+        parent_sp = sp_map.get(head_sales_person)
+        head_sales_code = parent_sp.custom_head_sales_code if parent_sp else None
+
+        # Skip if region missing (your existing rule)
         if not sp.custom_region:
             continue
 
@@ -168,14 +171,14 @@ def get_data(filters):
             continue
         if f_territory and sp.custom_territory != f_territory:
             continue
-        if f_parent and sp.parent_sales_person != f_parent:
+        if f_parent and head_sales_person != f_parent:
             continue
         if f_customer and t.customer != f_customer:
             continue
 
         data.append({
-            "head_sales_person": sp.parent_sales_person,
-            "custom_head_sales_code": sp.custom_head_sales_code,
+            "head_sales_person": head_sales_person,
+            "custom_head_sales_code": head_sales_code,
             "region": sp.custom_region,
             "location": sp.custom_location,
             "territory": sp.custom_territory,

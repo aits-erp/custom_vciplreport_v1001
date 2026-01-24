@@ -20,7 +20,7 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "Sales Person Report": "/app/query-report/Sales%20Person%20-%20Reports",
         // "Sales Analytics Report": "/app/query-report/Sales%20Analytics%20Report",
         "Monthwise Sales Report": "/app/query-report/Monthwise%20Sales%20Report",
-        "Sales order - with available qtyss": "/app/sales-order/view/report/Sales%20order%20-%20with%20available%20qtyss",
+        "Pending Sales Order Report": "/app/query-report/Pending%20Sales%20Order%20Report?company=Vinod+Cookware+India+Private+Limited&group_by_so=1",
         "Monthwises Purchase": "/app/query-report/Monthwises%20Purchase",
         "Item Category Wise - Report": "/app/query-report/Item%20Category%20Wise%20-%20Report"
     };

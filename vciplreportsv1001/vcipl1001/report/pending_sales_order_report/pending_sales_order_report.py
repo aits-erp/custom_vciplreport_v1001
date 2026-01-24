@@ -1,4 +1,4 @@
-# Copyright (c) 2013, Frappe Technologies Pvt. Ltd.
+# Copyright (c)
 # For license information, please see license.txt
 
 import copy
@@ -25,9 +25,21 @@ def execute(filters=None):
 	if not data:
 		return columns, [], None, []
 
-	data, chart_data = prepare_data(data, so_elapsed_time, filters)
+	data, chart_data, totals = prepare_data(data, so_elapsed_time, filters)
 
-	return columns, data, None, chart_data
+	# 🔥 FOOTER TOTALS
+	report_summary = [
+		{"label": _("Delivered Qty"), "value": totals["delivered_qty"], "datatype": "Float"},
+		{"label": _("Qty to Deliver"), "value": totals["pending_qty"], "datatype": "Float"},
+		{"label": _("Billed Qty"), "value": totals["billed_qty"], "datatype": "Float"},
+		{"label": _("Qty to Bill"), "value": totals["qty_to_bill"], "datatype": "Float"},
+		{"label": _("Amount"), "value": totals["amount"], "datatype": "Currency"},
+		{"label": _("Billed Amount"), "value": totals["billed_amount"], "datatype": "Currency"},
+		{"label": _("Pending Amount"), "value": totals["pending_amount"], "datatype": "Currency"},
+		{"label": _("Amount Delivered"), "value": totals["delivered_qty_amount"], "datatype": "Currency"},
+	]
+
+	return columns, data, None, chart_data, report_summary
 
 
 # --------------------------------------------------
@@ -67,7 +79,7 @@ def get_conditions(filters):
 
 
 # --------------------------------------------------
-# DATA QUERY (ITEM-WISE – SAFE)
+# DATA QUERY
 # --------------------------------------------------
 def get_data(conditions, filters):
 	return frappe.db.sql(
@@ -146,16 +158,23 @@ def get_so_elapsed_time(data):
 
 
 # --------------------------------------------------
-# 🔥 CORE FIX – GROUP BY SALES ORDER
+# PREPARE DATA + TOTALS
 # --------------------------------------------------
 def prepare_data(data, so_elapsed_time, filters):
-	completed, pending = 0, 0
 	sales_order_map = {}
 
-	for row in data:
-		completed += flt(row.billed_amount)
-		pending += flt(row.pending_amount)
+	totals = {
+		"delivered_qty": 0,
+		"pending_qty": 0,
+		"billed_qty": 0,
+		"qty_to_bill": 0,
+		"amount": 0,
+		"billed_amount": 0,
+		"pending_amount": 0,
+		"delivered_qty_amount": 0,
+	}
 
+	for row in data:
 		row.qty_to_bill = flt(row.qty) - flt(row.billed_qty)
 		row.delay = 0 if row.delay and row.delay < 0 else row.delay
 		row.time_taken_to_deliver = (
@@ -164,47 +183,29 @@ def prepare_data(data, so_elapsed_time, filters):
 			else 0
 		)
 
+		for f in totals:
+			totals[f] += flt(row.get(f))
+
 		if filters.get("group_by_so"):
 			so = row.sales_order
-
 			if so not in sales_order_map:
 				so_row = copy.deepcopy(row)
-
-				# clear item-specific columns
 				so_row.item_code = ""
 				so_row.description = ""
 				so_row.warehouse = ""
-
 				sales_order_map[so] = so_row
 			else:
 				so_row = sales_order_map[so]
-
-				so_row.delivery_date = max(
-					getdate(so_row.delivery_date),
-					getdate(row.delivery_date)
-				)
-
-				sum_fields = [
-					"qty",
-					"delivered_qty",
-					"pending_qty",
-					"billed_qty",
-					"qty_to_bill",
-					"amount",
-					"delivered_qty_amount",
-					"billed_amount",
-					"pending_amount",
-				]
-
-				for f in sum_fields:
+				so_row.delivery_date = max(getdate(so_row.delivery_date), getdate(row.delivery_date))
+				for f in totals:
 					so_row[f] = flt(so_row.get(f)) + flt(row.get(f))
 
-	chart_data = prepare_chart_data(pending, completed)
+	chart_data = prepare_chart_data(totals["pending_amount"], totals["billed_amount"])
 
 	if filters.get("group_by_so"):
-		return list(sales_order_map.values()), chart_data
+		return list(sales_order_map.values()), chart_data, totals
 
-	return data, chart_data
+	return data, chart_data, totals
 
 
 # --------------------------------------------------
@@ -222,7 +223,7 @@ def prepare_chart_data(pending, completed):
 
 
 # --------------------------------------------------
-# COLUMNS (UNCHANGED)
+# COLUMNS
 # --------------------------------------------------
 def get_columns(filters):
 	columns = [

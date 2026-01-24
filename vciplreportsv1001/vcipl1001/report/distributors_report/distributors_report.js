@@ -8,24 +8,7 @@ frappe.query_reports["Distributors Report"] = {
             options: "Customer Group",
             default: "Debtors Distributors"
         },
-        {
-            fieldname: "rsm",
-            label: "RSM",
-            fieldtype: "Link",
-            options: "Sales Person"
-        },
-        {
-            fieldname: "asm",
-            label: "ASM",
-            fieldtype: "Link",
-            options: "Sales Person"
-        },
-        {
-            fieldname: "tso",
-            label: "TSO",
-            fieldtype: "Link",
-            options: "Sales Person"
-        }
+        
     ],
 
     formatter(value, row, column, data, default_formatter) {

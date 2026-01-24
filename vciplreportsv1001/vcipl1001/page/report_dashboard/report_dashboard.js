@@ -18,7 +18,7 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "Bottom 100 Most selling Item": "/app/query-report/Bottom%20100%20Most%20selling%20Item",
         // "Outstanding Debtors Monthwise": "/app/query-report/Outstanding%20Debtors%20Monthwise",
         "Sales Person Report": "/app/query-report/Sales%20Person%20-%20Reports",
-        "Sales Analytics Report": "/app/query-report/Sales%20Analytics%20Report",
+        // "Sales Analytics Report": "/app/query-report/Sales%20Analytics%20Report",
         "Monthwise Sales Report": "/app/query-report/Monthwise%20Sales%20Report",
         "Sales order - with available qtyss": "/app/sales-order/view/report/Sales%20order%20-%20with%20available%20qtyss",
         "Monthwises Purchase": "/app/query-report/Monthwises%20Purchase",

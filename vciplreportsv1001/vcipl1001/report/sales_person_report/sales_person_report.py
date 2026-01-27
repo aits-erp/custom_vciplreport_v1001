@@ -1,10 +1,26 @@
 import frappe
-from frappe.utils import flt, get_first_day, get_last_day, add_years
+from frappe.utils import flt, get_first_day, get_last_day, add_years, nowdate
 
 
 def execute(filters=None):
     filters = frappe._dict(filters or {})
+    set_default_filters(filters)
     return get_columns(), get_data(filters)
+
+
+# --------------------------------------------------
+# DEFAULT FILTERS (CRITICAL FIX)
+# --------------------------------------------------
+def set_default_filters(filters):
+    today = nowdate()
+    year = int(today[:4])
+    month = int(today[5:7])
+
+    filters.period_type = filters.get("period_type") or "Month"
+    filters.year = int(filters.get("year") or year)
+    filters.month = int(filters.get("month") or month)
+    filters.quarter = filters.get("quarter") or "Q1"
+    filters.half_year = filters.get("half_year") or "H1"
 
 
 # --------------------------------------------------
@@ -27,7 +43,7 @@ def get_columns():
 
 
 # --------------------------------------------------
-# PERIOD → MONTH LIST
+# PERIOD → MONTH LIST (SAFE)
 # --------------------------------------------------
 def get_months(filters):
     if filters.period_type == "Quarter":
@@ -37,12 +53,12 @@ def get_months(filters):
             "Q3": [7, 8, 9],
             "Q4": [10, 11, 12],
         }
-        return q_map.get(filters.quarter or "Q1")
+        return q_map.get(filters.quarter, [1, 2, 3])
 
     if filters.period_type == "Half Year":
         return [1, 2, 3, 4, 5, 6] if filters.half_year == "H1" else [7, 8, 9, 10, 11, 12]
 
-    # Month
+    # Month (SAFE)
     return [int(filters.month)]
 
 
@@ -50,8 +66,8 @@ def get_months(filters):
 # DATE RANGE
 # --------------------------------------------------
 def get_date_range(filters):
-    year = int(filters.year)
     months = get_months(filters)
+    year = int(filters.year)
 
     from_date = get_first_day(f"{year}-{months[0]}-01")
     to_date = get_last_day(f"{year}-{months[-1]}-01")
@@ -64,7 +80,6 @@ def get_date_range(filters):
 # --------------------------------------------------
 def get_data(filters):
 
-    months = get_months(filters)
     from_date, to_date = get_date_range(filters)
 
     ly_from = add_years(from_date, -1)
@@ -84,7 +99,7 @@ def get_data(filters):
 
     sp_map = {sp.name: sp for sp in sales_persons}
 
-    # ---------------- TARGET (PERIOD-WISE FIXED) ----------------
+    # ---------------- TARGET (PERIOD-WISE) ----------------
     month_fields = {
         1: "custom_january", 2: "custom_february", 3: "custom_march",
         4: "custom_april", 5: "custom_may_", 6: "custom_june",
@@ -92,6 +107,7 @@ def get_data(filters):
         10: "custom_october", 11: "custom_november", 12: "custom_december",
     }
 
+    months = get_months(filters)
     target_expr = " + ".join([f"COALESCE(st.{month_fields[m]},0)" for m in months])
 
     targets = frappe.db.sql(f"""
@@ -170,7 +186,7 @@ def get_data(filters):
             "customer_name": "TOTAL",
             "target": total_target,
             "invoice_amount": total_invoice,
-            "achieved_pct": (total_invoice / total_target * 100) if total_target else 0
+            "achieved_pct": (total_invoice / total_target * 100) if total_target else 0,
         })
 
     return data

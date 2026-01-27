@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import flt, getdate, add_years, get_first_day, get_last_day
+from frappe.utils import flt, get_first_day, get_last_day, add_months, add_years
 
 
 def execute(filters=None):
@@ -12,17 +12,55 @@ def execute(filters=None):
 # --------------------------------------------------
 def get_columns():
     return [
-        {"label": "Head Sales Person", "fieldname": "head_sales_person", "fieldtype": "Link", "options": "Sales Person", "width": 190},
-        {"label": "Head Sales Code", "fieldname": "custom_head_sales_code", "width": 150},
+        {"label": "Head Sales Person", "fieldname": "head_sales_person", "fieldtype": "Link", "options": "Sales Person", "width": 180},
+        {"label": "Head Sales Code", "fieldname": "custom_head_sales_code", "width": 140},
         {"label": "Region", "fieldname": "region", "width": 120},
         {"label": "Location", "fieldname": "location", "width": 150},
-        {"label": "Territory", "fieldname": "territory", "width": 150},
+        {"label": "Territory", "fieldname": "territory", "width": 140},
         {"label": "Sales Person", "fieldname": "sales_person", "fieldtype": "Link", "options": "Sales Person", "width": 180},
-        {"label": "Customer Name", "fieldname": "customer_name", "width": 240},
-        {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 140},
-        {"label": "Invoice Amount", "fieldname": "invoice_amount", "fieldtype": "Currency", "width": 160},
-        {"label": "Last Year Achievement", "fieldname": "last_year_amount", "fieldtype": "Currency", "width": 180},
+        {"label": "Customer Name", "fieldname": "customer_name", "width": 220},
+        {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 130},
+        {"label": "Invoice Amount", "fieldname": "invoice_amount", "fieldtype": "Currency", "width": 150},
+        {
+            "label": "Achieved Target %",
+            "fieldname": "achieved_pct",
+            "fieldtype": "Percent",
+            "width": 140
+        },
+        {"label": "Last Year Achievement", "fieldname": "last_year_amount", "fieldtype": "Currency", "width": 170},
     ]
+
+
+# --------------------------------------------------
+# DATE RANGE LOGIC
+# --------------------------------------------------
+def get_date_range(filters):
+    year = int(filters.year)
+
+    if filters.period_type == "Quarter":
+        q_map = {
+            "Q1": (1, 3),
+            "Q2": (4, 6),
+            "Q3": (7, 9),
+            "Q4": (10, 12)
+        }
+        start_m, end_m = q_map[filters.quarter]
+        from_date = get_first_day(f"{year}-{start_m}-01")
+        to_date = get_last_day(f"{year}-{end_m}-01")
+
+    elif filters.period_type == "Half Year":
+        if filters.half_year == "H1":
+            from_date = get_first_day(f"{year}-01-01")
+            to_date = get_last_day(f"{year}-06-01")
+        else:
+            from_date = get_first_day(f"{year}-07-01")
+            to_date = get_last_day(f"{year}-12-01")
+
+    else:
+        from_date = get_first_day(f"{year}-{filters.month}-01")
+        to_date = get_last_day(from_date)
+
+    return from_date, to_date
 
 
 # --------------------------------------------------
@@ -30,32 +68,19 @@ def get_columns():
 # --------------------------------------------------
 def get_data(filters):
 
-    # ---------------- DATE LOGIC (FIX) ----------------
-    month = int(filters.get("month"))
-    year = int(filters.get("year"))
+    from_date, to_date = get_date_range(filters)
 
-    # ✅ Auto-generate correct month range
-    from_date = get_first_day(f"{year}-{month}-01")
-    to_date = get_last_day(from_date)
-
-    # Last year same month
     ly_from = add_years(from_date, -1)
     ly_to = add_years(to_date, -1)
 
-    # ---------------- FILTERS ----------------
-    f_region = filters.get("custom_region")
+    f_territory = filters.get("custom_territory")
     f_parent = filters.get("parent_sales_person")
     f_customer = filters.get("customer")
 
-    # ---------------- SALES PERSON MASTER ----------------
+    # ---------------- SALES PERSON ----------------
     sales_persons = frappe.db.sql("""
-        SELECT
-            name,
-            parent_sales_person,
-            custom_head_sales_code,
-            custom_region,
-            custom_location,
-            custom_territory
+        SELECT name, parent_sales_person, custom_head_sales_code,
+               custom_region, custom_location, custom_territory
         FROM `tabSales Person`
         WHERE enabled = 1
     """, as_dict=True)
@@ -64,66 +89,49 @@ def get_data(filters):
 
     # ---------------- TARGET ----------------
     targets = frappe.db.sql("""
-        SELECT
-            st.sales_person,
-            c.name AS customer,
-            c.customer_name,
-            CASE %(month)s
-                WHEN 1 THEN st.custom_january
-                WHEN 2 THEN st.custom_february
-                WHEN 3 THEN st.custom_march
-                WHEN 4 THEN st.custom_april
-                WHEN 5 THEN st.custom_may_
-                WHEN 6 THEN st.custom_june
-                WHEN 7 THEN st.custom_july
-                WHEN 8 THEN st.custom_august
-                WHEN 9 THEN st.custom_september
-                WHEN 10 THEN st.custom_october
-                WHEN 11 THEN st.custom_november
-                WHEN 12 THEN st.custom_december
-            END AS target
+        SELECT st.sales_person, c.name customer, c.customer_name,
+        COALESCE(st.custom_january,0)+COALESCE(st.custom_february,0)+
+        COALESCE(st.custom_march,0)+COALESCE(st.custom_april,0)+
+        COALESCE(st.custom_may_,0)+COALESCE(st.custom_june,0)+
+        COALESCE(st.custom_july,0)+COALESCE(st.custom_august,0)+
+        COALESCE(st.custom_september,0)+COALESCE(st.custom_october,0)+
+        COALESCE(st.custom_november,0)+COALESCE(st.custom_december,0) AS target
         FROM `tabSales Team` st
         JOIN `tabCustomer` c ON c.name = st.parent
         WHERE st.parenttype = 'Customer'
-    """, {"month": month}, as_dict=True)
+    """, as_dict=True)
 
-    # ---------------- INVOICE (FIXED) ----------------
-    current_invoice = frappe.db.sql("""
-        SELECT
-            customer,
-            SUM(base_net_total) AS amount
+    # ---------------- INVOICE ----------------
+    invoices = frappe.db.sql("""
+        SELECT customer, SUM(base_net_total) amount
         FROM `tabSales Invoice`
         WHERE docstatus = 1
           AND posting_date BETWEEN %(f)s AND %(t)s
         GROUP BY customer
     """, {"f": from_date, "t": to_date}, as_dict=True)
 
-    invoice_map = {r.customer: flt(r.amount) for r in current_invoice}
+    invoice_map = {i.customer: flt(i.amount) for i in invoices}
 
     # ---------------- LAST YEAR ----------------
-    last_year_invoice = frappe.db.sql("""
-        SELECT
-            customer,
-            SUM(base_net_total) AS amount
+    last_year = frappe.db.sql("""
+        SELECT customer, SUM(base_net_total) amount
         FROM `tabSales Invoice`
         WHERE docstatus = 1
           AND posting_date BETWEEN %(f)s AND %(t)s
         GROUP BY customer
     """, {"f": ly_from, "t": ly_to}, as_dict=True)
 
-    last_year_map = {r.customer: flt(r.amount) for r in last_year_invoice}
+    last_year_map = {i.customer: flt(i.amount) for i in last_year}
 
     data = []
-    total_target = 0
-    total_invoice = 0
+    total_target = total_invoice = 0
 
     for t in targets:
         sp = sp_map.get(t.sales_person)
         if not sp:
             continue
 
-        # Apply filters
-        if f_region and sp.custom_region != f_region:
+        if f_territory and sp.custom_territory != f_territory:
             continue
         if f_parent and sp.parent_sales_person != f_parent:
             continue
@@ -132,11 +140,12 @@ def get_data(filters):
 
         parent_sp = sp_map.get(sp.parent_sales_person)
 
-        target_val = flt(t.target)
-        invoice_val = invoice_map.get(t.customer, 0)
+        target = flt(t.target)
+        invoice = invoice_map.get(t.customer, 0)
+        achieved_pct = (invoice / target * 100) if target else 0
 
-        total_target += target_val
-        total_invoice += invoice_val
+        total_target += target
+        total_invoice += invoice
 
         data.append({
             "head_sales_person": sp.parent_sales_person,
@@ -146,17 +155,18 @@ def get_data(filters):
             "territory": sp.custom_territory,
             "sales_person": t.sales_person,
             "customer_name": t.customer_name,
-            "target": target_val,
-            "invoice_amount": invoice_val,
+            "target": target,
+            "invoice_amount": invoice,
+            "achieved_pct": achieved_pct,
             "last_year_amount": last_year_map.get(t.customer, 0),
         })
 
-    # ---------------- TOTAL ROW ----------------
     if data:
         data.append({
             "customer_name": "TOTAL",
             "target": total_target,
-            "invoice_amount": total_invoice
+            "invoice_amount": total_invoice,
+            "achieved_pct": (total_invoice / total_target * 100) if total_target else 0
         })
 
     return data

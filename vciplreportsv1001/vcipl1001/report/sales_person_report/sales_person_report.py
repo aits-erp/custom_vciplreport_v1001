@@ -70,9 +70,8 @@ def get_data(filters):
     ly_from = add_years(from_date, -1)
     ly_to = add_years(to_date, -1)
 
+    # 🔹 FILTER VALUES
     f_region = filters.get("custom_region")
-    f_location = filters.get("custom_location")
-    f_territory = filters.get("custom_territory")
     f_parent = filters.get("parent_sales_person")
     f_customer = filters.get("customer")
 
@@ -116,8 +115,7 @@ def get_data(filters):
         WHERE st.parenttype = 'Customer'
     """, {"month": month}, as_dict=True)
 
-    # ---------------- CURRENT INVOICE (FIXED) ----------------
-    # ❗ Use DATE RANGE instead of MONTH/YEAR so filters work correctly
+    # ---------------- CURRENT INVOICE ----------------
     current_invoice = frappe.db.sql("""
         SELECT
             customer,
@@ -144,7 +142,6 @@ def get_data(filters):
     last_year_map = {r.customer: flt(r.amount) for r in last_year_invoice}
 
     data = []
-
     total_target = 0
     total_invoice = 0
 
@@ -157,16 +154,10 @@ def get_data(filters):
         parent_sp = sp_map.get(head_sales_person)
         head_sales_code = parent_sp.custom_head_sales_code if parent_sp else None
 
-        if not sp.custom_region:
-            continue
-
-        # ---------------- APPLY FILTERS (WORKING) ----------------
+        # ---------------- APPLY REGION FILTER ----------------
         if f_region and sp.custom_region != f_region:
             continue
-        if f_location and sp.custom_location != f_location:
-            continue
-        if f_territory and sp.custom_territory != f_territory:
-            continue
+
         if f_parent and head_sales_person != f_parent:
             continue
         if f_customer and t.customer != f_customer:
@@ -175,7 +166,6 @@ def get_data(filters):
         target_val = flt(t.target)
         invoice_val = current_map.get(t.customer, 0)
 
-        # ✅ Totals calculated ONLY for filtered rows
         total_target += target_val
         total_invoice += invoice_val
 
@@ -192,7 +182,7 @@ def get_data(filters):
             "last_year_amount": last_year_map.get(t.customer, 0),
         })
 
-    # ---------------- TOTAL ROW (SAFE) ----------------
+    # ---------------- TOTAL ROW ----------------
     if data:
         data.append({
             "customer_name": "TOTAL",

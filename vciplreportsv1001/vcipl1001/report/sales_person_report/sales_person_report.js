@@ -40,6 +40,11 @@ frappe.query_reports["Sales Person Report"] = {
             default: frappe.sys_defaults.year_end_date
         },
         {
+            fieldname: "custom_region",
+            label: "Region",
+            fieldtype: "Data"
+        },
+        {
             fieldname: "parent_sales_person",
             label: "Head Sales Person",
             fieldtype: "Link",

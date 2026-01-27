@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import flt, get_first_day, get_last_day, add_months, add_years
+from frappe.utils import flt, get_first_day, get_last_day, add_years
 
 
 def execute(filters=None):
@@ -21,44 +21,40 @@ def get_columns():
         {"label": "Customer Name", "fieldname": "customer_name", "width": 220},
         {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 130},
         {"label": "Invoice Amount", "fieldname": "invoice_amount", "fieldtype": "Currency", "width": 150},
-        {
-            "label": "Achieved Target %",
-            "fieldname": "achieved_pct",
-            "fieldtype": "Percent",
-            "width": 140
-        },
+        {"label": "Achieved Target %", "fieldname": "achieved_pct", "fieldtype": "Percent", "width": 140},
         {"label": "Last Year Achievement", "fieldname": "last_year_amount", "fieldtype": "Currency", "width": 170},
     ]
 
 
 # --------------------------------------------------
-# DATE RANGE LOGIC
+# PERIOD → MONTH LIST
+# --------------------------------------------------
+def get_months(filters):
+    if filters.period_type == "Quarter":
+        q_map = {
+            "Q1": [1, 2, 3],
+            "Q2": [4, 5, 6],
+            "Q3": [7, 8, 9],
+            "Q4": [10, 11, 12],
+        }
+        return q_map.get(filters.quarter or "Q1")
+
+    if filters.period_type == "Half Year":
+        return [1, 2, 3, 4, 5, 6] if filters.half_year == "H1" else [7, 8, 9, 10, 11, 12]
+
+    # Month
+    return [int(filters.month)]
+
+
+# --------------------------------------------------
+# DATE RANGE
 # --------------------------------------------------
 def get_date_range(filters):
     year = int(filters.year)
+    months = get_months(filters)
 
-    if filters.period_type == "Quarter":
-        q_map = {
-            "Q1": (1, 3),
-            "Q2": (4, 6),
-            "Q3": (7, 9),
-            "Q4": (10, 12)
-        }
-        start_m, end_m = q_map[filters.quarter]
-        from_date = get_first_day(f"{year}-{start_m}-01")
-        to_date = get_last_day(f"{year}-{end_m}-01")
-
-    elif filters.period_type == "Half Year":
-        if filters.half_year == "H1":
-            from_date = get_first_day(f"{year}-01-01")
-            to_date = get_last_day(f"{year}-06-01")
-        else:
-            from_date = get_first_day(f"{year}-07-01")
-            to_date = get_last_day(f"{year}-12-01")
-
-    else:
-        from_date = get_first_day(f"{year}-{filters.month}-01")
-        to_date = get_last_day(from_date)
+    from_date = get_first_day(f"{year}-{months[0]}-01")
+    to_date = get_last_day(f"{year}-{months[-1]}-01")
 
     return from_date, to_date
 
@@ -68,6 +64,7 @@ def get_date_range(filters):
 # --------------------------------------------------
 def get_data(filters):
 
+    months = get_months(filters)
     from_date, to_date = get_date_range(filters)
 
     ly_from = add_years(from_date, -1)
@@ -87,15 +84,22 @@ def get_data(filters):
 
     sp_map = {sp.name: sp for sp in sales_persons}
 
-    # ---------------- TARGET ----------------
-    targets = frappe.db.sql("""
-        SELECT st.sales_person, c.name customer, c.customer_name,
-        COALESCE(st.custom_january,0)+COALESCE(st.custom_february,0)+
-        COALESCE(st.custom_march,0)+COALESCE(st.custom_april,0)+
-        COALESCE(st.custom_may_,0)+COALESCE(st.custom_june,0)+
-        COALESCE(st.custom_july,0)+COALESCE(st.custom_august,0)+
-        COALESCE(st.custom_september,0)+COALESCE(st.custom_october,0)+
-        COALESCE(st.custom_november,0)+COALESCE(st.custom_december,0) AS target
+    # ---------------- TARGET (PERIOD-WISE FIXED) ----------------
+    month_fields = {
+        1: "custom_january", 2: "custom_february", 3: "custom_march",
+        4: "custom_april", 5: "custom_may_", 6: "custom_june",
+        7: "custom_july", 8: "custom_august", 9: "custom_september",
+        10: "custom_october", 11: "custom_november", 12: "custom_december",
+    }
+
+    target_expr = " + ".join([f"COALESCE(st.{month_fields[m]},0)" for m in months])
+
+    targets = frappe.db.sql(f"""
+        SELECT
+            st.sales_person,
+            c.name AS customer,
+            c.customer_name,
+            ({target_expr}) AS target
         FROM `tabSales Team` st
         JOIN `tabCustomer` c ON c.name = st.parent
         WHERE st.parenttype = 'Customer'

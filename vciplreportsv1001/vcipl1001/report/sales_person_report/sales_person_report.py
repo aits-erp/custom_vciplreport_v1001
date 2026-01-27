@@ -58,7 +58,6 @@ def get_months(filters):
     if filters.period_type == "Half Year":
         return [1, 2, 3, 4, 5, 6] if filters.half_year == "H1" else [7, 8, 9, 10, 11, 12]
 
-    # Month (SAFE)
     return [int(filters.month)]
 
 
@@ -85,6 +84,9 @@ def get_data(filters):
     ly_from = add_years(from_date, -1)
     ly_to = add_years(to_date, -1)
 
+    # 🔹 FILTER VALUES
+    f_region = filters.get("custom_region")
+    f_location = filters.get("custom_location")
     f_territory = filters.get("custom_territory")
     f_parent = filters.get("parent_sales_person")
     f_customer = filters.get("customer")
@@ -151,6 +153,11 @@ def get_data(filters):
         if not sp:
             continue
 
+        # ✅ APPLY ALL FILTERS
+        if f_region and sp.custom_region != f_region:
+            continue
+        if f_location and sp.custom_location != f_location:
+            continue
         if f_territory and sp.custom_territory != f_territory:
             continue
         if f_parent and sp.parent_sales_person != f_parent:

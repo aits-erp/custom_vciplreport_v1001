@@ -24,7 +24,6 @@ def execute(filters=None):
 
 	data, chart_data, totals = prepare_data(data, so_elapsed_time, filters)
 
-	# 🔹 FOOTER TOTALS (RENAMED)
 	report_summary = [
 		{"label": _("Delivered Qty"), "value": totals["delivered_qty"], "datatype": "Float"},
 		{"label": _("Qty to Deliver"), "value": totals["pending_qty"], "datatype": "Float"},
@@ -73,7 +72,7 @@ def get_conditions(filters):
 
 
 # --------------------------------------------------
-# DATA
+# DATA (Customer Name)
 # --------------------------------------------------
 def get_data(conditions, filters):
 	return frappe.db.sql(
@@ -83,7 +82,7 @@ def get_data(conditions, filters):
 			soi.delivery_date,
 			so.name AS sales_order,
 			so.status,
-			so.customer,
+			c.customer_name AS customer,
 			soi.item_code,
 			DATEDIFF(CURRENT_DATE, soi.delivery_date) AS delay,
 			soi.qty,
@@ -95,11 +94,11 @@ def get_data(conditions, filters):
 			(soi.billed_amt * IFNULL(so.conversion_rate, 1)) AS billed_amount,
 			(soi.base_amount - (soi.billed_amt * IFNULL(so.conversion_rate, 1))) AS pending_amount,
 			soi.warehouse,
-			so.company,
 			soi.name,
 			soi.description
 		FROM `tabSales Order` so
 		INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+		INNER JOIN `tabCustomer` c ON c.name = so.customer
 		LEFT JOIN `tabSales Invoice Item` sii
 			ON sii.so_detail = soi.name AND sii.docstatus = 1
 		WHERE so.docstatus = 1
@@ -216,7 +215,7 @@ def prepare_chart_data(pending, billed):
 
 
 # --------------------------------------------------
-# COLUMNS (RENAMED)
+# COLUMNS (❌ COMPANY REMOVED)
 # --------------------------------------------------
 def get_columns(filters):
 	qty_label = _("Ordered Qty") if filters.get("group_by_so") else _("Qty")
@@ -225,7 +224,7 @@ def get_columns(filters):
 		{"label": _("Date"), "fieldname": "date", "fieldtype": "Date", "width": 90},
 		{"label": _("Sales Order"), "fieldname": "sales_order", "fieldtype": "Link", "options": "Sales Order", "width": 160},
 		{"label": _("Status"), "fieldname": "status", "width": 120},
-		{"label": _("Customer"), "fieldname": "customer", "fieldtype": "Link", "options": "Customer", "width": 150},
+		{"label": _("Customer"), "fieldname": "customer", "fieldtype": "Data", "width": 200},
 	]
 
 	if not filters.get("group_by_so"):
@@ -248,7 +247,5 @@ def get_columns(filters):
 
 	if not filters.get("group_by_so"):
 		columns.append({"label": _("Warehouse"), "fieldname": "warehouse", "fieldtype": "Link", "options": "Warehouse"})
-
-	columns.append({"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"})
 
 	return columns

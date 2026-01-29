@@ -1,13 +1,22 @@
 import frappe
+from datetime import date
 
 
 def execute(filters=None):
     filters = filters or {}
 
+    # -----------------------------
+    # DEFAULT FILTER VALUES
+    # -----------------------------
+    today = date.today()
+    fy_year = today.year if today.month >= 4 else today.year - 1
+
+    from_date = filters.get("from_date") or date(fy_year, 4, 1)
+    to_date = filters.get("to_date") or today
     item_type = filters.get("custom_item_type") or "Finished Goods"
 
     columns = get_columns()
-    data = get_data(item_type)
+    data = get_data(item_type, from_date, to_date)
 
     return columns, data
 
@@ -33,7 +42,7 @@ def get_columns():
     ]
 
 
-def get_data(item_type):
+def get_data(item_type, from_date, to_date):
 
     rows = frappe.db.sql(
         """
@@ -44,7 +53,6 @@ def get_data(item_type):
             SUM(b.actual_qty) AS current_stock,
 
             COALESCE(ip.price_list_rate, 0) AS rate,
-
             SUM(b.actual_qty) * COALESCE(ip.price_list_rate, 0) AS amount,
 
             SUM(CASE WHEN b.warehouse = 'Finished Goods - VCIPL' THEN b.actual_qty ELSE 0 END) AS fg,
@@ -60,6 +68,7 @@ def get_data(item_type):
         FROM `tabItem` i
         LEFT JOIN `tabBin` b ON b.item_code = i.name
 
+        -- LATEST ITEM PRICE (STANDARD SELLING)
         LEFT JOIN (
             SELECT
                 ip1.item_code,
@@ -84,6 +93,7 @@ def get_data(item_type):
             i.disabled = 0
             AND i.is_stock_item = 1
             AND i.custom_item_type = %s
+            AND DATE(i.creation) BETWEEN %s AND %s
 
         GROUP BY
             i.name, i.item_name, ip.price_list_rate
@@ -91,7 +101,7 @@ def get_data(item_type):
         ORDER BY
             i.name
         """,
-        (item_type,),
+        (item_type, from_date, to_date),
         as_dict=True
     )
 

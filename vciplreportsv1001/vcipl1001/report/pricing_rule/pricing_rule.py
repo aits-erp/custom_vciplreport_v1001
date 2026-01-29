@@ -1,10 +1,8 @@
 import frappe
 
-
 def execute(filters=None):
-    columns = get_columns()
-    data = get_data(filters)
-    return columns, data
+    filters = filters or {}
+    return get_columns(), get_data(filters)
 
 
 def get_columns():
@@ -51,22 +49,23 @@ def get_columns():
 
 def get_data(filters):
     conditions = []
+    params = {}
 
     if filters.get("customer"):
         conditions.append("pr.customer = %(customer)s")
+        params["customer"] = filters["customer"]
 
     if filters.get("apply_on"):
         conditions.append("pr.apply_on = %(apply_on)s")
+        params["apply_on"] = filters["apply_on"]
 
     if filters.get("enabled") is not None:
         conditions.append("pr.enabled = %(enabled)s")
+        params["enabled"] = filters["enabled"]
 
-    where_clause = " AND ".join(conditions)
-    if where_clause:
-        where_clause = "WHERE " + where_clause
+    where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
-    return frappe.db.sql(
-        f"""
+    query = f"""
         SELECT
             pr.name,
             pr.title,
@@ -83,7 +82,6 @@ def get_data(filters):
             AND prd.parentfield = 'items'
         {where_clause}
         ORDER BY pr.modified DESC
-        """,
-        filters,
-        as_dict=True
-    )
+    """
+
+    return frappe.db.sql(query, params, as_dict=True)

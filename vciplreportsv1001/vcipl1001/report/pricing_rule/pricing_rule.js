@@ -1,4 +1,4 @@
-frappe.query_reports["Pricing Rule"] = {
+frappe.query_reports["Customer Pricing Rule Report"] = {
     filters: [
         {
             fieldname: "customer",

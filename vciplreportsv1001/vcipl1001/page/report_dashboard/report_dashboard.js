@@ -50,7 +50,8 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
             "&to_date=2026-01-27" +
             "&valuation_field_type=Currency",
 
-            
+        "Pricing Rule Report":
+            "/app/query-report/Pricing%20Rule%20Report"   
         
     };
 

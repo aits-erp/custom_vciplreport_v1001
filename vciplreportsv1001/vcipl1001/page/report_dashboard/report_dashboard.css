@@ -1,68 +1,68 @@
 .dashboard-container {
-    margin: 28px;
+    padding: 20px;
+}
+
+.page-title {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 15px;
 }
 
 .section-title {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 30px 0 18px;
-    color: #2c3e50;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 30px 0 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 26px;
-    align-items: stretch;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 25px;
 }
 
 .dashboard-card {
-    background: #ffffff;
-    border-radius: 20px;
-    padding: 22px 16px;
+    background: #fff;
+    border-radius: 18px;
+    padding: 20px;
     text-align: center;
     cursor: pointer;
-    transition: all .35s ease;
-    box-shadow: 0 10px 28px rgba(0,0,0,.08);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 210px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+    transition: all 0.25s ease;
 }
 
 .dashboard-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 22px 45px rgba(0,0,0,.18);
+    transform: translateY(-6px);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.12);
 }
 
 .icon-box {
-    width: 90px;
-    height: 90px;
+    width: 64px;
+    height: 64px;
+    margin: auto;
     border-radius: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 12px;
 }
 
 .icon-box svg {
-    width: 42px;
-    height: 42px;
+    width: 28px;
+    height: 28px;
     stroke: #fff;
-    stroke-width: 2;
     fill: none;
+    stroke-width: 2;
 }
+
+.blue { background: linear-gradient(135deg,#2bb0ff,#3fd2ff); }
+.green { background: linear-gradient(135deg,#2ecc71,#58f0a7); }
+.red { background: linear-gradient(135deg,#ff4d4f,#ff7875); }
+.orange { background: linear-gradient(135deg,#f59e0b,#fbbf24); }
 
 .dashboard-title {
+    font-size: 14px;
     font-weight: 600;
-    font-size: 15.5px;
-    color: #2d3436;
-    min-height: 40px;
 }
-
-/* Gradients */
-.g-blue   { background: linear-gradient(135deg,#4facfe,#00f2fe); }
-.g-green  { background: linear-gradient(135deg,#43e97b,#38f9d7); }
-.g-red    { background: linear-gradient(135deg,#ff416c,#ff4b2b); }
-.g-purple { background: linear-gradient(135deg,#667eea,#764ba2); }
-.g-orange { background: linear-gradient(135deg,#f7971e,#ffd200); }

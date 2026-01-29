@@ -99,12 +99,12 @@ def get_data(filters):
         stock_map[b.item_code] = stock_map.get(b.item_code, 0) + b.actual_qty
 
     # -----------------------------
-    # FETCH ITEM PRICES (STANDARD SELLING)
+    # FETCH ITEM PRICE (ERPNext v15 FIX)
     # -----------------------------
     prices = frappe.db.sql("""
         SELECT
             item_code,
-            rate
+            price_list_rate
         FROM `tabItem Price`
         WHERE price_list = 'Standard Selling'
           AND selling = 1
@@ -114,7 +114,7 @@ def get_data(filters):
 
     price_map = {}
     for p in prices:
-        price_map[p.item_code] = p.rate
+        price_map[p.item_code] = p.price_list_rate
 
     # -----------------------------
     # FINAL DATA

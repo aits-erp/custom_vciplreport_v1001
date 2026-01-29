@@ -44,11 +44,7 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
             "/app/query-report/Item%20Category%20Wise%20-%20Report",
 
         "Stock Balance Report":
-            "/app/query-report/Stock%20Balance%20Report" +
-            "?company=Vinod+Cookware+India+Private+Limited" +
-            "&from_date=2025-12-27" +
-            "&to_date=2026-01-27" +
-            "&valuation_field_type=Currency",
+            "/app/query-report/Stock%20Report%20-%20Cumulative",
 
         "Pricing Rule Report":
             "/app/query-report/Pricing%20Rule%20Report"   

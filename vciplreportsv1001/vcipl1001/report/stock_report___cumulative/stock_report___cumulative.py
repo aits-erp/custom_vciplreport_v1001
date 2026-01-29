@@ -5,13 +5,10 @@ from datetime import date
 def execute(filters=None):
     filters = filters or {}
 
-    # -----------------------------
-    # DEFAULT FILTER VALUES
-    # -----------------------------
     today = date.today()
-    fy_year = today.year if today.month >= 4 else today.year - 1
 
-    from_date = filters.get("from_date") or date(fy_year, 4, 1)
+    # ✅ DEFAULT: 01-04-2025 → TODAY
+    from_date = filters.get("from_date") or date(2025, 4, 1)
     to_date = filters.get("to_date") or today
     item_type = filters.get("custom_item_type") or "Finished Goods"
 
@@ -44,14 +41,13 @@ def get_columns():
 
 def get_data(item_type, from_date, to_date):
 
-    rows = frappe.db.sql(
+    return frappe.db.sql(
         """
         SELECT
             i.name AS item_code,
             i.item_name,
 
             SUM(b.actual_qty) AS current_stock,
-
             COALESCE(ip.price_list_rate, 0) AS rate,
             SUM(b.actual_qty) * COALESCE(ip.price_list_rate, 0) AS amount,
 
@@ -68,23 +64,19 @@ def get_data(item_type, from_date, to_date):
         FROM `tabItem` i
         LEFT JOIN `tabBin` b ON b.item_code = i.name
 
-        -- LATEST ITEM PRICE (STANDARD SELLING)
         LEFT JOIN (
-            SELECT
-                ip1.item_code,
-                ip1.price_list_rate
+            SELECT ip1.item_code, ip1.price_list_rate
             FROM `tabItem Price` ip1
             INNER JOIN (
-                SELECT
-                    item_code,
-                    MAX(COALESCE(valid_from, '1900-01-01')) AS latest_valid_from
+                SELECT item_code,
+                       MAX(COALESCE(valid_from, '1900-01-01')) AS latest_valid_from
                 FROM `tabItem Price`
                 WHERE price_list = 'Standard Selling'
                   AND selling = 1
                 GROUP BY item_code
             ) ip2
-                ON ip1.item_code = ip2.item_code
-               AND COALESCE(ip1.valid_from, '1900-01-01') = ip2.latest_valid_from
+              ON ip1.item_code = ip2.item_code
+             AND COALESCE(ip1.valid_from, '1900-01-01') = ip2.latest_valid_from
             WHERE ip1.price_list = 'Standard Selling'
               AND ip1.selling = 1
         ) ip ON ip.item_code = i.name
@@ -95,14 +87,9 @@ def get_data(item_type, from_date, to_date):
             AND i.custom_item_type = %s
             AND DATE(i.creation) BETWEEN %s AND %s
 
-        GROUP BY
-            i.name, i.item_name, ip.price_list_rate
-
-        ORDER BY
-            i.name
+        GROUP BY i.name, i.item_name, ip.price_list_rate
+        ORDER BY i.name
         """,
         (item_type, from_date, to_date),
         as_dict=True
     )
-
-    return rows

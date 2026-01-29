@@ -10,7 +10,7 @@ frappe.query_reports["Stock Report - Cumulative"] = {
             fieldname: "from_date",
             label: __("From Date"),
             fieldtype: "Date",
-            default: frappe.datetime.year_start()
+            default: "2025-04-01"   // ✅ FIXED DEFAULT
         },
         {
             fieldname: "to_date",

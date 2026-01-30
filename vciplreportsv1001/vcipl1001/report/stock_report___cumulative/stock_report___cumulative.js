@@ -7,10 +7,16 @@ frappe.query_reports["Stock Report - Cumulative"] = {
             default: "Finished Goods"
         },
         {
+            fieldname: "item_group",
+            label: __("Item Group"),
+            fieldtype: "Link",
+            options: "Item Group"
+        },
+        {
             fieldname: "from_date",
             label: __("From Date"),
             fieldtype: "Date",
-            default: "2025-04-01"   // ✅ FIXED DEFAULT
+            default: "2025-04-01"
         },
         {
             fieldname: "to_date",

@@ -7,13 +7,15 @@ def execute(filters=None):
 
     today = date.today()
 
-    # ✅ DEFAULT: 01-04-2025 → TODAY
+    # DEFAULT DATE RANGE
     from_date = filters.get("from_date") or date(2025, 4, 1)
     to_date = filters.get("to_date") or today
+
     item_type = filters.get("custom_item_type") or "Finished Goods"
+    item_group = filters.get("item_group")
 
     columns = get_columns()
-    data = get_data(item_type, from_date, to_date)
+    data = get_data(item_type, item_group, from_date, to_date)
 
     return columns, data
 
@@ -22,6 +24,7 @@ def get_columns():
     return [
         {"label": "Item Code", "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 150},
         {"label": "Item Name", "fieldname": "item_name", "fieldtype": "Data", "width": 220},
+        {"label": "Item Group", "fieldname": "item_group", "fieldtype": "Link", "options": "Item Group", "width": 160},
 
         {"label": "Current Stock", "fieldname": "current_stock", "fieldtype": "Float", "width": 130},
         {"label": "Rate", "fieldname": "rate", "fieldtype": "Currency", "width": 120},
@@ -39,13 +42,21 @@ def get_columns():
     ]
 
 
-def get_data(item_type, from_date, to_date):
+def get_data(item_type, item_group, from_date, to_date):
+
+    conditions = ""
+    values = [item_type, from_date, to_date]
+
+    if item_group:
+        conditions += " AND i.item_group = %s"
+        values.append(item_group)
 
     return frappe.db.sql(
-        """
+        f"""
         SELECT
             i.name AS item_code,
             i.item_name,
+            i.item_group,
 
             SUM(b.actual_qty) AS current_stock,
             COALESCE(ip.price_list_rate, 0) AS rate,
@@ -86,10 +97,14 @@ def get_data(item_type, from_date, to_date):
             AND i.is_stock_item = 1
             AND i.custom_item_type = %s
             AND DATE(i.creation) BETWEEN %s AND %s
+            {conditions}
 
-        GROUP BY i.name, i.item_name, ip.price_list_rate
-        ORDER BY i.name
+        GROUP BY i.name, i.item_name, i.item_group, ip.price_list_rate
+
+        HAVING SUM(b.actual_qty) != 0
+
+        ORDER BY current_stock DESC
         """,
-        (item_type, from_date, to_date),
+        values,
         as_dict=True
     )

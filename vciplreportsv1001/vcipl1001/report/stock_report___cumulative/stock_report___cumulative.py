@@ -1,5 +1,4 @@
 import frappe
-from datetime import date
 
 
 def execute(filters=None):
@@ -17,7 +16,7 @@ def execute(filters=None):
 def get_columns():
     return [
         {"label": "Item Code", "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 150},
-        {"label": "Item Name", "fieldname": "item_name", "fieldtype": "Data", "width": 220},
+        {"label": "Item Name", "fieldname": "item_name", "width": 220},
         {"label": "Item Group", "fieldname": "item_group", "fieldtype": "Link", "options": "Item Group", "width": 160},
 
         {"label": "Current Stock", "fieldname": "current_stock", "fieldtype": "Float", "width": 130},
@@ -52,10 +51,16 @@ def get_data(item_type, item_group):
             i.item_name,
             i.item_group,
 
-            COALESCE(SUM(b.actual_qty), 0) AS current_stock,
-            COALESCE(ip.price_list_rate, 0) AS rate,
-            COALESCE(SUM(b.actual_qty), 0) * COALESCE(ip.price_list_rate, 0) AS amount,
+            -- TOTAL STOCK
+            SUM(b.actual_qty) AS current_stock,
 
+            -- SAFE RATE (ONE ROW PER ITEM)
+            COALESCE(rate.rate, 0) AS rate,
+
+            -- AMOUNT
+            SUM(b.actual_qty) * COALESCE(rate.rate, 0) AS amount,
+
+            -- WAREHOUSE SPLIT
             SUM(CASE WHEN b.warehouse = 'Finished Goods - VCIPL' THEN b.actual_qty ELSE 0 END) AS fg,
             SUM(CASE WHEN b.warehouse = 'Goods In Transit - VCIPL' THEN b.actual_qty ELSE 0 END) AS git,
             SUM(CASE WHEN b.warehouse = 'Bby Gala No. 014 - VCIPL' THEN b.actual_qty ELSE 0 END) AS g014,
@@ -69,22 +74,16 @@ def get_data(item_type, item_group):
         FROM `tabItem` i
         LEFT JOIN `tabBin` b ON b.item_code = i.name
 
+        -- 🔒 SAFE PRICE FETCH (NO DUPLICATION)
         LEFT JOIN (
-            SELECT ip1.item_code, ip1.price_list_rate
-            FROM `tabItem Price` ip1
-            INNER JOIN (
-                SELECT item_code,
-                       MAX(COALESCE(valid_from, '1900-01-01')) AS latest_valid_from
-                FROM `tabItem Price`
-                WHERE price_list = 'Standard Selling'
-                  AND selling = 1
-                GROUP BY item_code
-            ) ip2
-              ON ip1.item_code = ip2.item_code
-             AND COALESCE(ip1.valid_from, '1900-01-01') = ip2.latest_valid_from
-            WHERE ip1.price_list = 'Standard Selling'
-              AND ip1.selling = 1
-        ) ip ON ip.item_code = i.name
+            SELECT
+                item_code,
+                MAX(price_list_rate) AS rate
+            FROM `tabItem Price`
+            WHERE price_list = 'Standard Selling'
+              AND selling = 1
+            GROUP BY item_code
+        ) rate ON rate.item_code = i.name
 
         WHERE
             i.disabled = 0
@@ -92,11 +91,14 @@ def get_data(item_type, item_group):
             AND i.custom_item_type = %s
             {conditions}
 
-        GROUP BY i.name, i.item_name, i.item_group, ip.price_list_rate
+        GROUP BY
+            i.name, i.item_name, i.item_group, rate.rate
 
-        HAVING COALESCE(SUM(b.actual_qty), 0) != 0
+        HAVING
+            SUM(b.actual_qty) != 0
 
-        ORDER BY current_stock DESC
+        ORDER BY
+            current_stock DESC
         """,
         values,
         as_dict=True

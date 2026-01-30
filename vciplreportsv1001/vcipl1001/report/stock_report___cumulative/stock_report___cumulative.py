@@ -5,17 +5,11 @@ from datetime import date
 def execute(filters=None):
     filters = filters or {}
 
-    today = date.today()
-
-    # DEFAULT DATE RANGE
-    from_date = filters.get("from_date") or date(2025, 4, 1)
-    to_date = filters.get("to_date") or today
-
     item_type = filters.get("custom_item_type") or "Finished Goods"
     item_group = filters.get("item_group")
 
     columns = get_columns()
-    data = get_data(item_type, item_group, from_date, to_date)
+    data = get_data(item_type, item_group)
 
     return columns, data
 
@@ -42,10 +36,10 @@ def get_columns():
     ]
 
 
-def get_data(item_type, item_group, from_date, to_date):
+def get_data(item_type, item_group):
 
     conditions = ""
-    values = [item_type, from_date, to_date]
+    values = [item_type]
 
     if item_group:
         conditions += " AND i.item_group = %s"
@@ -58,9 +52,9 @@ def get_data(item_type, item_group, from_date, to_date):
             i.item_name,
             i.item_group,
 
-            SUM(b.actual_qty) AS current_stock,
+            COALESCE(SUM(b.actual_qty), 0) AS current_stock,
             COALESCE(ip.price_list_rate, 0) AS rate,
-            SUM(b.actual_qty) * COALESCE(ip.price_list_rate, 0) AS amount,
+            COALESCE(SUM(b.actual_qty), 0) * COALESCE(ip.price_list_rate, 0) AS amount,
 
             SUM(CASE WHEN b.warehouse = 'Finished Goods - VCIPL' THEN b.actual_qty ELSE 0 END) AS fg,
             SUM(CASE WHEN b.warehouse = 'Goods In Transit - VCIPL' THEN b.actual_qty ELSE 0 END) AS git,
@@ -96,12 +90,11 @@ def get_data(item_type, item_group, from_date, to_date):
             i.disabled = 0
             AND i.is_stock_item = 1
             AND i.custom_item_type = %s
-            AND DATE(i.creation) BETWEEN %s AND %s
             {conditions}
 
         GROUP BY i.name, i.item_name, i.item_group, ip.price_list_rate
 
-        HAVING SUM(b.actual_qty) != 0
+        HAVING COALESCE(SUM(b.actual_qty), 0) != 0
 
         ORDER BY current_stock DESC
         """,

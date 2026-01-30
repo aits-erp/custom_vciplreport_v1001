@@ -37,7 +37,7 @@ frappe.query_reports["Pending Sales Order Report"] = {
 			fieldname: "status",
 			label: __("Status"),
 			fieldtype: "MultiSelectList",
-			options: ["Draft", "To Deliver", "To Bill", "Completed", "Closed"]
+			options: ["Draft", "To Deliver", "To Bill"]
 		},
 		{
 			fieldname: "warehouse",
@@ -58,10 +58,6 @@ frappe.query_reports["Pending Sales Order Report"] = {
 
 		if (column.fieldname === "pending_qty" && data?.pending_qty > 0) {
 			value = `<span style="color:#d9534f;font-weight:600">${value}</span>`;
-		}
-
-		if (column.fieldname === "delay" && data?.delay > 0) {
-			value = `<span style="color:#f0ad4e;font-weight:600">${value}</span>`;
 		}
 
 		return value;

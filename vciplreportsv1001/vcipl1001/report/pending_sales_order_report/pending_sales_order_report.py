@@ -1,10 +1,6 @@
 import copy
-from collections import OrderedDict
-
 import frappe
-from frappe import _, qb
-from frappe.query_builder import CustomFunction
-from frappe.query_builder.functions import Max
+from frappe import _
 from frappe.utils import flt, getdate, date_diff
 
 
@@ -21,20 +17,17 @@ def execute(filters=None):
 	conditions = get_conditions(filters)
 	data = get_data(conditions, filters)
 
-	# 🔧 ERROR FIX: function now exists
-	so_elapsed_time = get_so_elapsed_time(data)
-
 	if not data:
 		return columns, [], None, []
 
-	data, chart_data, totals = prepare_data(data, so_elapsed_time, filters)
+	data, chart_data, totals = prepare_data(data, filters)
 
 	report_summary = [
 		{"label": _("Ordered Qty"), "value": totals["qty"], "datatype": "Float"},
 		{"label": _("Delivered Qty"), "value": totals["delivered_qty"], "datatype": "Float"},
 		{"label": _("Qty to Deliver"), "value": totals["pending_qty"], "datatype": "Float"},
 		{"label": _("Order Amount"), "value": totals["amount"], "datatype": "Currency"},
-		{"label": _("Delivered Amount"), "value": totals["delivered_qty_amount"], "datatype": "Currency"},
+		{"label": _("Delivered Amount"), "value": totals["delivered_amount"], "datatype": "Currency"},
 		{"label": _("Pending Amount"), "value": totals["pending_amount"], "datatype": "Currency"},
 	]
 
@@ -57,19 +50,19 @@ def get_conditions(filters):
 	conditions = ""
 
 	if filters.get("from_date") and filters.get("to_date"):
-		conditions += " and so.transaction_date between %(from_date)s and %(to_date)s"
+		conditions += " AND so.transaction_date BETWEEN %(from_date)s AND %(to_date)s"
 
 	if filters.get("company"):
-		conditions += " and so.company = %(company)s"
+		conditions += " AND so.company = %(company)s"
 
 	if filters.get("sales_order"):
-		conditions += " and so.name in %(sales_order)s"
+		conditions += " AND so.name IN %(sales_order)s"
 
 	if filters.get("status"):
-		conditions += " and so.status in %(status)s"
+		conditions += " AND so.status IN %(status)s"
 
 	if filters.get("warehouse"):
-		conditions += " and soi.warehouse = %(warehouse)s"
+		conditions += " AND soi.warehouse = %(warehouse)s"
 
 	return conditions
 
@@ -91,15 +84,13 @@ def get_data(conditions, filters):
 			soi.delivered_qty,
 			(soi.qty - soi.delivered_qty) AS pending_qty,
 			soi.base_amount AS amount,
-			(soi.delivered_qty * soi.base_rate) AS delivered_qty_amount,
-			(soi.base_amount - (soi.delivered_qty * soi.base_rate)) AS pending_amount,
-			soi.warehouse,
-			soi.description
+			(soi.delivered_qty * soi.base_rate) AS delivered_amount,
+			(soi.base_amount - (soi.delivered_qty * soi.base_rate)) AS pending_amount
 		FROM `tabSales Order` so
 		INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
 		INNER JOIN `tabCustomer` c ON c.name = so.customer
 		WHERE so.docstatus = 1
-		AND so.status NOT IN ('Stopped', 'On Hold')
+		AND so.status NOT IN ('Completed', 'Closed', 'Stopped', 'On Hold')
 		{conditions}
 		ORDER BY so.transaction_date
 		""",
@@ -109,28 +100,16 @@ def get_data(conditions, filters):
 
 
 # --------------------------------------------------
-# 🔧 ERROR FIX: DUMMY FUNCTION (OLD LOGIC SAFE)
+# PREPARE DATA
 # --------------------------------------------------
-def get_so_elapsed_time(data):
-	"""
-	This function existed in old logic.
-	It is kept to avoid NameError.
-	Currently not used for calculations.
-	"""
-	return {}
-
-
-# --------------------------------------------------
-# PREPARE DATA (OLD LOGIC)
-# --------------------------------------------------
-def prepare_data(data, so_elapsed_time, filters):
+def prepare_data(data, filters):
 	sales_order_map = {}
 	totals = {
 		"qty": 0,
 		"delivered_qty": 0,
 		"pending_qty": 0,
 		"amount": 0,
-		"delivered_qty_amount": 0,
+		"delivered_amount": 0,
 		"pending_amount": 0,
 	}
 
@@ -139,7 +118,7 @@ def prepare_data(data, so_elapsed_time, filters):
 		totals["delivered_qty"] += flt(row.delivered_qty)
 		totals["pending_qty"] += flt(row.pending_qty)
 		totals["amount"] += flt(row.amount)
-		totals["delivered_qty_amount"] += flt(row.delivered_qty_amount)
+		totals["delivered_amount"] += flt(row.delivered_amount)
 		totals["pending_amount"] += flt(row.pending_amount)
 
 		if filters.get("group_by_so"):
@@ -147,8 +126,6 @@ def prepare_data(data, so_elapsed_time, filters):
 			if so not in sales_order_map:
 				so_row = copy.deepcopy(row)
 				so_row.item_code = ""
-				so_row.description = ""
-				so_row.warehouse = ""
 				sales_order_map[so] = so_row
 			else:
 				so_row = sales_order_map[so]
@@ -156,17 +133,17 @@ def prepare_data(data, so_elapsed_time, filters):
 				so_row.delivered_qty += flt(row.delivered_qty)
 				so_row.pending_qty += flt(row.pending_qty)
 				so_row.amount += flt(row.amount)
-				so_row.delivered_qty_amount += flt(row.delivered_qty_amount)
+				so_row.delivered_amount += flt(row.delivered_amount)
 				so_row.pending_amount += flt(row.pending_amount)
-				so_row.delivery_date = max(
-					getdate(so_row.delivery_date),
-					getdate(row.delivery_date)
-				)
 
-	chart_data = prepare_chart_data(
-		totals["pending_amount"],
-		totals["delivered_qty_amount"]
-	)
+	chart_data = {
+		"data": {
+			"labels": [_("Pending Amount"), _("Delivered Amount")],
+			"datasets": [{"values": [totals["pending_amount"], totals["delivered_amount"]]}],
+		},
+		"type": "donut",
+		"height": 300,
+	}
 
 	if filters.get("group_by_so"):
 		return list(sales_order_map.values()), chart_data, totals
@@ -175,36 +152,20 @@ def prepare_data(data, so_elapsed_time, filters):
 
 
 # --------------------------------------------------
-# CHART
-# --------------------------------------------------
-def prepare_chart_data(pending, delivered):
-	return {
-		"data": {
-			"labels": [_("Pending Amount"), _("Delivered Amount")],
-			"datasets": [{"values": [pending, delivered]}],
-		},
-		"type": "donut",
-		"height": 300,
-	}
-
-
-# --------------------------------------------------
 # COLUMNS
 # --------------------------------------------------
 def get_columns(filters):
 	qty_label = _("Ordered Qty") if filters.get("group_by_so") else _("Qty")
 
-	columns = [
+	return [
 		{"label": _("Date"), "fieldname": "date", "fieldtype": "Date"},
 		{"label": _("Sales Order"), "fieldname": "sales_order", "fieldtype": "Link", "options": "Sales Order"},
 		{"label": _("Status"), "fieldname": "status"},
-		{"label": _("Customer"), "fieldname": "customer", "fieldtype": "Data"},
+		{"label": _("Customer"), "fieldname": "customer"},
 		{"label": qty_label, "fieldname": "qty", "fieldtype": "Float"},
 		{"label": _("Delivered Qty"), "fieldname": "delivered_qty", "fieldtype": "Float"},
 		{"label": _("Qty to Deliver"), "fieldname": "pending_qty", "fieldtype": "Float"},
 		{"label": _("Order Amount"), "fieldname": "amount", "fieldtype": "Currency"},
-		{"label": _("Delivered Amount"), "fieldname": "delivered_qty_amount", "fieldtype": "Currency"},
+		{"label": _("Delivered Amount"), "fieldname": "delivered_amount", "fieldtype": "Currency"},
 		{"label": _("Pending Amount"), "fieldname": "pending_amount", "fieldtype": "Currency"},
 	]
-
-	return columns

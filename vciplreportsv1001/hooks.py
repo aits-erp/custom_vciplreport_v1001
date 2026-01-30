@@ -9,7 +9,7 @@ app_license = "mit"
 
 app_include_js = "/assets/vciplreportsv1001/js/global_dashboard_btn_v2.js"
 
-app_include_css = "/assets/vciplreportsv1001/css/customui06.css"
+app_include_css = "/assets/vciplreportsv1001/css/customui07.css"
 #sai
 
 # Apps

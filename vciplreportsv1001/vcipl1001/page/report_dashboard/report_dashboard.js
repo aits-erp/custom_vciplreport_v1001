@@ -49,11 +49,9 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "Pricing Rule Report":
             "/app/query-report/Pricing%20Rule%20Report",
             
-        "Accounts Receivable":"/app/query-report/Accounts%20Receivable?company=Vinod+Cookware+India+Private+Limited&report_date=2026-01-30&ageing_based_on=Due+Date&calculate_ageing_with=Report+Date&range=30%2C+60%2C+90%2C+120"
+        "Ageing Report - Customer":"/app/query-report/Ageing%20Report%20-%20Customer?company=Vinod+Cookware+India+Private+Limited&report_date=2026-01-31&ageing_based_on=Due+Date&calculate_ageing_with=Report+Date&range=30%2C+60%2C+90%2C+120"
         
-
-
-           
+       
     };
 
     // ================================

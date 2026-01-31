@@ -32,6 +32,11 @@ frappe.query_reports["Item Category Wise - Report"] = {
             fieldtype: "Data"
         },
         {
+            fieldname: "custom_sub_group",
+            label: "Sub Group",
+            fieldtype: "Data"
+        },
+        {
             fieldname: "custom_item_type",
             label: "Item Type",
             fieldtype: "Data"

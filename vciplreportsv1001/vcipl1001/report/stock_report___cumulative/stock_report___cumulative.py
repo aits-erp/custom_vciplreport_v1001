@@ -6,9 +6,10 @@ def execute(filters=None):
 
     item_type = filters.get("custom_item_type") or "Finished Goods"
     item_group = filters.get("item_group")
+    main_group = filters.get("custom_main_group")
 
     columns = get_columns()
-    data = get_data(item_type, item_group)
+    data = get_data(item_type, item_group, main_group)
 
     return columns, data
 
@@ -16,6 +17,7 @@ def execute(filters=None):
 def get_columns():
     return [
         {"label": "Item Code", "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 150},
+        {"label": "Main Group", "fieldname": "custom_main_group", "width": 150},
         {"label": "Item Name", "fieldname": "item_name", "width": 220},
         {"label": "Item Group", "fieldname": "item_group", "fieldtype": "Link", "options": "Item Group", "width": 160},
 
@@ -35,7 +37,7 @@ def get_columns():
     ]
 
 
-def get_data(item_type, item_group):
+def get_data(item_type, item_group, main_group):
 
     conditions = ""
     values = [item_type]
@@ -44,17 +46,22 @@ def get_data(item_type, item_group):
         conditions += " AND i.item_group = %s"
         values.append(item_group)
 
+    if main_group:
+        conditions += " AND i.custom_main_group = %s"
+        values.append(main_group)
+
     return frappe.db.sql(
         f"""
         SELECT
             i.name AS item_code,
+            i.custom_main_group,
             i.item_name,
             i.item_group,
 
             -- TOTAL STOCK
             SUM(b.actual_qty) AS current_stock,
 
-            -- SAFE RATE (ONE ROW PER ITEM)
+            -- SAFE RATE
             COALESCE(rate.rate, 0) AS rate,
 
             -- AMOUNT
@@ -74,7 +81,6 @@ def get_data(item_type, item_group):
         FROM `tabItem` i
         LEFT JOIN `tabBin` b ON b.item_code = i.name
 
-        -- 🔒 SAFE PRICE FETCH (NO DUPLICATION)
         LEFT JOIN (
             SELECT
                 item_code,
@@ -92,7 +98,7 @@ def get_data(item_type, item_group):
             {conditions}
 
         GROUP BY
-            i.name, i.item_name, i.item_group, rate.rate
+            i.name, i.custom_main_group, i.item_name, i.item_group, rate.rate
 
         HAVING
             SUM(b.actual_qty) != 0

@@ -145,7 +145,8 @@ frappe.query_reports["Pending Sales Order Report"] = {
 frappe.query_reports["Pending Sales Order Report"].show_pending_dialog = function(so) {
 
 	frappe.call({
-		method: "your_app.your_report_file.get_pending_delivery_items",
+		method: "vciplreportsv1001.vciplreportsv1001.report.pending_sales_order_report.pending_sales_order_report.get_pending_delivery_items",
+
 		args: { sales_order: so },
 		callback: function(r) {
 

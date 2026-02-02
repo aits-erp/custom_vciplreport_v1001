@@ -169,13 +169,18 @@
 	# 		{"label": _("Delivered Amount"), "fieldname": "delivered_amount", "fieldtype": "Currency"},
 	# 		{"label": _("Pending Amount"), "fieldname": "pending_amount", "fieldtype": "Currency"},
 	# 	]
-import copy
+
+	import copy
 import frappe
 from frappe import _
 from frappe.utils import flt, date_diff
 
 
+# -------------------------------------------------
+# EXECUTE
+# -------------------------------------------------
 def execute(filters=None):
+
 	if not filters:
 		return [], [], None, []
 
@@ -202,15 +207,21 @@ def execute(filters=None):
 	return columns, data, None, chart_data, report_summary
 
 
-# ---------------- VALIDATION ----------------
+# -------------------------------------------------
+# VALIDATION
+# -------------------------------------------------
 def validate_filters(filters):
+
 	if filters.get("from_date") and filters.get("to_date"):
 		if date_diff(filters.to_date, filters.from_date) < 0:
 			frappe.throw(_("To Date cannot be before From Date."))
 
 
-# ---------------- CONDITIONS ----------------
+# -------------------------------------------------
+# CONDITIONS
+# -------------------------------------------------
 def get_conditions(filters):
+
 	conditions = ""
 
 	if filters.get("from_date") and filters.get("to_date"):
@@ -231,7 +242,9 @@ def get_conditions(filters):
 	return conditions
 
 
-# ---------------- DATA ----------------
+# -------------------------------------------------
+# DATA
+# -------------------------------------------------
 def get_data(conditions, filters):
 
 	data = frappe.db.sql(f"""
@@ -269,6 +282,7 @@ def get_data(conditions, filters):
 	so_popup = {}
 
 	for row in data:
+
 		available = bin_map.get((row.item_code, row.warehouse), 0)
 
 		so_popup.setdefault(row.sales_order, []).append({
@@ -286,12 +300,24 @@ def get_data(conditions, filters):
 	return data
 
 
-# ---------------- PREPARE ----------------
+# -------------------------------------------------
+# PREPARE DATA
+# -------------------------------------------------
 def prepare_data(data, filters):
+
 	sales_order_map = {}
-	totals = {"qty":0,"delivered_qty":0,"pending_qty":0,"amount":0,"delivered_amount":0,"pending_amount":0}
+
+	totals = {
+		"qty": 0,
+		"delivered_qty": 0,
+		"pending_qty": 0,
+		"amount": 0,
+		"delivered_amount": 0,
+		"pending_amount": 0,
+	}
 
 	for row in data:
+
 		totals["qty"] += flt(row.qty)
 		totals["delivered_qty"] += flt(row.delivered_qty)
 		totals["pending_qty"] += flt(row.pending_qty)
@@ -300,11 +326,18 @@ def prepare_data(data, filters):
 		totals["pending_amount"] += flt(row.pending_amount)
 
 		if filters.get("group_by_so"):
+
 			so = row.sales_order
+
 			if so not in sales_order_map:
 				sales_order_map[so] = copy.deepcopy(row)
 			else:
+				sales_order_map[so].qty += flt(row.qty)
+				sales_order_map[so].delivered_qty += flt(row.delivered_qty)
 				sales_order_map[so].pending_qty += flt(row.pending_qty)
+				sales_order_map[so].amount += flt(row.amount)
+				sales_order_map[so].delivered_amount += flt(row.delivered_amount)
+				sales_order_map[so].pending_amount += flt(row.pending_amount)
 
 	chart_data = {
 		"data": {
@@ -321,8 +354,11 @@ def prepare_data(data, filters):
 	return data, chart_data, totals
 
 
-# ---------------- COLUMNS ----------------
+# -------------------------------------------------
+# COLUMNS
+# -------------------------------------------------
 def get_columns(filters):
+
 	qty_label = _("Ordered Qty") if filters.get("group_by_so") else _("Qty")
 
 	return [
@@ -339,10 +375,6 @@ def get_columns(filters):
 		{"label": _("Delivered Amount"), "fieldname": "delivered_amount", "fieldtype": "Currency"},
 		{"label": _("Pending Amount"), "fieldname": "pending_amount", "fieldtype": "Currency"},
 
-		# 👇 new popup column
 		{"label": _("Pending Delivery"), "fieldname": "pending_delivery"},
-
-		# hidden json popup data
 		{"fieldname": "pending_popup", "hidden": 1},
 	]
-# changes

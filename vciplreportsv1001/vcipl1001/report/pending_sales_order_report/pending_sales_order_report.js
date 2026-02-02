@@ -75,8 +75,7 @@
 // 		});
 // 	}
 // };
-
-	frappe.query_reports["Pending Sales Order Report"] = {
+frappe.query_reports["Pending Sales Order Report"] = {
 
 	filters: [
 		{
@@ -136,10 +135,12 @@
 
 		value = default_formatter(value, row, column, data);
 
-		if (column.fieldname === "pending_qty" && data.pending_qty > 0) {
-			value = `<span style="color:red;font-weight:600">${value}</span>`;
+		// old red pending highlight
+		if (column.fieldname === "pending_qty" && data?.pending_qty > 0) {
+			value = `<span style="color:#d9534f;font-weight:600">${value}</span>`;
 		}
 
+		// new popup button
 		if (column.fieldname === "pending_delivery") {
 			return `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
 				onclick='frappe.query_reports["Pending Sales Order Report"]
@@ -151,7 +152,27 @@
 		return value;
 	},
 
+	onload(report) {
+
+		// old buttons restored
+		report.page.add_inner_button(__("Group by Sales Order"), () => {
+			report.set_filter_value("group_by_so", 1);
+			report.refresh();
+		});
+
+		report.page.add_inner_button(__("Item Wise"), () => {
+			report.set_filter_value("group_by_so", 0);
+			report.refresh();
+		});
+	},
+
+	// popup logic
 	show_popup(rows) {
+
+		if (!rows || rows.length === 0) {
+			frappe.msgprint("No pending items");
+			return;
+		}
 
 		let total_pending = 0;
 		let total_available = 0;
@@ -161,22 +182,22 @@
 		<table class="table table-bordered">
 		<tr>
 			<th>Item</th>
-			<th>Qty</th>
-			<th>Delivered</th>
 			<th>Pending</th>
-			<th>Available</th>
+			<th>Stock Available</th>
 			<th>Date</th>
 		</tr>`;
 
 		rows.forEach(r => {
+
+			// show only pending
+			if (r.pending_qty <= 0) return;
+
 			total_pending += r.pending_qty;
 			total_available += r.available_qty;
 
 			html += `
 			<tr>
 				<td>${r.item_code}</td>
-				<td>${r.qty}</td>
-				<td>${r.delivered_qty}</td>
 				<td style="color:red;font-weight:bold">${r.pending_qty}</td>
 				<td style="color:green;font-weight:bold">${r.available_qty}</td>
 				<td>${r.delivery_date}</td>
@@ -185,7 +206,7 @@
 
 		html += `
 		<tr style="font-weight:bold;background:#f3f3f3">
-			<td colspan="3">TOTAL</td>
+			<td>TOTAL</td>
 			<td style="color:red">${total_pending}</td>
 			<td style="color:green">${total_available}</td>
 			<td></td>
@@ -199,4 +220,3 @@
 		});
 	}
 };
-// changes

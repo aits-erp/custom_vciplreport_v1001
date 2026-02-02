@@ -75,13 +75,61 @@
 // 		});
 // 	}
 // };
-frappe.query_reports["Pending Sales Order Report"] = {
+
+	frappe.query_reports["Pending Sales Order Report"] = {
 
 	filters: [
-		{ fieldname:"company", label:"Company", fieldtype:"Link", options:"Company", default:frappe.defaults.get_user_default("Company"), reqd:1 },
-		{ fieldname:"from_date", label:"From Date", fieldtype:"Date" },
-		{ fieldname:"to_date", label:"To Date", fieldtype:"Date" },
-		{ fieldname:"group_by_so", label:"Group by Sales Order", fieldtype:"Check", default:1 }
+		{
+			fieldname: "company",
+			label: __("Company"),
+			fieldtype: "Link",
+			options: "Company",
+			default: frappe.defaults.get_user_default("Company"),
+			reqd: 1
+		},
+		{
+			fieldname: "from_date",
+			label: __("From Date"),
+			fieldtype: "Date"
+		},
+		{
+			fieldname: "to_date",
+			label: __("To Date"),
+			fieldtype: "Date"
+		},
+		{
+			fieldname: "sales_order",
+			label: __("Sales Order"),
+			fieldtype: "MultiSelectList",
+			options: "Sales Order",
+			get_data(txt) {
+				return frappe.db.get_link_options("Sales Order", txt);
+			}
+		},
+		{
+			fieldname: "customer",
+			label: __("Customer"),
+			fieldtype: "Link",
+			options: "Customer"
+		},
+		{
+			fieldname: "status",
+			label: __("Status"),
+			fieldtype: "MultiSelectList",
+			options: ["Draft", "To Deliver", "To Bill"]
+		},
+		{
+			fieldname: "warehouse",
+			label: __("Warehouse"),
+			fieldtype: "Link",
+			options: "Warehouse"
+		},
+		{
+			fieldname: "group_by_so",
+			label: __("Group by Sales Order"),
+			fieldtype: "Check",
+			default: 1
+		}
 	],
 
 	formatter(value, row, column, data, default_formatter) {
@@ -105,30 +153,49 @@ frappe.query_reports["Pending Sales Order Report"] = {
 
 	show_popup(rows) {
 
-		if (!rows || rows.length === 0) {
-			frappe.msgprint("No pending items");
-			return;
-		}
+		let total_pending = 0;
+		let total_available = 0;
 
 		let html = `
 		<div style="max-height:450px;overflow:auto">
 		<table class="table table-bordered">
 		<tr>
-			<th>Item</th><th>Qty</th><th>Delivered</th><th>Pending</th><th>Date</th>
+			<th>Item</th>
+			<th>Qty</th>
+			<th>Delivered</th>
+			<th>Pending</th>
+			<th>Available</th>
+			<th>Date</th>
 		</tr>`;
 
-		rows.forEach(r=>{
-			html+=`<tr>
+		rows.forEach(r => {
+			total_pending += r.pending_qty;
+			total_available += r.available_qty;
+
+			html += `
+			<tr>
 				<td>${r.item_code}</td>
 				<td>${r.qty}</td>
 				<td>${r.delivered_qty}</td>
 				<td style="color:red;font-weight:bold">${r.pending_qty}</td>
+				<td style="color:green;font-weight:bold">${r.available_qty}</td>
 				<td>${r.delivery_date}</td>
 			</tr>`;
 		});
 
-		html += "</table></div>";
+		html += `
+		<tr style="font-weight:bold;background:#f3f3f3">
+			<td colspan="3">TOTAL</td>
+			<td style="color:red">${total_pending}</td>
+			<td style="color:green">${total_available}</td>
+			<td></td>
+		</tr>
+		</table></div>`;
 
-		frappe.msgprint({title:"Pending Items", message:html, wide:true});
+		frappe.msgprint({
+			title: "Pending Items",
+			message: html,
+			wide: true
+		});
 	}
 };

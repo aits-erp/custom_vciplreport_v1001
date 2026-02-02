@@ -15,6 +15,9 @@ def execute(filters=None):
     conditions = get_conditions(filters)
     data = get_data(conditions, filters)
 
+    # ✅ keep only pending rows
+    data = [d for d in data if flt(d.pending_qty) > 0]
+
     if not data:
         return columns, [], None, []
 
@@ -32,12 +35,16 @@ def execute(filters=None):
     return columns, data, None, chart_data, report_summary
 
 
+# ---------------- VALIDATION ----------------
+
 def validate_filters(filters):
 
     if filters.get("from_date") and filters.get("to_date"):
         if date_diff(filters.to_date, filters.from_date) < 0:
             frappe.throw(_("To Date cannot be before From Date."))
 
+
+# ---------------- CONDITIONS ----------------
 
 def get_conditions(filters):
 
@@ -61,6 +68,8 @@ def get_conditions(filters):
     return conditions
 
 
+# ---------------- DATA ----------------
+
 def get_data(conditions, filters):
 
     data = frappe.db.sql(f"""
@@ -70,6 +79,7 @@ def get_data(conditions, filters):
             so.status,
             c.customer_name AS customer,
             soi.item_code,
+            soi.item_name,
             soi.qty,
             soi.delivered_qty,
             (soi.qty - soi.delivered_qty) AS pending_qty,
@@ -86,6 +96,7 @@ def get_data(conditions, filters):
         {conditions}
     """, filters, as_dict=True)
 
+    # stock lookup
     bins = frappe.db.sql("""
         SELECT item_code, warehouse, actual_qty
         FROM `tabBin`
@@ -103,7 +114,7 @@ def get_data(conditions, filters):
         row["fill_ratio"] = round(ratio, 2)
 
         so_popup.setdefault(row.sales_order, []).append({
-            "item_code": row.item_code,
+            "item_name": row.item_name,
             "pending_qty": row.pending_qty,
             "available_qty": available,
             "ratio": round(ratio, 2),
@@ -115,6 +126,8 @@ def get_data(conditions, filters):
 
     return data
 
+
+# ---------------- PREPARE ----------------
 
 def prepare_data(data, filters):
 
@@ -167,6 +180,8 @@ def prepare_data(data, filters):
     return data, chart_data, totals
 
 
+# ---------------- COLUMNS ----------------
+
 def get_columns(filters):
 
     qty_label = _("Ordered Qty") if filters.get("group_by_so") else _("Qty")
@@ -174,6 +189,7 @@ def get_columns(filters):
     return [
         {"label": _("Date"), "fieldname": "date", "fieldtype": "Date"},
         {"label": _("Sales Order"), "fieldname": "sales_order", "fieldtype": "Link", "options": "Sales Order"},
+        {"label": _("Pending Delivery"), "fieldname": "pending_delivery"},
         {"label": _("Status"), "fieldname": "status"},
         {"label": _("Customer"), "fieldname": "customer"},
 
@@ -186,6 +202,5 @@ def get_columns(filters):
         {"label": _("Delivered Amount"), "fieldname": "delivered_amount", "fieldtype": "Currency"},
         {"label": _("Pending Amount"), "fieldname": "pending_amount", "fieldtype": "Currency"},
 
-        {"label": _("Pending Delivery"), "fieldname": "pending_delivery"},
         {"fieldname": "pending_popup", "hidden": 1},
     ]

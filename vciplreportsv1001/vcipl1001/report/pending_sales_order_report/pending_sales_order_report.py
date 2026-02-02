@@ -345,3 +345,4 @@ def get_columns(filters):
 		# hidden json popup data
 		{"fieldname": "pending_popup", "hidden": 1},
 	]
+# changes

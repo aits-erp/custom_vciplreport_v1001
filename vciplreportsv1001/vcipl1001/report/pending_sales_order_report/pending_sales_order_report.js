@@ -4,8 +4,13 @@ frappe.query_reports["Pending Sales Order Report"] = {
         { fieldname: "company", label: __("Company"), fieldtype: "Link", options: "Company", default: frappe.defaults.get_user_default("Company"), reqd: 1 },
         { fieldname: "from_date", label: __("From Date"), fieldtype: "Date" },
         { fieldname: "to_date", label: __("To Date"), fieldtype: "Date" },
-        { fieldname: "sales_order", label: __("Sales Order"), fieldtype: "MultiSelectList", options: "Sales Order",
-            get_data(txt) { return frappe.db.get_link_options("Sales Order", txt); } },
+        {
+            fieldname: "sales_order",
+            label: __("Sales Order"),
+            fieldtype: "MultiSelectList",
+            options: "Sales Order",
+            get_data(txt) { return frappe.db.get_link_options("Sales Order", txt); }
+        },
         { fieldname: "customer", label: __("Customer"), fieldtype: "Link", options: "Customer" },
         { fieldname: "status", label: __("Status"), fieldtype: "MultiSelectList", default: ["To Deliver and Bill"] },
         { fieldname: "warehouse", label: __("Warehouse"), fieldtype: "Link", options: "Warehouse" },
@@ -22,7 +27,8 @@ frappe.query_reports["Pending Sales Order Report"] = {
 
         if (column.fieldname === "pending_delivery") {
             return `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
-                onclick='frappe.query_reports["Pending Sales Order Report"].show_popup(${data.pending_popup})'>
+                onclick='frappe.query_reports["Pending Sales Order Report"]
+                .show_popup(${data.pending_popup}, "${data.customer}", "${data.sales_order}")'>
                 View Pending
             </a>`;
         }
@@ -30,9 +36,18 @@ frappe.query_reports["Pending Sales Order Report"] = {
         return value;
     },
 
-    show_popup(rows) {
+    show_popup(rows, customer, sales_order) {
 
         let html = `
+        <div id="pending-popup">
+
+        <h4 style="margin-bottom:5px">
+            Customer: ${customer}
+        </h4>
+        <h5 style="margin-top:0">
+            Sales Order: ${sales_order}
+        </h5>
+
         <div style="max-height:450px;overflow:auto">
         <table class="table table-bordered">
         <tr>
@@ -57,8 +72,47 @@ frappe.query_reports["Pending Sales Order Report"] = {
             </tr>`;
         });
 
-        html += `</table></div>`;
+        html += `
+        </table>
+        </div>
 
-        frappe.msgprint({ title: "Pending Items", message: html, wide: true });
+        <button class="btn btn-primary" onclick="print_pending_popup()">
+            Print
+        </button>
+
+        </div>`;
+
+        frappe.msgprint({
+            title: "Pending Items",
+            message: html,
+            wide: true
+        });
     }
+};
+
+
+window.print_pending_popup = function () {
+
+    let content = document.getElementById("pending-popup").innerHTML;
+
+    let w = window.open("", "", "width=900,height=700");
+    w.document.write(`
+        <html>
+        <head>
+            <title>Pending Items</title>
+            <style>
+                body { font-family: Arial; padding: 20px; }
+                table { border-collapse: collapse; width: 100%; }
+                table, th, td { border: 1px solid black; padding: 6px; }
+                h4, h5 { margin: 2px 0; }
+            </style>
+        </head>
+        <body>
+            ${content}
+        </body>
+        </html>
+    `);
+
+    w.document.close();
+    w.print();
 };

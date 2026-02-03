@@ -110,7 +110,7 @@ def get_data(conditions, filters):
 
         available = bin_map.get((row.item_code, row.warehouse), 0)
 
-        ratio = (row.pending_qty / available * 100) if available else 0
+        ratio = (row.pending_qty / row.qty * 100) if row.qty > 0 else 0
         row["fill_ratio"] = round(ratio, 2)
 
         so_popup.setdefault(row.sales_order, []).append({

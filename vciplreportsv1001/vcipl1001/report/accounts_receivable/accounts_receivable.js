@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
+// Copyright (c) 2015, Frappe Technologies Pvt. Ltd.
 // License: GNU General Public License v3. See license.txt
 
 frappe.provide("erpnext.utils");
@@ -32,11 +32,7 @@ frappe.query_reports["Accounts Receivable"] = {
 			options: "Cost Center",
 			get_query: () => {
 				var company = frappe.query_report.get_filter_value("company");
-				return {
-					filters: {
-						company: company,
-					},
-				};
+				return { filters: { company: company } };
 			},
 		},
 		{
@@ -59,10 +55,8 @@ frappe.query_reports["Accounts Receivable"] = {
 			options: "party_type",
 			get_data: function (txt) {
 				if (!frappe.query_report.filters) return;
-
 				let party_type = frappe.query_report.get_filter_value("party_type");
 				if (!party_type) return;
-
 				return frappe.db.get_link_options(party_type, txt);
 			},
 		},
@@ -96,12 +90,15 @@ frappe.query_reports["Accounts Receivable"] = {
 			options: "Report Date\nToday Date",
 			default: "Report Date",
 		},
+
+		// ✅ UPDATED AGEING RANGE
 		{
 			fieldname: "range",
 			label: __("Ageing Range"),
 			fieldtype: "Data",
-			default: "30, 60, 90, 120",
+			default: "15, 30, 60, 90, 120",
 		},
+
 		{
 			fieldname: "customer_group",
 			label: __("Customer Group"),
@@ -193,7 +190,9 @@ frappe.query_reports["Accounts Receivable"] = {
 	onload: function (report) {
 		report.page.add_inner_button(__("Accounts Receivable Summary"), function () {
 			var filters = report.get_values();
-			frappe.set_route("query-report", "Accounts Receivable Summary", { company: filters.company });
+			frappe.set_route("query-report", "Accounts Receivable Summary", {
+				company: filters.company,
+			});
 		});
 	},
 };

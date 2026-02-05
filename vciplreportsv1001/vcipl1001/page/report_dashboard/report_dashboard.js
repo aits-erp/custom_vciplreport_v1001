@@ -37,12 +37,12 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
             "/app/query-report/Pending%20Sales%20Order%20Report" +
             "?company=Vinod+Cookware+India+Private+Limited&group_by_so=1",
 
-        "SALES ORDER FILL RATIO":
-            "/app/query-report/SALES%20ORDER%20FILL%20RATIO",
+        "FILL RATIO SALES ORDER":
+            "/app/query-report/FILL%20RATIO%20SALES%20ORDER?company=AITS+%28Demo%29",
 
-        "SALES ORDER FILL RATIO":
-            "/app/query-report/Customer%20%26%20Supplier%20Fill%20Ratio",
-            
+        "FILL RATIO SALES ORDER":
+            "/app/query-report/FILL%20RATIO%20SALES%20ORDER?company=AITS+%28Demo%29",
+
         "Monthwises Purchase":
             "/app/query-report/Monthwises%20Purchase",
 

@@ -40,6 +40,9 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "SALES ORDER FILL RATIO":
             "/app/query-report/SALES%20ORDER%20FILL%20RATIO",
 
+        "SALES ORDER FILL RATIO":
+            "/app/query-report/Customer%20%26%20Supplier%20Fill%20Ratio",
+            
         "Monthwises Purchase":
             "/app/query-report/Monthwises%20Purchase",
 

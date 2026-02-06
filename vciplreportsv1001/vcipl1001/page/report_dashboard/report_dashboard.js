@@ -40,8 +40,8 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "FILL RATIO SALES ORDER":
             "/app/query-report/FILL%20RATIO%20SALES%20ORDER?company=AITS+%28Demo%29",
 
-        "FILL RATIO SALES ORDER":
-            "/app/query-report/FILL%20RATIO%20SALES%20ORDER?company=AITS+%28Demo%29",
+        "Customer & Supplier Fill Ratio":
+            "/app/query-report/Customer%20%26%20Supplier%20Fill%20Ratio?party_type=Customer&company=AITS+%28Demo%29",
 
         "Monthwises Purchase":
             "/app/query-report/Monthwises%20Purchase",

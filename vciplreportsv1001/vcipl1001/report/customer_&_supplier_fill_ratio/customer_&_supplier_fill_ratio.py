@@ -21,7 +21,7 @@ def validate_filters(filters):
             frappe.throw(_("To Date cannot be before From Date."))
 
 
-# ---------------- MAIN REPORT ----------------
+# ---------------- MAIN DATA ----------------
 
 def get_data(filters):
 
@@ -59,6 +59,14 @@ def get_data(filters):
             if row.qty else 0,
             2
         )
+
+        # Risk logic
+        if row.fill_ratio < 50:
+            row.risk = "Critical"
+        elif row.fill_ratio < 80:
+            row.risk = "Warning"
+        else:
+            row.risk = "OK"
 
         row.order_popup = frappe.as_json(get_customer_orders(row.name))
 
@@ -104,7 +112,7 @@ def get_customer_orders(customer):
 
 def get_pending_items(so):
 
-    return frappe.db.sql("""
+    items = frappe.db.sql("""
         SELECT
             item_name AS item,
             qty,
@@ -114,6 +122,8 @@ def get_pending_items(so):
         WHERE parent = %s
         AND qty > delivered_qty
     """, so, as_dict=True)
+
+    return items
 
 
 # ---------------- COLUMNS ----------------
@@ -127,5 +137,6 @@ def get_columns():
         {"label": _("Delivered"), "fieldname": "delivered_qty", "fieldtype": "Float"},
         {"label": _("Pending"), "fieldname": "pending_qty", "fieldtype": "Float"},
         {"label": _("Fill %"), "fieldname": "fill_ratio", "fieldtype": "Percent"},
+        {"label": _("Risk Level"), "fieldname": "risk", "width": 120},
         {"fieldname": "order_popup", "hidden": 1},
     ]

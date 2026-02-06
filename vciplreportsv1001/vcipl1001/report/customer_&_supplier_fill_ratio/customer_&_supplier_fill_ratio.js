@@ -16,11 +16,31 @@ frappe.query_reports["Customer & Supplier Fill Ratio"] = {
 
         value = default_formatter(value, row, column, data);
 
+        if (column.fieldname === "fill_ratio") {
+
+            if (data.fill_ratio < 50)
+                value = `<span style="color:red;font-weight:bold">${data.fill_ratio}%</span>`;
+            else if (data.fill_ratio < 80)
+                value = `<span style="color:orange;font-weight:bold">${data.fill_ratio}%</span>`;
+            else
+                value = `<span style="color:green;font-weight:bold">${data.fill_ratio}%</span>`;
+        }
+
+        if (column.fieldname === "risk") {
+
+            if (data.risk === "Critical")
+                value = `<span style="color:red;font-weight:bold">🔴 Critical</span>`;
+            else if (data.risk === "Warning")
+                value = `<span style="color:orange;font-weight:bold">🟠 Warning</span>`;
+            else
+                value = `<span style="color:green;font-weight:bold">🟢 OK</span>`;
+        }
+
         if (column.fieldname === "order_count" && data.order_popup) {
 
             let safe = encodeURIComponent(data.order_popup);
 
-            return `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
+            value = `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
                 onclick='show_orders("${safe}", "${data.party}")'>
                 ${data.order_count}
             </a>`;
@@ -31,8 +51,7 @@ frappe.query_reports["Customer & Supplier Fill Ratio"] = {
 };
 
 
-
-// ================= PRINT FUNCTION =================
+// ================= PRINT =================
 
 window.print_section = function(id) {
 
@@ -59,8 +78,7 @@ window.print_section = function(id) {
 };
 
 
-
-// ================= LEVEL 2 POPUP =================
+// ================= LEVEL 2 =================
 
 window.show_orders = function(encoded, party) {
 
@@ -68,8 +86,7 @@ window.show_orders = function(encoded, party) {
 
     let tot_qty = 0, tot_del = 0;
 
-    let html = `
-    <div id="print_orders">
+    let html = `<div id="print_orders">
     <h3>Pending Orders — ${party}</h3>
     <table class="table table-bordered">
     <thead>
@@ -93,12 +110,8 @@ window.show_orders = function(encoded, party) {
         html += `<tr>
             <td><b>${r.so_no}</b></td>
             <td>${r.so_date}</td>
-            <td>
-                <a style="color:red;font-weight:bold;cursor:pointer"
-                onclick='show_items("${safe}")'>
-                View Pending
-                </a>
-            </td>
+            <td><a style="color:red;font-weight:bold;cursor:pointer"
+                onclick='show_items("${safe}")'>View Pending</a></td>
             <td>${r.qty}</td>
             <td>${r.delivered}</td>
             <td>${r.fill_ratio}%</td>
@@ -107,14 +120,12 @@ window.show_orders = function(encoded, party) {
 
     let total_ratio = tot_qty ? ((tot_del / tot_qty) * 100).toFixed(2) : 0;
 
-    html += `
-        <tr style="font-weight:bold;background:#eee">
-            <td colspan="3">Grand Total</td>
-            <td>${tot_qty}</td>
-            <td>${tot_del}</td>
-            <td>${total_ratio}%</td>
-        </tr>
-    </tbody></table></div>`;
+    html += `<tr style="font-weight:bold;background:#eee">
+        <td colspan="3">Grand Total</td>
+        <td>${tot_qty}</td>
+        <td>${tot_del}</td>
+        <td>${total_ratio}%</td>
+    </tr></tbody></table></div>`;
 
     let d = new frappe.ui.Dialog({
         title: "Order Details",
@@ -132,8 +143,7 @@ window.show_orders = function(encoded, party) {
 };
 
 
-
-// ================= LEVEL 3 POPUP =================
+// ================= LEVEL 3 =================
 
 window.show_items = function(encoded) {
 
@@ -141,8 +151,7 @@ window.show_items = function(encoded) {
 
     let tot_qty = 0, tot_del = 0, tot_pen = 0;
 
-    let html = `
-    <div id="print_items">
+    let html = `<div id="print_items">
     <h3>Pending Items</h3>
     <table class="table table-bordered">
     <thead>
@@ -174,15 +183,13 @@ window.show_items = function(encoded) {
 
     let total_ratio = tot_qty ? ((tot_del / tot_qty) * 100).toFixed(2) : 0;
 
-    html += `
-        <tr style="font-weight:bold;background:#eee">
-            <td>Grand Total</td>
-            <td>${tot_qty}</td>
-            <td>${tot_del}</td>
-            <td>${tot_pen}</td>
-            <td>${total_ratio}%</td>
-        </tr>
-    </tbody></table></div>`;
+    html += `<tr style="font-weight:bold;background:#eee">
+        <td>Grand Total</td>
+        <td>${tot_qty}</td>
+        <td>${tot_del}</td>
+        <td>${tot_pen}</td>
+        <td>${total_ratio}%</td>
+    </tr></tbody></table></div>`;
 
     let d = new frappe.ui.Dialog({
         title: "Pending Items",

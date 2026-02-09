@@ -5,6 +5,8 @@ from frappe.utils import flt, date_diff
 
 def execute(filters=None):
 
+    filters = filters or {}
+
     validate_filters(filters)
 
     columns = get_columns()
@@ -13,21 +15,32 @@ def execute(filters=None):
     return columns, data
 
 
+# ---------------- VALIDATION ----------------
+
 def validate_filters(filters):
     if filters.get("from_date") and filters.get("to_date"):
         if date_diff(filters.to_date, filters.from_date) < 0:
             frappe.throw(_("To Date cannot be before From Date."))
 
 
+# ---------------- MAIN DATA ----------------
+
 def get_data(filters):
 
-    conditions = ""
+    conditions = []
 
     if filters.get("company"):
-        conditions += " AND so.company = %(company)s"
+        conditions.append("so.company = %(company)s")
 
-    if filters.get("from_date") and filters.get("to_date"):
-        conditions += " AND so.transaction_date BETWEEN %(from_date)s AND %(to_date)s"
+    if filters.get("from_date"):
+        conditions.append("so.transaction_date >= %(from_date)s")
+
+    if filters.get("to_date"):
+        conditions.append("so.transaction_date <= %(to_date)s")
+
+    condition_sql = " AND ".join(conditions)
+    if condition_sql:
+        condition_sql = " AND " + condition_sql
 
     customers = frappe.db.sql(f"""
         SELECT
@@ -41,8 +54,7 @@ def get_data(filters):
         INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
         INNER JOIN `tabCustomer` c ON c.name = so.customer
         WHERE so.docstatus = 1
-        AND so.status NOT IN ('Completed','Closed','Stopped','On Hold')
-        {conditions}
+        {condition_sql}
         GROUP BY c.name
     """, filters, as_dict=True)
 
@@ -63,15 +75,33 @@ def get_data(filters):
         else:
             row.risk = "OK"
 
-        row.order_popup = frappe.as_json(get_customer_orders(row.name))
+        row.order_popup = frappe.as_json(get_customer_orders(row.name, filters))
         final.append(row)
 
     return final
 
 
-def get_customer_orders(customer):
+# ---------------- ORDER POPUP ----------------
 
-    orders = frappe.db.sql("""
+def get_customer_orders(customer, filters):
+
+    conditions = ["so.customer = %(customer)s"]
+
+    if filters.get("company"):
+        conditions.append("so.company = %(company)s")
+
+    if filters.get("from_date"):
+        conditions.append("so.transaction_date >= %(from_date)s")
+
+    if filters.get("to_date"):
+        conditions.append("so.transaction_date <= %(to_date)s")
+
+    condition_sql = " AND ".join(conditions)
+
+    params = dict(filters)
+    params["customer"] = customer
+
+    orders = frappe.db.sql(f"""
         SELECT
             so.name AS so_no,
             so.transaction_date AS so_date,
@@ -80,12 +110,10 @@ def get_customer_orders(customer):
             SUM(soi.qty - soi.delivered_qty) AS pending
         FROM `tabSales Order` so
         INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
-        WHERE so.customer = %s
-        AND so.docstatus = 1
-        AND so.status NOT IN ('Completed','Closed','Stopped','On Hold')
+        WHERE so.docstatus = 1
+        AND {condition_sql}
         GROUP BY so.name
-        HAVING pending > 0
-    """, customer, as_dict=True)
+    """, params, as_dict=True)
 
     for o in orders:
         o.fill_ratio = round(
@@ -98,6 +126,8 @@ def get_customer_orders(customer):
     return orders
 
 
+# ---------------- ITEM POPUP ----------------
+
 def get_pending_items(so):
 
     return frappe.db.sql("""
@@ -108,9 +138,10 @@ def get_pending_items(so):
             (qty - delivered_qty) AS pending
         FROM `tabSales Order Item`
         WHERE parent = %s
-        AND qty > delivered_qty
     """, so, as_dict=True)
 
+
+# ---------------- COLUMNS ----------------
 
 def get_columns():
 

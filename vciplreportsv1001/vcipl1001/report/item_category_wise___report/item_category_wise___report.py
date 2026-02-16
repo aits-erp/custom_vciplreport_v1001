@@ -17,6 +17,11 @@ def execute(filters=None):
 def get_columns(customers):
     columns = [
         {
+            "label": "Item Group",
+            "fieldname": "item_group",
+            "width": 180
+        },
+        {
             "label": "Main Group",
             "fieldname": "custom_main_group",
             "width": 180
@@ -55,6 +60,10 @@ def get_pivot_data(filters):
         conditions += " AND si.customer = %(customer)s"
         values["customer"] = filters.customer
 
+    if filters.item_group:
+        conditions += " AND i.item_group = %(item_group)s"
+        values["item_group"] = filters.item_group
+
     if filters.custom_main_group:
         conditions += " AND i.custom_main_group = %(custom_main_group)s"
         values["custom_main_group"] = filters.custom_main_group
@@ -75,6 +84,7 @@ def get_pivot_data(filters):
     raw_data = frappe.db.sql(
         f"""
         SELECT
+            i.item_group,
             i.custom_main_group,
             i.custom_sub_group,
             c.customer_name,
@@ -95,10 +105,12 @@ def get_pivot_data(filters):
           AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
           {conditions}
         GROUP BY
+            i.item_group,
             i.custom_main_group,
             i.custom_sub_group,
             c.customer_name
         ORDER BY
+            i.item_group,
             i.custom_main_group,
             i.custom_sub_group
         """,
@@ -111,14 +123,16 @@ def get_pivot_data(filters):
     result = {}
 
     for row in raw_data:
+        item_group = row.item_group or "Undefined"
         main_group = row.custom_main_group or "Undefined"
         sub_group = row.custom_sub_group or "Undefined"
         customer = row.customer_name
 
-        key = f"{main_group}::{sub_group}"
+        key = f"{item_group}::{main_group}::{sub_group}"
 
         if key not in result:
             result[key] = {
+                "item_group": item_group,
                 "custom_main_group": main_group,
                 "custom_sub_group": sub_group
             }

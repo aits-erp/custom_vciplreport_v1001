@@ -3,17 +3,15 @@ from datetime import date
 
 
 def execute(filters=None):
-    filters = filters or {}
+    filters = frappe._dict(filters or {})
 
-    # ---------------- FINANCIAL YEAR ----------------
-    today = date.today()
-    fy_year = today.year if today.month > 3 else today.year - 1
+    # ---------- DEFAULT FINANCIAL YEAR ----------
+    if not filters.get("from_date") or not filters.get("to_date"):
+        today = date.today()
+        fy_year = today.year if today.month > 3 else today.year - 1
 
-    from_date = date(fy_year, 4, 1)
-    to_date = date(fy_year + 1, 3, 31)
-
-    filters["from_date"] = from_date
-    filters["to_date"] = to_date
+        filters.from_date = date(fy_year, 4, 1)
+        filters.to_date = date(fy_year + 1, 3, 31)
 
     return get_columns(), get_data(filters)
 
@@ -68,8 +66,8 @@ def get_data(filters):
 
     params = {
         "docstatus": 1,
-        "from_date": filters["from_date"],
-        "to_date": filters["to_date"],
+        "from_date": filters.from_date,
+        "to_date": filters.to_date,
         "item_type": filters.get("custom_item_type")
     }
 

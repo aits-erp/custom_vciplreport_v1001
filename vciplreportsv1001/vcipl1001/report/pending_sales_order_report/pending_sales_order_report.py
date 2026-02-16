@@ -15,7 +15,6 @@ def execute(filters=None):
     conditions = get_conditions(filters)
     data = get_data(conditions, filters)
 
-    # ✅ keep only pending rows
     data = [d for d in data if flt(d.pending_qty) > 0]
 
     if not data:
@@ -35,16 +34,12 @@ def execute(filters=None):
     return columns, data, None, chart_data, report_summary
 
 
-# ---------------- VALIDATION ----------------
-
 def validate_filters(filters):
 
     if filters.get("from_date") and filters.get("to_date"):
         if date_diff(filters.to_date, filters.from_date) < 0:
             frappe.throw(_("To Date cannot be before From Date."))
 
-
-# ---------------- CONDITIONS ----------------
 
 def get_conditions(filters):
 
@@ -67,8 +62,6 @@ def get_conditions(filters):
 
     return conditions
 
-
-# ---------------- DATA ----------------
 
 def get_data(conditions, filters):
 
@@ -96,7 +89,6 @@ def get_data(conditions, filters):
         {conditions}
     """, filters, as_dict=True)
 
-    # stock lookup
     bins = frappe.db.sql("""
         SELECT item_code, warehouse, actual_qty
         FROM `tabBin`
@@ -110,14 +102,10 @@ def get_data(conditions, filters):
 
         available = bin_map.get((row.item_code, row.warehouse), 0)
 
-        ratio = (row.pending_qty / row.qty * 100) if row.qty > 0 else 0
-        row["fill_ratio"] = round(ratio, 2)
-
         so_popup.setdefault(row.sales_order, []).append({
             "item_name": row.item_name,
             "pending_qty": row.pending_qty,
             "available_qty": available,
-            "ratio": round(ratio, 2),
             "delivery_date": str(row.delivery_date) if row.delivery_date else ""
         })
 
@@ -126,8 +114,6 @@ def get_data(conditions, filters):
 
     return data
 
-
-# ---------------- PREPARE ----------------
 
 def prepare_data(data, filters):
 
@@ -180,8 +166,6 @@ def prepare_data(data, filters):
     return data, chart_data, totals
 
 
-# ---------------- COLUMNS ----------------
-
 def get_columns(filters):
 
     qty_label = _("Ordered Qty") if filters.get("group_by_so") else _("Qty")
@@ -196,7 +180,6 @@ def get_columns(filters):
         {"label": qty_label, "fieldname": "qty", "fieldtype": "Float"},
         {"label": _("Delivered Qty"), "fieldname": "delivered_qty", "fieldtype": "Float"},
         {"label": _("Qty to Deliver"), "fieldname": "pending_qty", "fieldtype": "Float"},
-        {"label": _("Fill Ratio %"), "fieldname": "fill_ratio", "fieldtype": "Float"},
 
         {"label": _("Order Amount"), "fieldname": "amount", "fieldtype": "Currency"},
         {"label": _("Delivered Amount"), "fieldname": "delivered_amount", "fieldtype": "Currency"},

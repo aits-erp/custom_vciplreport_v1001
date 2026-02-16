@@ -15,6 +15,12 @@ frappe.query_reports["Item Category Wise - Report"] = {
             reqd: 1
         },
         {
+            fieldname: "item_group",
+            label: "Item Group",
+            fieldtype: "Link",
+            options: "Item Group"
+        },
+        {
             fieldname: "parent_sales_person",
             label: "Parent Sales Person",
             fieldtype: "Link",

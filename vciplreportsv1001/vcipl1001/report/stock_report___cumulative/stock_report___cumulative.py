@@ -14,6 +14,9 @@ def execute(filters=None):
     return columns, data
 
 
+# ------------------------------
+# COLUMNS
+# ------------------------------
 def get_columns():
     return [
         {"label": "Item Code", "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 150},
@@ -37,6 +40,9 @@ def get_columns():
     ]
 
 
+# ------------------------------
+# DATA
+# ------------------------------
 def get_data(item_type, item_group, main_group):
 
     conditions = ""
@@ -58,25 +64,25 @@ def get_data(item_type, item_group, main_group):
             i.item_name,
             i.item_group,
 
-            -- TOTAL STOCK
-            SUM(b.actual_qty) AS current_stock,
+            -- TOTAL STOCK (NULL SAFE)
+            COALESCE(SUM(b.actual_qty), 0) AS current_stock,
 
             -- SAFE RATE
             COALESCE(rate.rate, 0) AS rate,
 
             -- AMOUNT
-            SUM(b.actual_qty) * COALESCE(rate.rate, 0) AS amount,
+            COALESCE(SUM(b.actual_qty), 0) * COALESCE(rate.rate, 0) AS amount,
 
             -- WAREHOUSE SPLIT
-            SUM(CASE WHEN b.warehouse = 'Finished Goods - VCIPL' THEN b.actual_qty ELSE 0 END) AS fg,
-            SUM(CASE WHEN b.warehouse = 'Goods In Transit - VCIPL' THEN b.actual_qty ELSE 0 END) AS git,
-            SUM(CASE WHEN b.warehouse = 'Bby Gala No. 014 - VCIPL' THEN b.actual_qty ELSE 0 END) AS g014,
-            SUM(CASE WHEN b.warehouse = 'Bby Gala No. 203 - VCIPL' THEN b.actual_qty ELSE 0 END) AS g203,
-            SUM(CASE WHEN b.warehouse = 'Unit-1 Shelvali - VCIPL' THEN b.actual_qty ELSE 0 END) AS u1,
-            SUM(CASE WHEN b.warehouse = 'Unit-2 BIDCO - VCIPL' THEN b.actual_qty ELSE 0 END) AS u2,
-            SUM(CASE WHEN b.warehouse = 'Unit-3 Gundale - VCIPL' THEN b.actual_qty ELSE 0 END) AS u3,
-            SUM(CASE WHEN b.warehouse = 'Work In Progress - VCIPL' THEN b.actual_qty ELSE 0 END) AS wip,
-            SUM(CASE WHEN b.warehouse = 'Stores - VCIPL' THEN b.actual_qty ELSE 0 END) AS stores
+            COALESCE(SUM(CASE WHEN b.warehouse = 'Finished Goods - VCIPL' THEN b.actual_qty END), 0) AS fg,
+            COALESCE(SUM(CASE WHEN b.warehouse = 'Goods In Transit - VCIPL' THEN b.actual_qty END), 0) AS git,
+            COALESCE(SUM(CASE WHEN b.warehouse = 'Bby Gala No. 014 - VCIPL' THEN b.actual_qty END), 0) AS g014,
+            COALESCE(SUM(CASE WHEN b.warehouse = 'Bby Gala No. 203 - VCIPL' THEN b.actual_qty END), 0) AS g203,
+            COALESCE(SUM(CASE WHEN b.warehouse = 'Unit-1 Shelvali - VCIPL' THEN b.actual_qty END), 0) AS u1,
+            COALESCE(SUM(CASE WHEN b.warehouse = 'Unit-2 BIDCO - VCIPL' THEN b.actual_qty END), 0) AS u2,
+            COALESCE(SUM(CASE WHEN b.warehouse = 'Unit-3 Gundale - VCIPL' THEN b.actual_qty END), 0) AS u3,
+            COALESCE(SUM(CASE WHEN b.warehouse = 'Work In Progress - VCIPL' THEN b.actual_qty END), 0) AS wip,
+            COALESCE(SUM(CASE WHEN b.warehouse = 'Stores - VCIPL' THEN b.actual_qty END), 0) AS stores
 
         FROM `tabItem` i
         LEFT JOIN `tabBin` b ON b.item_code = i.name
@@ -99,9 +105,6 @@ def get_data(item_type, item_group, main_group):
 
         GROUP BY
             i.name, i.custom_main_group, i.item_name, i.item_group, rate.rate
-
-        HAVING
-            SUM(b.actual_qty) != 0
 
         ORDER BY
             current_stock DESC

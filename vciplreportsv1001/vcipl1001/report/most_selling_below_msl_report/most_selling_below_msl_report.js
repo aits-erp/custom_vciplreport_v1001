@@ -1,9 +1,30 @@
 frappe.query_reports["Most Selling Below MSL Report"] = {
     onload: function (report) {
         report.set_filter_value("custom_item_type", "Finished Goods");
+
+        // Default FY dates (April → March)
+        let today = frappe.datetime.get_today();
+        let year = frappe.datetime.str_to_obj(today).getMonth() >= 3
+            ? frappe.datetime.str_to_obj(today).getFullYear()
+            : frappe.datetime.str_to_obj(today).getFullYear() - 1;
+
+        report.set_filter_value("from_date", `${year}-04-01`);
+        report.set_filter_value("to_date", `${year + 1}-03-31`);
     },
 
     filters: [
+        {
+            fieldname: "from_date",
+            label: __("From Date"),
+            fieldtype: "Date",
+            reqd: 1
+        },
+        {
+            fieldname: "to_date",
+            label: __("To Date"),
+            fieldtype: "Date",
+            reqd: 1
+        },
         {
             fieldname: "custom_item_type",
             label: __("Item Type"),

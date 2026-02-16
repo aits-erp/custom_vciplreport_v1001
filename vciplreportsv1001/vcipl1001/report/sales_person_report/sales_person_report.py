@@ -9,7 +9,7 @@ def execute(filters=None):
 
 
 # --------------------------------------------------
-# DEFAULT FILTERS (CRITICAL FIX)
+# DEFAULT FILTERS
 # --------------------------------------------------
 def set_default_filters(filters):
     today = nowdate()
@@ -43,20 +43,20 @@ def get_columns():
 
 
 # --------------------------------------------------
-# PERIOD → MONTH LIST (SAFE)
+# FINANCIAL YEAR MONTH MAPPING
 # --------------------------------------------------
 def get_months(filters):
     if filters.period_type == "Quarter":
         q_map = {
-            "Q1": [1, 2, 3],
-            "Q2": [4, 5, 6],
-            "Q3": [7, 8, 9],
-            "Q4": [10, 11, 12],
+            "Q1": [4, 5, 6],
+            "Q2": [7, 8, 9],
+            "Q3": [10, 11, 12],
+            "Q4": [1, 2, 3],
         }
-        return q_map.get(filters.quarter, [1, 2, 3])
+        return q_map.get(filters.quarter, [4, 5, 6])
 
     if filters.period_type == "Half Year":
-        return [1, 2, 3, 4, 5, 6] if filters.half_year == "H1" else [7, 8, 9, 10, 11, 12]
+        return [4, 5, 6, 7, 8, 9] if filters.half_year == "H1" else [10, 11, 12, 1, 2, 3]
 
     return [int(filters.month)]
 
@@ -84,14 +84,12 @@ def get_data(filters):
     ly_from = add_years(from_date, -1)
     ly_to = add_years(to_date, -1)
 
-    # 🔹 FILTER VALUES
     f_region = filters.get("custom_region")
     f_location = filters.get("custom_location")
     f_territory = filters.get("custom_territory")
     f_parent = filters.get("parent_sales_person")
     f_customer = filters.get("customer")
 
-    # ---------------- SALES PERSON ----------------
     sales_persons = frappe.db.sql("""
         SELECT name, parent_sales_person, custom_head_sales_code,
                custom_region, custom_location, custom_territory
@@ -101,7 +99,6 @@ def get_data(filters):
 
     sp_map = {sp.name: sp for sp in sales_persons}
 
-    # ---------------- TARGET (PERIOD-WISE) ----------------
     month_fields = {
         1: "custom_january", 2: "custom_february", 3: "custom_march",
         4: "custom_april", 5: "custom_may_", 6: "custom_june",
@@ -123,7 +120,6 @@ def get_data(filters):
         WHERE st.parenttype = 'Customer'
     """, as_dict=True)
 
-    # ---------------- INVOICE ----------------
     invoices = frappe.db.sql("""
         SELECT customer, SUM(base_net_total) amount
         FROM `tabSales Invoice`
@@ -134,7 +130,6 @@ def get_data(filters):
 
     invoice_map = {i.customer: flt(i.amount) for i in invoices}
 
-    # ---------------- LAST YEAR ----------------
     last_year = frappe.db.sql("""
         SELECT customer, SUM(base_net_total) amount
         FROM `tabSales Invoice`
@@ -153,7 +148,6 @@ def get_data(filters):
         if not sp:
             continue
 
-        # ✅ APPLY ALL FILTERS
         if f_region and sp.custom_region != f_region:
             continue
         if f_location and sp.custom_location != f_location:

@@ -1,5 +1,6 @@
 frappe.query_reports["Sales Person Report"] = {
     filters: [
+
         // ---------------- PERIOD TYPE ----------------
         {
             fieldname: "period_type",
@@ -33,16 +34,16 @@ frappe.query_reports["Sales Person Report"] = {
             depends_on: "eval:doc.period_type=='Month'"
         },
 
-        // ---------------- QUARTER ----------------
+        // ---------------- QUARTER (FY STYLE) ----------------
         {
             fieldname: "quarter",
             label: "Quarter",
             fieldtype: "Select",
             options: [
-                { label: "Q1 (Jan–Mar)", value: "Q1" },
-                { label: "Q2 (Apr–Jun)", value: "Q2" },
-                { label: "Q3 (Jul–Sep)", value: "Q3" },
-                { label: "Q4 (Oct–Dec)", value: "Q4" }
+                { label: "Q1 (Apr–Jun)", value: "Q1" },
+                { label: "Q2 (Jul–Sep)", value: "Q2" },
+                { label: "Q3 (Oct–Dec)", value: "Q3" },
+                { label: "Q4 (Jan–Mar)", value: "Q4" }
             ],
             default: "Q1",
             depends_on: "eval:doc.period_type=='Quarter'"
@@ -54,8 +55,8 @@ frappe.query_reports["Sales Person Report"] = {
             label: "Half Year",
             fieldtype: "Select",
             options: [
-                { label: "H1 (Jan–Jun)", value: "H1" },
-                { label: "H2 (Jul–Dec)", value: "H2" }
+                { label: "H1 (Apr–Sep)", value: "H1" },
+                { label: "H2 (Oct–Mar)", value: "H2" }
             ],
             default: "H1",
             depends_on: "eval:doc.period_type=='Half Year'"
@@ -71,14 +72,14 @@ frappe.query_reports["Sales Person Report"] = {
             reqd: 1
         },
 
-        // ---------------- REGION (✅ ADDED) ----------------
+        // ---------------- REGION ----------------
         {
             fieldname: "custom_region",
             label: "Region",
             fieldtype: "Data"
         },
 
-        // ---------------- LOCATION (✅ ADDED) ----------------
+        // ---------------- LOCATION ----------------
         {
             fieldname: "custom_location",
             label: "Location",

@@ -1,12 +1,27 @@
 import frappe
 from frappe import _
 from frappe.utils import flt, date_diff
+from datetime import date
 
 
 def execute(filters=None):
 
     if not filters:
         filters = {}
+
+    # ✅ Default Financial Year (Apr → Mar)
+    today = date.today()
+    fy_year = today.year if today.month > 3 else today.year - 1
+
+    if not filters.get("from_date"):
+        filters["from_date"] = date(fy_year, 4, 1)
+
+    if not filters.get("to_date"):
+        filters["to_date"] = date(fy_year + 1, 3, 31)
+
+    # ✅ Default Company
+    if not filters.get("company"):
+        filters["company"] = "Vinod Cookware India Private Limited"
 
     validate_filters(filters)
 
@@ -59,14 +74,12 @@ def get_data(filters):
 
     for row in data:
 
-        # calculate fill ratio
         row.fill_ratio = round(
             (flt(row.total_delivered) / flt(row.total_ordered) * 100)
             if row.total_ordered else 0,
             2
         )
 
-        # risk classification
         if row.fill_ratio < 50:
             row.risk = "Critical"
         elif row.fill_ratio < 80:
@@ -74,7 +87,6 @@ def get_data(filters):
         else:
             row.risk = "OK"
 
-        # apply risk filter
         risk_filter = filters.get("risk_filter")
 
         if risk_filter == "HIGH" and row.risk != "Critical":

@@ -7,7 +7,7 @@ frappe.query_reports["FILL RATIO SALES ORDER"] = {
             label: __("Company"),
             fieldtype: "Link",
             options: "Company",
-            default: frappe.defaults.get_user_default("Company"),
+            default: "Vinod Cookware India Private Limited",
             reqd: 1
         },
 

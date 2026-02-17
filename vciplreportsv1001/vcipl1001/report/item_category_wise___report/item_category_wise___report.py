@@ -14,21 +14,9 @@
 # # ---------------- COLUMNS ----------------
 # def get_columns(customers):
 #     columns = [
-#         {
-#             "label": "Item Group",
-#             "fieldname": "item_group",
-#             "width": 180
-#         },
-#         {
-#             "label": "Main Group",
-#             "fieldname": "custom_main_group",
-#             "width": 180
-#         },
-#         {
-#             "label": "Sub Group",
-#             "fieldname": "custom_sub_group",
-#             "width": 180
-#         }
+#         {"label": "Item Group", "fieldname": "item_group", "width": 180},
+#         {"label": "Main Group", "fieldname": "custom_main_group", "width": 180},
+#         {"label": "Sub Group", "fieldname": "custom_sub_group", "width": 180}
 #     ]
 
 #     for customer in customers:
@@ -84,17 +72,12 @@
 #             c.customer_name,
 #             SUM(sii.base_net_amount) AS amount
 #         FROM `tabSales Invoice` si
-#         JOIN `tabSales Invoice Item` sii
-#             ON sii.parent = si.name
-#         JOIN `tabItem` i
-#             ON i.name = sii.item_code
-#         JOIN `tabCustomer` c
-#             ON c.name = si.customer
+#         JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+#         JOIN `tabItem` i ON i.name = sii.item_code
+#         JOIN `tabCustomer` c ON c.name = si.customer
 #         LEFT JOIN `tabSales Team` st
-#             ON st.parent = si.name
-#             AND st.parenttype = 'Sales Invoice'
-#         LEFT JOIN `tabSales Person` sp
-#             ON sp.name = st.sales_person
+#             ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
+#         LEFT JOIN `tabSales Person` sp ON sp.name = st.sales_person
 #         WHERE si.docstatus = 1
 #           AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
 #           {conditions}
@@ -136,8 +119,39 @@
 
 #     return list(result.values()), customers
 
+
+# # ---------------- DRILLDOWN METHOD ----------------
+# @frappe.whitelist()
+# def get_customer_items(customer, item_group, main_group, sub_group):
+
+#     data = frappe.db.sql("""
+#         SELECT
+#             si.name AS invoice,
+#             sii.item_name,
+#             sii.qty,
+#             sii.base_net_amount AS amount
+#         FROM `tabSales Invoice` si
+#         JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+#         JOIN `tabItem` i ON i.name = sii.item_code
+#         JOIN `tabCustomer` c ON c.name = si.customer
+#         WHERE si.docstatus = 1
+#             AND c.customer_name = %(customer)s
+#             AND IFNULL(i.item_group,'Undefined') = %(item_group)s
+#             AND IFNULL(i.custom_main_group,'Undefined') = %(main_group)s
+#             AND IFNULL(i.custom_sub_group,'Undefined') = %(sub_group)s
+#         ORDER BY si.posting_date DESC
+#     """, {
+#         "customer": customer,
+#         "item_group": item_group,
+#         "main_group": main_group,
+#         "sub_group": sub_group
+#     }, as_dict=True)
+
+#     return data
+
 import frappe
 from frappe.utils import flt
+import json
 
 
 def execute(filters=None):
@@ -164,6 +178,9 @@ def get_columns(customers):
             "fieldtype": "Currency",
             "width": 150
         })
+
+    # hidden popup column
+    columns.append({"fieldname": "popup_data", "hidden": 1})
 
     return columns
 
@@ -208,7 +225,10 @@ def get_pivot_data(filters):
             i.custom_main_group,
             i.custom_sub_group,
             c.customer_name,
-            SUM(sii.base_net_amount) AS amount
+            sii.item_name,
+            sii.qty,
+            sii.base_net_amount AS amount,
+            si.name AS invoice
         FROM `tabSales Invoice` si
         JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         JOIN `tabItem` i ON i.name = sii.item_code
@@ -219,15 +239,6 @@ def get_pivot_data(filters):
         WHERE si.docstatus = 1
           AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
           {conditions}
-        GROUP BY
-            i.item_group,
-            i.custom_main_group,
-            i.custom_sub_group,
-            c.customer_name
-        ORDER BY
-            i.item_group,
-            i.custom_main_group,
-            i.custom_sub_group
         """,
         values,
         as_dict=True
@@ -237,6 +248,7 @@ def get_pivot_data(filters):
     result = {}
 
     for row in raw_data:
+
         item_group = row.item_group or "Undefined"
         main_group = row.custom_main_group or "Undefined"
         sub_group = row.custom_sub_group or "Undefined"
@@ -248,41 +260,23 @@ def get_pivot_data(filters):
             result[key] = {
                 "item_group": item_group,
                 "custom_main_group": main_group,
-                "custom_sub_group": sub_group
+                "custom_sub_group": sub_group,
+                "popup_data": {}
             }
             for c in customers:
                 result[key][frappe.scrub(c)] = 0
+                result[key]["popup_data"][frappe.scrub(c)] = []
 
         result[key][frappe.scrub(customer)] += flt(row.amount)
 
+        result[key]["popup_data"][frappe.scrub(customer)].append({
+            "invoice": row.invoice,
+            "item_name": row.item_name,
+            "qty": row.qty,
+            "amount": row.amount
+        })
+
+    for k in result:
+        result[k]["popup_data"] = json.dumps(result[k]["popup_data"])
+
     return list(result.values()), customers
-
-
-# ---------------- DRILLDOWN METHOD ----------------
-@frappe.whitelist()
-def get_customer_items(customer, item_group, main_group, sub_group):
-
-    data = frappe.db.sql("""
-        SELECT
-            si.name AS invoice,
-            sii.item_name,
-            sii.qty,
-            sii.base_net_amount AS amount
-        FROM `tabSales Invoice` si
-        JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        JOIN `tabItem` i ON i.name = sii.item_code
-        JOIN `tabCustomer` c ON c.name = si.customer
-        WHERE si.docstatus = 1
-            AND c.customer_name = %(customer)s
-            AND IFNULL(i.item_group,'Undefined') = %(item_group)s
-            AND IFNULL(i.custom_main_group,'Undefined') = %(main_group)s
-            AND IFNULL(i.custom_sub_group,'Undefined') = %(sub_group)s
-        ORDER BY si.posting_date DESC
-    """, {
-        "customer": customer,
-        "item_group": item_group,
-        "main_group": main_group,
-        "sub_group": sub_group
-    }, as_dict=True)
-
-    return data

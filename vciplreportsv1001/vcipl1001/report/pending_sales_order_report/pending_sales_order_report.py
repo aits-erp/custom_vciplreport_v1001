@@ -87,6 +87,7 @@ def get_data(conditions, filters):
         WHERE so.docstatus = 1
         AND so.status NOT IN ('Completed','Closed','Stopped','On Hold')
         {conditions}
+        ORDER BY so.transaction_date DESC, so.name DESC
     """, filters, as_dict=True)
 
     bins = frappe.db.sql("""

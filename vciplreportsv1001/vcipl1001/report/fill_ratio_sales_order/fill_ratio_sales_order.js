@@ -1,3 +1,23 @@
+// Auto Financial Year calculation (Apr → Mar)
+function get_default_fy_dates() {
+    const today = frappe.datetime.get_today();
+    const d = frappe.datetime.str_to_obj(today);
+
+    let fy_start, fy_end;
+
+    if ((d.getMonth() + 1) > 3) {
+        fy_start = `${d.getFullYear()}-04-01`;
+        fy_end = `${d.getFullYear() + 1}-03-31`;
+    } else {
+        fy_start = `${d.getFullYear() - 1}-04-01`;
+        fy_end = `${d.getFullYear()}-03-31`;
+    }
+
+    return { fy_start, fy_end };
+}
+
+const fy = get_default_fy_dates();
+
 frappe.query_reports["FILL RATIO SALES ORDER"] = {
 
     filters: [
@@ -14,13 +34,15 @@ frappe.query_reports["FILL RATIO SALES ORDER"] = {
         {
             fieldname: "from_date",
             label: __("From Date"),
-            fieldtype: "Date"
+            fieldtype: "Date",
+            default: fy.fy_start
         },
 
         {
             fieldname: "to_date",
             label: __("To Date"),
-            fieldtype: "Date"
+            fieldtype: "Date",
+            default: fy.fy_end
         },
 
         {
@@ -36,6 +58,8 @@ frappe.query_reports["FILL RATIO SALES ORDER"] = {
     formatter(value, row, column, data, default_formatter) {
 
         value = default_formatter(value, row, column, data);
+
+        if (!data) return value;
 
         if (column.fieldname === "risk") {
 

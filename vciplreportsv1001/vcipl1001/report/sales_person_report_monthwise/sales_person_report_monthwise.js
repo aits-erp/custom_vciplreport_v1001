@@ -3,7 +3,6 @@
 
 frappe.query_reports["Sales Person Report Monthwise"] = {
     filters: [
-        // Year Filter
         {
             fieldname: "year",
             label: __("Year"),
@@ -12,249 +11,281 @@ frappe.query_reports["Sales Person Report Monthwise"] = {
             default: new Date().getFullYear().toString(),
             reqd: 1
         },
-        
-        // Month Filter
         {
             fieldname: "month",
             label: __("Month"),
             fieldtype: "Select",
             options: [
-                { "value": 1, "label": __("January") },
-                { "value": 2, "label": __("February") },
-                { "value": 3, "label": __("March") },
-                { "value": 4, "label": __("April") },
-                { "value": 5, "label": __("May") },
-                { "value": 6, "label": __("June") },
-                { "value": 7, "label": __("July") },
-                { "value": 8, "label": __("August") },
-                { "value": 9, "label": __("September") },
-                { "value": 10, "label": __("October") },
-                { "value": 11, "label": __("November") },
-                { "value": 12, "label": __("December") }
+                { value: 1, label: __("January") },
+                { value: 2, label: __("February") },
+                { value: 3, label: __("March") },
+                { value: 4, label: __("April") },
+                { value: 5, label: __("May") },
+                { value: 6, label: __("June") },
+                { value: 7, label: __("July") },
+                { value: 8, label: __("August") },
+                { value: 9, label: __("September") },
+                { value: 10, label: __("October") },
+                { value: 11, label: __("November") },
+                { value: 12, label: __("December") }
             ],
             default: new Date().getMonth() + 1,
             reqd: 1
         },
-        
-        // Head Sales Person Filter
         {
             fieldname: "parent_sales_person",
             label: __("Head Sales Person"),
             fieldtype: "Link",
             options: "Sales Person"
         },
-        
-        // Sales Person Filter
         {
             fieldname: "sales_person",
             label: __("Sales Person"),
             fieldtype: "Link",
             options: "Sales Person"
         },
-        
-        // Region Filter
         {
             fieldname: "custom_region",
             label: __("Region"),
             fieldtype: "Data"
         },
-        
-        // Location Filter
         {
             fieldname: "custom_location",
             label: __("Location"),
             fieldtype: "Data"
         },
-        
-        // Territory Filter
         {
             fieldname: "custom_territory",
             label: __("Territory"),
             fieldtype: "Data"
         },
-        
-        // Customer Filter
         {
             fieldname: "customer",
             label: __("Customer"),
             fieldtype: "Link",
             options: "Customer"
         },
-        
-        // Include Targets Toggle
         {
             fieldname: "include_targets",
             label: __("Include Targets"),
             fieldtype: "Check",
             default: 1
         },
-        
-        // Compare with Previous Year
         {
             fieldname: "compare_previous_year",
             label: __("Compare with Previous Year"),
             fieldtype: "Check",
             default: 0
+        },
+        {
+            fieldname: "detailed_view",
+            label: __("Detailed View"),
+            fieldtype: "Check",
+            default: 0,
+            hidden: 1
         }
     ],
 
-    // Formatter for better visualization
     formatter: function(value, row, column, data, default_formatter) {
+        if (!data) return default_formatter(value, row, column, data);
+        
         value = default_formatter(value, row, column, data);
         
-        if (!data) return value;
+        // Make customer names clickable (Level 2 rows)
+        if (column.fieldname == "customer_name" && data.level == "2" && data.customer_name && data.customer_name !== "TOTAL") {
+            let customer = encodeURIComponent(data.customer_name);
+            let sales_person = encodeURIComponent(data.sales_person || '');
+            let month = frappe.query_report.get_filter_value('month');
+            let year = frappe.query_report.get_filter_value('year');
+            
+            value = `<a style="color: #007bff; cursor: pointer; text-decoration: underline; font-weight: 500;" 
+                onclick="frappe.query_reports['Sales Person Report Monthwise'].show_customer_details('${customer}', '${sales_person}', ${month}, ${year})">
+                ${value} 🔍
+            </a>`;
+        }
+        
+        // Make invoice amounts clickable
+        if (column.fieldname == "invoice_amount" && data.level == "2" && data.invoice_amount > 0) {
+            let customer = encodeURIComponent(data.customer_name);
+            let sales_person = encodeURIComponent(data.sales_person || '');
+            let month = frappe.query_report.get_filter_value('month');
+            let year = frappe.query_report.get_filter_value('year');
+            
+            value = `<a style="color: #28a745; cursor: pointer; text-decoration: underline;" 
+                onclick="frappe.query_reports['Sales Person Report Monthwise'].show_invoice_breakdown('${customer}', '${sales_person}', ${month}, ${year})">
+                ${value}
+            </a>`;
+        }
         
         // Color coding for achievement percentage
         if (column.fieldname == "achieved_pct" && data.achieved_pct !== undefined) {
-            if (data.achieved_pct >= 100) {
+            let pct = flt(data.achieved_pct);
+            if (pct >= 100) {
                 value = `<span style="color: #28a745; font-weight: bold;">${value}</span>`;
-            } else if (data.achieved_pct >= 75) {
+            } else if (pct >= 75) {
                 value = `<span style="color: #ffc107; font-weight: bold;">${value}</span>`;
-            } else if (data.achieved_pct < 50 && data.achieved_pct > 0) {
+            } else if (pct < 50 && pct > 0) {
                 value = `<span style="color: #dc3545; font-weight: bold;">${value}</span>`;
             }
         }
         
-        // Highlight total row
-        if (data.is_total_row) {
-            value = `<span style="font-weight: bold; background-color: #f0f0f0;">${value}</span>`;
+        // Style for section headers
+        if (data.level == "1") {
+            value = `<span style="font-weight: bold; font-size: 1.1em; background-color: #f0f0f0; padding: 5px; display: block;">${value}</span>`;
         }
         
-        // Make customer names clickable for drill-down
-        if (column.fieldname == "customer_name" && data.customer_name && data.customer_name !== "TOTAL") {
-            value = `<a style="color: #007bff; cursor: pointer; text-decoration: underline;" 
-                onclick="frappe.query_reports['Sales Person Report Monthwise'].open_customer_details('${data.customer_name}', '${data.sales_person}')">
-                ${value}
-            </a>`;
+        // Style for total rows
+        if (data.is_total_row) {
+            value = `<span style="font-weight: bold; background-color: #f8f9fa;">${value}</span>`;
         }
         
         return value;
     },
 
-    // Drill-down to customer details
-    open_customer_details: function(customer_name, sales_person) {
+    tree_view: function(data) {
+        return data && data.indent !== undefined;
+    },
+
+    show_customer_details: function(customer, sales_person, month, year) {
         frappe.call({
             method: "your_app.your_app.report.sales_person_report_monthwise.sales_person_report_monthwise.get_customer_details",
             args: {
-                customer: customer_name,
-                sales_person: sales_person,
-                month: frappe.query_report.get_filter_value("month"),
-                year: frappe.query_report.get_filter_value("year")
+                customer: decodeURIComponent(customer),
+                sales_person: decodeURIComponent(sales_person),
+                month: month,
+                year: year
             },
             callback: function(r) {
-                if (r.message) {
-                    show_customer_details_modal(r.message, customer_name);
+                if (r.message && r.message.length > 0) {
+                    show_customer_details_modal(r.message, decodeURIComponent(customer));
+                } else {
+                    frappe.msgprint({
+                        title: __("No Details Found"),
+                        message: __("No invoice details found for {0} in this period", [decodeURIComponent(customer)]),
+                        indicator: "orange"
+                    });
                 }
             }
         });
     },
 
-    // Tree view toggle
-    tree_view: function(data) {
-        // Enable tree view for hierarchical data
-        return data && data.indent !== undefined;
+    show_invoice_breakdown: function(customer, sales_person, month, year) {
+        frappe.call({
+            method: "your_app.your_app.report.sales_person_report_monthwise.sales_person_report_monthwise.get_invoice_breakdown",
+            args: {
+                customer: decodeURIComponent(customer),
+                sales_person: decodeURIComponent(sales_person),
+                month: month,
+                year: year
+            },
+            callback: function(r) {
+                if (r.message && r.message.invoices && r.message.invoices.length > 0) {
+                    show_invoice_breakdown_modal(r.message, decodeURIComponent(customer));
+                } else {
+                    frappe.msgprint({
+                        title: __("No Details Found"),
+                        message: __("No invoices found for {0} in this period", [decodeURIComponent(customer)]),
+                        indicator: "orange"
+                    });
+                }
+            }
+        });
     },
 
-    // On load event
     onload: function(report) {
-        // Add export buttons
         report.page.add_inner_button(__("Export to Excel"), function() {
-            frappe.query_reports["Sales Person Report Monthwise"].export_report(report, "Excel");
+            export_report("Excel");
         });
         
         report.page.add_inner_button(__("Export to PDF"), function() {
-            frappe.query_reports["Sales Person Report Monthwise"].export_report(report, "PDF");
+            export_report("PDF");
         });
         
-        // Add view toggle buttons
         report.page.add_inner_button(__("Summary View"), function() {
             frappe.query_report.set_filter_value("detailed_view", 0);
+            frappe.query_report.refresh();
         });
         
         report.page.add_inner_button(__("Detailed View"), function() {
             frappe.query_report.set_filter_value("detailed_view", 1);
-        });
-        
-        // Add hidden filter for view type
-        report.add_filter({
-            fieldname: "detailed_view",
-            label: __("Detailed View"),
-            fieldtype: "Check",
-            hidden: 1,
-            default: 0
-        });
-    },
-
-    // Export function
-    export_report: function(report, format) {
-        var filters = report.get_values();
-        
-        frappe.call({
-            method: "frappe.desk.query_report.export_query",
-            args: {
-                report_name: "Sales Person Report Monthwise",
-                report_type: "Custom Report",
-                filters: filters,
-                file_format_type: format,
-                title: `Sales_Person_Report_${filters.month}_${filters.year}`
-            },
-            callback: function(r) {
-                if (r.message) {
-                    window.open(r.message);
-                }
-            }
+            frappe.query_report.refresh();
         });
     }
 };
 
-// Helper function to generate year options
 function get_year_options() {
     let current_year = new Date().getFullYear();
     let years = [];
-    for (let i = current_year - 5; i <= current_year + 1; i++) {
+    for (let i = current_year - 5; i <= current_year + 2; i++) {
         years.push(i.toString());
     }
     return years;
 }
 
-// Helper function to show customer details modal
+function export_report(format) {
+    var filters = frappe.query_report.get_filter_values();
+    
+    frappe.call({
+        method: "frappe.desk.query_report.export_query",
+        args: {
+            report_name: "Sales Person Report Monthwise",
+            report_type: "Custom Report",
+            filters: filters,
+            file_format_type: format,
+            title: `Sales_Person_Report_${filters.month}_${filters.year}`
+        },
+        callback: function(r) {
+            if (r.message) {
+                window.open(r.message);
+            }
+        }
+    });
+}
+
 function show_customer_details_modal(data, customer_name) {
+    let total_qty = 0;
+    let total_amount = 0;
+    
+    let rows = data.map(row => {
+        total_qty += flt(row.qty);
+        total_amount += flt(row.amount);
+        return `
+            <tr>
+                <td>
+                    <a href="/app/sales-invoice/${row.invoice_no}" target="_blank" style="color: #007bff;">
+                        ${row.invoice_no}
+                    </a>
+                </td>
+                <td>${row.posting_date}</td>
+                <td>${row.item_name || row.item_code || ''}</td>
+                <td style="text-align: right;">${format_number(row.qty)}</td>
+                <td style="text-align: right;">${format_currency(row.amount)}</td>
+            </tr>
+        `;
+    }).join('');
+    
     let html = `
-        <div style="max-height: 500px; overflow-y: auto;">
-            <h4>Customer: ${customer_name}</h4>
-            <table class="table table-bordered">
-                <thead>
+        <div style="max-height: 500px; overflow-y: auto; padding: 10px;">
+            <h4 style="margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #007bff; padding-bottom: 10px;">
+                <i class="fa fa-user"></i> Customer: ${customer_name}
+            </h4>
+            <table class="table table-bordered table-hover">
+                <thead style="background-color: #f8f9fa;">
                     <tr>
                         <th>Invoice No</th>
                         <th>Date</th>
                         <th>Item</th>
-                        <th>Qty</th>
-                        <th>Amount</th>
+                        <th style="text-align: right;">Qty</th>
+                        <th style="text-align: right;">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
-    `;
-    
-    let total_amount = 0;
-    
-    data.forEach(row => {
-        total_amount += row.amount;
-        html += `
-            <tr>
-                <td><a href="/app/sales-invoice/${row.invoice_no}" target="_blank">${row.invoice_no}</a></td>
-                <td>${row.posting_date}</td>
-                <td>${row.item_name}</td>
-                <td style="text-align: right;">${row.qty}</td>
-                <td style="text-align: right;">${format_currency(row.amount)}</td>
-            </tr>
-        `;
-    });
-    
-    html += `
+                    ${rows}
                 </tbody>
-                <tfoot>
-                    <tr style="font-weight: bold;">
-                        <td colspan="4" style="text-align: right;">Total:</td>
+                <tfoot style="background-color: #e9ecef; font-weight: bold;">
+                    <tr>
+                        <td colspan="3" style="text-align: right;">TOTAL:</td>
+                        <td style="text-align: right;">${format_number(total_qty)}</td>
                         <td style="text-align: right;">${format_currency(total_amount)}</td>
                     </tr>
                 </tfoot>
@@ -269,10 +300,73 @@ function show_customer_details_modal(data, customer_name) {
     });
 }
 
-// Helper function to format currency
-function format_currency(amount) {
-    return new Intl.NumberFormat('en-US', { 
+function show_invoice_breakdown_modal(data, customer_name) {
+    let rows = data.invoices.map(inv => {
+        return `
+            <tr>
+                <td>
+                    <a href="/app/sales-invoice/${inv.name}" target="_blank" style="color: #007bff;">
+                        ${inv.name}
+                    </a>
+                </td>
+                <td>${inv.posting_date}</td>
+                <td style="text-align: right;">${format_number(inv.total_qty)}</td>
+                <td style="text-align: right;">${format_currency(inv.total_amount)}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    let html = `
+        <div style="max-height: 500px; overflow-y: auto; padding: 10px;">
+            <h4 style="margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #28a745; padding-bottom: 10px;">
+                <i class="fa fa-file-invoice"></i> Invoice Breakdown - ${customer_name}
+            </h4>
+            <table class="table table-bordered">
+                <thead style="background-color: #f8f9fa;">
+                    <tr>
+                        <th>Invoice No</th>
+                        <th>Date</th>
+                        <th style="text-align: right;">Total Qty</th>
+                        <th style="text-align: right;">Total Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+                <tfoot style="background-color: #e9ecef; font-weight: bold;">
+                    <tr>
+                        <td colspan="3" style="text-align: right;">GRAND TOTAL:</td>
+                        <td style="text-align: right;">${format_currency(data.grand_total)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    `;
+    
+    frappe.msgprint({
+        title: __("Invoice Summary"),
+        message: html,
+        wide: true
+    });
+}
+
+function format_number(num) {
+    if (!num) return '0';
+    return new Intl.NumberFormat('en-IN', { 
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 0
+    }).format(num);
+}
+
+function format_currency(amt) {
+    if (!amt) return '₹ 0.00';
+    return new Intl.NumberFormat('en-IN', { 
         style: 'currency', 
-        currency: 'USD' 
-    }).format(amount);
+        currency: 'INR',
+        maximumFractionDigits: 2
+    }).format(amt);
+}
+
+function flt(value) {
+    return parseFloat(value) || 0;
 }

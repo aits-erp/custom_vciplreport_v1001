@@ -55,8 +55,8 @@ frappe.query_reports["Sales Person Report Monthwise"] = {
             fieldtype: "Data"
         },
         {
-            fieldname: "custom_territory",
-            label: __("Territory"),
+            fieldname: "custom_territory_name",
+            label: __("Territory Name"),
             fieldtype: "Data"
         },
         {
@@ -76,88 +76,109 @@ frappe.query_reports["Sales Person Report Monthwise"] = {
             label: __("Compare with Previous Year"),
             fieldtype: "Check",
             default: 0
-        },
-        {
-            fieldname: "detailed_view",
-            label: __("Detailed View"),
-            fieldtype: "Check",
-            default: 0,
-            hidden: 1
         }
     ],
 
-    formatter: function(value, row, column, data, default_formatter) {
-        if (!data) return default_formatter(value, row, column, data);
-        
+    formatter(value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
         
-        // Make customer names clickable (Level 2 rows)
-        if (column.fieldname == "customer_name" && data.level == "2" && data.customer_name && data.customer_name !== "TOTAL") {
+        if (!data) return value;
+        
+        // Make customer names clickable (Level 2 rows) - Like your reference code
+        if (column.fieldname === "customer_name" && data.level === "2" && data.customer_name && data.customer_name !== "TOTAL") {
             let customer = encodeURIComponent(data.customer_name);
             let sales_person = encodeURIComponent(data.sales_person || '');
             let month = frappe.query_report.get_filter_value('month');
             let year = frappe.query_report.get_filter_value('year');
             
-            value = `<a style="color: #007bff; cursor: pointer; text-decoration: underline; font-weight: 500;" 
-                onclick="frappe.query_reports['Sales Person Report Monthwise'].show_customer_details('${customer}', '${sales_person}', ${month}, ${year})">
+            // Using the same pattern as your reference code
+            value = `<a style="color:#1674E0;cursor:pointer;text-decoration:underline;font-weight:500"
+                onclick='frappe.query_reports["Sales Person Report Monthwise"]
+                .show_customer_details("${customer}", "${sales_person}", ${month}, ${year})'>
                 ${value} 🔍
             </a>`;
         }
         
-        // Make invoice amounts clickable
-        if (column.fieldname == "invoice_amount" && data.level == "2" && data.invoice_amount > 0) {
+        // Make invoice amounts clickable - Like your reference code
+        if (column.fieldname === "invoice_amount" && data.level === "2" && data.invoice_amount > 0) {
             let customer = encodeURIComponent(data.customer_name);
             let sales_person = encodeURIComponent(data.sales_person || '');
             let month = frappe.query_report.get_filter_value('month');
             let year = frappe.query_report.get_filter_value('year');
             
-            value = `<a style="color: #28a745; cursor: pointer; text-decoration: underline;" 
-                onclick="frappe.query_reports['Sales Person Report Monthwise'].show_invoice_breakdown('${customer}', '${sales_person}', ${month}, ${year})">
+            value = `<a style="color:#28a745;cursor:pointer;text-decoration:underline;font-weight:500"
+                onclick='frappe.query_reports["Sales Person Report Monthwise"]
+                .show_invoice_breakdown("${customer}", "${sales_person}", ${month}, ${year})'>
                 ${value}
             </a>`;
         }
         
-        // Color coding for achievement percentage
-        if (column.fieldname == "achieved_pct" && data.achieved_pct !== undefined) {
-            let pct = flt(data.achieved_pct);
-            if (pct >= 100) {
-                value = `<span style="color: #28a745; font-weight: bold;">${value}</span>`;
-            } else if (pct >= 75) {
-                value = `<span style="color: #ffc107; font-weight: bold;">${value}</span>`;
-            } else if (pct < 50 && pct > 0) {
-                value = `<span style="color: #dc3545; font-weight: bold;">${value}</span>`;
+        // Color coding for achievement percentage - Like your reference code
+        if (column.fieldname === "achieved_pct" && data.achieved_pct !== undefined) {
+            if (data.achieved_pct >= 100) {
+                value = `<span style="color:#28a745;font-weight:bold">${value}</span>`;
+            } else if (data.achieved_pct >= 75) {
+                value = `<span style="color:#ffc107;font-weight:bold">${value}</span>`;
+            } else if (data.achieved_pct < 50 && data.achieved_pct > 0) {
+                value = `<span style="color:#dc3545;font-weight:bold">${value}</span>`;
             }
         }
         
         // Style for section headers
-        if (data.level == "1") {
-            value = `<span style="font-weight: bold; font-size: 1.1em; background-color: #f0f0f0; padding: 5px; display: block;">${value}</span>`;
+        if (data.level === "1") {
+            value = `<span style="font-weight:bold;font-size:1.1em;background-color:#f0f0f0;padding:5px;display:block">${value}</span>`;
         }
         
         // Style for total rows
         if (data.is_total_row) {
-            value = `<span style="font-weight: bold; background-color: #f8f9fa;">${value}</span>`;
+            value = `<span style="font-weight:bold;background-color:#f8f9fa">${value}</span>`;
         }
         
         return value;
     },
 
-    tree_view: function(data) {
-        return data && data.indent !== undefined;
-    },
+    // Tree view for hierarchical data
+    tree_view: true,
 
-    show_customer_details: function(customer, sales_person, month, year) {
+    // Customer details popup - Like your show_popup function
+    show_customer_details(customer, sales_person, month, year) {
         frappe.call({
-            method: "your_app.your_app.report.sales_person_report_monthwise.sales_person_report_monthwise.get_customer_details",
+            method: "frappe.client.get_list",
             args: {
-                customer: decodeURIComponent(customer),
-                sales_person: decodeURIComponent(sales_person),
-                month: month,
-                year: year
+                doctype: "Sales Invoice",
+                filters: {
+                    customer: decodeURIComponent(customer),
+                    docstatus: 1,
+                    posting_date: ["between", [
+                        frappe.datetime.month_start(`${year}-${month}-01`),
+                        frappe.datetime.month_end(`${year}-${month}-01`)
+                    ]]
+                },
+                fields: ["name", "posting_date"],
+                limit_page_length: 100
             },
             callback: function(r) {
                 if (r.message && r.message.length > 0) {
-                    show_customer_details_modal(r.message, decodeURIComponent(customer));
+                    // Get invoice names
+                    let invoice_names = r.message.map(inv => inv.name);
+                    
+                    // Get items for these invoices
+                    frappe.call({
+                        method: "frappe.client.get_list",
+                        args: {
+                            doctype: "Sales Invoice Item",
+                            filters: {
+                                parent: ["in", invoice_names]
+                            },
+                            fields: ["parent as invoice_no", "item_code", "item_name", "qty", "base_net_amount as amount"],
+                            limit_page_length: 500
+                        },
+                        callback: function(r2) {
+                            if (r2.message) {
+                                show_customer_details_modal(r2.message, decodeURIComponent(customer));
+                            }
+                        }
+                    });
                 } else {
                     frappe.msgprint({
                         title: __("No Details Found"),
@@ -169,17 +190,25 @@ frappe.query_reports["Sales Person Report Monthwise"] = {
         });
     },
 
-    show_invoice_breakdown: function(customer, sales_person, month, year) {
+    // Invoice breakdown popup
+    show_invoice_breakdown(customer, sales_person, month, year) {
         frappe.call({
-            method: "your_app.your_app.report.sales_person_report_monthwise.sales_person_report_monthwise.get_invoice_breakdown",
+            method: "frappe.client.get_list",
             args: {
-                customer: decodeURIComponent(customer),
-                sales_person: decodeURIComponent(sales_person),
-                month: month,
-                year: year
+                doctype: "Sales Invoice",
+                filters: {
+                    customer: decodeURIComponent(customer),
+                    docstatus: 1,
+                    posting_date: ["between", [
+                        frappe.datetime.month_start(`${year}-${month}-01`),
+                        frappe.datetime.month_end(`${year}-${month}-01`)
+                    ]]
+                },
+                fields: ["name", "posting_date", "base_net_total as total_amount"],
+                limit_page_length: 100
             },
             callback: function(r) {
-                if (r.message && r.message.invoices && r.message.invoices.length > 0) {
+                if (r.message && r.message.length > 0) {
                     show_invoice_breakdown_modal(r.message, decodeURIComponent(customer));
                 } else {
                     frappe.msgprint({
@@ -192,6 +221,7 @@ frappe.query_reports["Sales Person Report Monthwise"] = {
         });
     },
 
+    // On load event
     onload: function(report) {
         report.page.add_inner_button(__("Export to Excel"), function() {
             export_report("Excel");
@@ -200,19 +230,10 @@ frappe.query_reports["Sales Person Report Monthwise"] = {
         report.page.add_inner_button(__("Export to PDF"), function() {
             export_report("PDF");
         });
-        
-        report.page.add_inner_button(__("Summary View"), function() {
-            frappe.query_report.set_filter_value("detailed_view", 0);
-            frappe.query_report.refresh();
-        });
-        
-        report.page.add_inner_button(__("Detailed View"), function() {
-            frappe.query_report.set_filter_value("detailed_view", 1);
-            frappe.query_report.refresh();
-        });
     }
 };
 
+// Helper function to generate year options
 function get_year_options() {
     let current_year = new Date().getFullYear();
     let years = [];
@@ -222,6 +243,7 @@ function get_year_options() {
     return years;
 }
 
+// Export function
 function export_report(format) {
     var filters = frappe.query_report.get_filter_values();
     
@@ -242,55 +264,48 @@ function export_report(format) {
     });
 }
 
+// Customer details modal - Following your reference code pattern
 function show_customer_details_modal(data, customer_name) {
     let total_qty = 0;
     let total_amount = 0;
     
-    let rows = data.map(row => {
-        total_qty += flt(row.qty);
-        total_amount += flt(row.amount);
-        return `
+    let html = `
+        <div id="customer-details-popup" style="max-height:450px;overflow:auto">
+            <h4>Customer: ${customer_name}</h4>
+            <table class="table table-bordered">
+                <tr>
+                    <th>Invoice No</th>
+                    <th>Date</th>
+                    <th>Item Name</th>
+                    <th>Qty</th>
+                    <th>Amount</th>
+                </tr>
+    `;
+    
+    data.forEach(row => {
+        total_qty += row.qty || 0;
+        total_amount += row.amount || 0;
+        
+        html += `
             <tr>
-                <td>
-                    <a href="/app/sales-invoice/${row.invoice_no}" target="_blank" style="color: #007bff;">
-                        ${row.invoice_no}
-                    </a>
-                </td>
-                <td>${row.posting_date}</td>
+                <td><a href="/app/sales-invoice/${row.invoice_no}" target="_blank">${row.invoice_no}</a></td>
+                <td>${row.posting_date || ''}</td>
                 <td>${row.item_name || row.item_code || ''}</td>
-                <td style="text-align: right;">${format_number(row.qty)}</td>
-                <td style="text-align: right;">${format_currency(row.amount)}</td>
+                <td style="text-align:right">${format_number(row.qty)}</td>
+                <td style="text-align:right">${format_currency(row.amount)}</td>
             </tr>
         `;
-    }).join('');
+    });
     
-    let html = `
-        <div style="max-height: 500px; overflow-y: auto; padding: 10px;">
-            <h4 style="margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #007bff; padding-bottom: 10px;">
-                <i class="fa fa-user"></i> Customer: ${customer_name}
-            </h4>
-            <table class="table table-bordered table-hover">
-                <thead style="background-color: #f8f9fa;">
-                    <tr>
-                        <th>Invoice No</th>
-                        <th>Date</th>
-                        <th>Item</th>
-                        <th style="text-align: right;">Qty</th>
-                        <th style="text-align: right;">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rows}
-                </tbody>
-                <tfoot style="background-color: #e9ecef; font-weight: bold;">
-                    <tr>
-                        <td colspan="3" style="text-align: right;">TOTAL:</td>
-                        <td style="text-align: right;">${format_number(total_qty)}</td>
-                        <td style="text-align: right;">${format_currency(total_amount)}</td>
-                    </tr>
-                </tfoot>
+    html += `
+                <tr style="font-weight:bold;background-color:#f7f7f7">
+                    <td colspan="3" style="text-align:right">TOTAL:</td>
+                    <td style="text-align:right">${format_number(total_qty)}</td>
+                    <td style="text-align:right">${format_currency(total_amount)}</td>
+                </tr>
             </table>
         </div>
+        <button class="btn btn-primary" onclick="print_customer_details()">Print</button>
     `;
     
     frappe.msgprint({
@@ -300,47 +315,41 @@ function show_customer_details_modal(data, customer_name) {
     });
 }
 
+// Invoice breakdown modal - Following your reference code pattern
 function show_invoice_breakdown_modal(data, customer_name) {
-    let rows = data.invoices.map(inv => {
-        return `
-            <tr>
-                <td>
-                    <a href="/app/sales-invoice/${inv.name}" target="_blank" style="color: #007bff;">
-                        ${inv.name}
-                    </a>
-                </td>
-                <td>${inv.posting_date}</td>
-                <td style="text-align: right;">${format_number(inv.total_qty)}</td>
-                <td style="text-align: right;">${format_currency(inv.total_amount)}</td>
-            </tr>
-        `;
-    }).join('');
+    let total_amount = 0;
     
     let html = `
-        <div style="max-height: 500px; overflow-y: auto; padding: 10px;">
-            <h4 style="margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #28a745; padding-bottom: 10px;">
-                <i class="fa fa-file-invoice"></i> Invoice Breakdown - ${customer_name}
-            </h4>
+        <div id="invoice-breakdown-popup" style="max-height:450px;overflow:auto">
+            <h4>Invoice Summary - ${customer_name}</h4>
             <table class="table table-bordered">
-                <thead style="background-color: #f8f9fa;">
-                    <tr>
-                        <th>Invoice No</th>
-                        <th>Date</th>
-                        <th style="text-align: right;">Total Qty</th>
-                        <th style="text-align: right;">Total Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rows}
-                </tbody>
-                <tfoot style="background-color: #e9ecef; font-weight: bold;">
-                    <tr>
-                        <td colspan="3" style="text-align: right;">GRAND TOTAL:</td>
-                        <td style="text-align: right;">${format_currency(data.grand_total)}</td>
-                    </tr>
-                </tfoot>
+                <tr>
+                    <th>Invoice No</th>
+                    <th>Date</th>
+                    <th>Amount</th>
+                </tr>
+    `;
+    
+    data.forEach(inv => {
+        total_amount += inv.total_amount || 0;
+        
+        html += `
+            <tr>
+                <td><a href="/app/sales-invoice/${inv.name}" target="_blank">${inv.name}</a></td>
+                <td>${inv.posting_date}</td>
+                <td style="text-align:right">${format_currency(inv.total_amount)}</td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                <tr style="font-weight:bold;background-color:#f7f7f7">
+                    <td colspan="2" style="text-align:right">GRAND TOTAL:</td>
+                    <td style="text-align:right">${format_currency(total_amount)}</td>
+                </tr>
             </table>
         </div>
+        <button class="btn btn-primary" onclick="print_invoice_breakdown()">Print</button>
     `;
     
     frappe.msgprint({
@@ -350,23 +359,60 @@ function show_invoice_breakdown_modal(data, customer_name) {
     });
 }
 
+// Print functions - Following your reference code pattern
+window.print_customer_details = function() {
+    let content = document.getElementById("customer-details-popup").innerHTML;
+    
+    let w = window.open("", "", "width=900,height=700");
+    w.document.write(`
+        <html>
+        <head>
+            <title>Customer Invoice Details</title>
+            <style>
+                body { font-family: Arial; padding: 20px; }
+                table { border-collapse: collapse; width: 100%; }
+                table, th, td { border: 1px solid black; padding: 6px; }
+                th { background-color: #f2f2f2; }
+            </style>
+        </head>
+        <body>${content}</body>
+        </html>
+    `);
+    
+    w.document.close();
+    w.print();
+};
+
+window.print_invoice_breakdown = function() {
+    let content = document.getElementById("invoice-breakdown-popup").innerHTML;
+    
+    let w = window.open("", "", "width=900,height=700");
+    w.document.write(`
+        <html>
+        <head>
+            <title>Invoice Summary</title>
+            <style>
+                body { font-family: Arial; padding: 20px; }
+                table { border-collapse: collapse; width: 100%; }
+                table, th, td { border: 1px solid black; padding: 6px; }
+                th { background-color: #f2f2f2; }
+            </style>
+        </head>
+        <body>${content}</body>
+        </html>
+    `);
+    
+    w.document.close();
+    w.print();
+};
+
+// Helper functions
 function format_number(num) {
     if (!num) return '0';
-    return new Intl.NumberFormat('en-IN', { 
-        maximumFractionDigits: 2,
-        minimumFractionDigits: 0
-    }).format(num);
+    return num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 }
 
 function format_currency(amt) {
     if (!amt) return '₹ 0.00';
-    return new Intl.NumberFormat('en-IN', { 
-        style: 'currency', 
-        currency: 'INR',
-        maximumFractionDigits: 2
-    }).format(amt);
-}
-
-function flt(value) {
-    return parseFloat(value) || 0;
+    return '₹ ' + amt.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 }

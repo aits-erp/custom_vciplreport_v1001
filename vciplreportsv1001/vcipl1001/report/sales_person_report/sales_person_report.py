@@ -32,7 +32,7 @@ def get_columns():
         {"label": "Head Sales Code", "fieldname": "custom_head_sales_code", "width": 140},
         {"label": "Region", "fieldname": "region", "width": 120},
         {"label": "Location", "fieldname": "location", "width": 150},
-        {"label": "Territory", "fieldname": "territory", "width": 140},
+        {"label": "Territory", "fieldname": "custom_territory_name", "width": 140},
         {"label": "Sales Person", "fieldname": "sales_person", "fieldtype": "Link", "options": "Sales Person", "width": 180},
         {"label": "Customer Name", "fieldname": "customer_name", "width": 220},
         {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 130},
@@ -86,13 +86,13 @@ def get_data(filters):
 
     f_region = filters.get("custom_region")
     f_location = filters.get("custom_location")
-    f_territory = filters.get("custom_territory")
+    f_territory = filters.get("custom_territory_name")
     f_parent = filters.get("parent_sales_person")
     f_customer = filters.get("customer")
 
     sales_persons = frappe.db.sql("""
         SELECT name, parent_sales_person, custom_head_sales_code,
-               custom_region, custom_location, custom_territory
+               custom_region, custom_location, custom_territory_name
         FROM `tabSales Person`
         WHERE enabled = 1
     """, as_dict=True)
@@ -152,7 +152,7 @@ def get_data(filters):
             continue
         if f_location and sp.custom_location != f_location:
             continue
-        if f_territory and sp.custom_territory != f_territory:
+        if f_territory and sp.custom_territory_name != f_territory:
             continue
         if f_parent and sp.parent_sales_person != f_parent:
             continue
@@ -173,7 +173,7 @@ def get_data(filters):
             "custom_head_sales_code": parent_sp.custom_head_sales_code if parent_sp else None,
             "region": sp.custom_region,
             "location": sp.custom_location,
-            "territory": sp.custom_territory,
+            "custom_territory_name": sp.custom_territory_name,
             "sales_person": t.sales_person,
             "customer_name": t.customer_name,
             "target": target,

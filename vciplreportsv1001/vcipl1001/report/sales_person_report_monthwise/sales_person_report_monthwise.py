@@ -59,6 +59,13 @@ def get_columns(filters):
     """
     columns = [
         {
+            "label": _("Level"),
+            "fieldname": "level",
+            "fieldtype": "Data",
+            "width": 60,
+            "hidden": 1
+        },
+        {
             "label": _("Head Sales Person"),
             "fieldname": "head_sales_person",
             "fieldtype": "Link",
@@ -66,10 +73,17 @@ def get_columns(filters):
             "width": 180
         },
         {
-            "label": _("Head Sales Code"),
-            "fieldname": "head_sales_code",
+            "label": _("Sales Person"),
+            "fieldname": "sales_person",
+            "fieldtype": "Link",
+            "options": "Sales Person",
+            "width": 180
+        },
+        {
+            "label": _("Customer Name"),
+            "fieldname": "customer_name",
             "fieldtype": "Data",
-            "width": 120
+            "width": 250
         },
         {
             "label": _("Region"),
@@ -88,31 +102,6 @@ def get_columns(filters):
             "fieldname": "territory",
             "fieldtype": "Data",
             "width": 140
-        },
-        {
-            "label": _("Sales Person"),
-            "fieldname": "sales_person",
-            "fieldtype": "Link",
-            "options": "Sales Person",
-            "width": 180
-        },
-        {
-            "label": _("Sales Person Code"),
-            "fieldname": "sales_person_code",
-            "fieldtype": "Data",
-            "width": 140
-        },
-        {
-            "label": _("Customer Name"),
-            "fieldname": "customer_name",
-            "fieldtype": "Data",
-            "width": 250
-        },
-        {
-            "label": _("Customer Group"),
-            "fieldname": "customer_group",
-            "fieldtype": "Data",
-            "width": 150
         }
     ]
     
@@ -122,18 +111,6 @@ def get_columns(filters):
             {
                 "label": _(f"Target ({get_month_name(filters.month)})"),
                 "fieldname": "monthly_target",
-                "fieldtype": "Currency",
-                "width": 140
-            },
-            {
-                "label": _("Quarterly Target"),
-                "fieldname": "quarterly_target",
-                "fieldtype": "Currency",
-                "width": 140
-            },
-            {
-                "label": _("Yearly Target"),
-                "fieldname": "yearly_target",
                 "fieldtype": "Currency",
                 "width": 140
             }
@@ -186,27 +163,59 @@ def get_columns(filters):
                 "fieldname": "invoice_count",
                 "fieldtype": "Int",
                 "width": 130
-            },
-            {
-                "label": _("Average Invoice Value"),
-                "fieldname": "avg_invoice_value",
-                "fieldtype": "Currency",
-                "width": 160
             }
         ])
     
+    # Add indent for tree view
+    columns.append({
+        "fieldname": "indent",
+        "fieldtype": "Data",
+        "hidden": 1
+    })
+    
+    columns.append({
+        "fieldname": "is_total_row",
+        "fieldtype": "Data",
+        "hidden": 1
+    })
+    
     return columns
+
+
+def get_month_name(month):
+    """
+    Get month name from month number
+    """
+    month_names = {
+        1: "January", 2: "February", 3: "March", 4: "April",
+        5: "May", 6: "June", 7: "July", 8: "August",
+        9: "September", 10: "October", 11: "November", 12: "December"
+    }
+    return month_names.get(month, "")
 
 
 def get_data(filters):
     """
     Main function to fetch and process data
     """
-    # Get all active sales persons
+    data = []
+    
+    # Add header
+    data.append({
+        "level": "1",
+        "customer_name": "<b>SALES PERSON PERFORMANCE</b>",
+        "indent": 0
+    })
+    
+    # Get sales persons with their details
     sales_persons = get_sales_persons(filters)
     
-    # Get targets for sales persons
-    targets = get_targets(filters, sales_persons)
+    if not sales_persons:
+        frappe.msgprint(_("No sales persons found with the selected filters"))
+        return data
+    
+    # Get targets
+    targets = get_targets(filters, sales_persons) if filters.include_targets else {}
     
     # Get invoice data
     invoices = get_invoice_data(filters)
@@ -216,48 +225,136 @@ def get_data(filters):
     if filters.get("compare_previous_year"):
         last_year_data = get_previous_year_data(filters)
     
-    # Build the data structure
-    data = []
+    # Track totals
+    grand_total_target = 0
+    grand_total_invoice = 0
+    grand_total_last_year = 0
     
-    # Group by head sales person
-    head_sales_persons = {}
+    # Process each sales person
     for sp in sales_persons:
-        head = sp.get("parent_sales_person") or "No Head"
-        if head not in head_sales_persons:
-            head_sales_persons[head] = []
-        head_sales_persons[head].append(sp)
-    
-    # Process data for each head sales person
-    for head_name, sp_list in head_sales_persons.items():
-        # Add head row
-        head_row = get_head_summary(head_name, sp_list, targets, invoices, last_year_data, filters)
-        if head_row:
-            data.append(head_row)
+        # Get customers for this sales person
+        customers = get_customers_for_sales_person(sp.name, filters)
         
-        # Add sales persons under this head
-        for sp in sp_list:
-            # Get customers for this sales person
-            customers = get_customers_for_sales_person(sp.name, filters)
+        if not customers:
+            continue
+        
+        sp_total_target = 0
+        sp_total_invoice = 0
+        sp_total_last_year = 0
+        sp_total_qty = 0
+        sp_total_invoices = 0
+        
+        # Add each customer
+        for customer in customers:
+            # Get targets
+            monthly_target = 0
+            if filters.include_targets:
+                sp_targets = targets.get(sp.name, {})
+                monthly_target = sp_targets.get(customer.customer, 0)
             
-            if customers:
-                for customer in customers:
-                    row = create_detail_row(
-                        sp, customer, targets, invoices, 
-                        last_year_data, filters
-                    )
-                    if row:
-                        data.append(row)
+            # Get invoice data
+            sp_invoices = invoices.get(sp.name, {})
+            customer_invoice = sp_invoices.get(customer.customer, {})
+            invoice_amount = customer_invoice.get("amount", 0)
+            invoice_qty = customer_invoice.get("qty", 0)
+            invoice_count = customer_invoice.get("invoice_count", 0)
             
-            # Add sales person total row
-            sp_total = get_sales_person_total(sp, customers, targets, invoices, last_year_data, filters)
-            if sp_total:
-                sp_total["indent"] = 1
-                data.append(sp_total)
+            # Get last year data
+            last_year_amount = 0
+            if filters.get("compare_previous_year"):
+                sp_ly = last_year_data.get(sp.name, {})
+                last_year_amount = sp_ly.get(customer.customer, 0)
+            
+            # Calculate achievement
+            achieved_pct = (invoice_amount / monthly_target * 100) if monthly_target else 0
+            
+            # Calculate growth
+            growth_pct = 0
+            if last_year_amount:
+                growth_pct = ((invoice_amount - last_year_amount) / last_year_amount * 100)
+            
+            # Add customer row
+            row = {
+                "level": "2",
+                "head_sales_person": sp.parent_sales_person,
+                "sales_person": sp.name,
+                "customer_name": customer.customer_name,
+                "region": sp.region,
+                "location": sp.location,
+                "territory": sp.territory,
+                "monthly_target": monthly_target,
+                "invoice_amount": invoice_amount,
+                "achieved_pct": achieved_pct,
+                "indent": 1
+            }
+            
+            if filters.get("compare_previous_year"):
+                row["last_year_amount"] = last_year_amount
+                row["growth_pct"] = growth_pct
+            
+            if filters.detailed_view:
+                row["total_qty"] = invoice_qty
+                row["invoice_count"] = invoice_count
+            
+            data.append(row)
+            
+            # Add to totals
+            sp_total_target += monthly_target
+            sp_total_invoice += invoice_amount
+            sp_total_last_year += last_year_amount
+            sp_total_qty += invoice_qty
+            sp_total_invoices += invoice_count
+        
+        # Add sales person total row
+        if sp_total_invoice > 0 or sp_total_target > 0:
+            sp_achieved = (sp_total_invoice / sp_total_target * 100) if sp_total_target else 0
+            sp_growth = ((sp_total_invoice - sp_total_last_year) / sp_total_last_year * 100) if sp_total_last_year else 0
+            
+            total_row = {
+                "level": "2",
+                "customer_name": f"<b>TOTAL - {sp.sales_person_name or sp.name}</b>",
+                "monthly_target": sp_total_target,
+                "invoice_amount": sp_total_invoice,
+                "achieved_pct": sp_achieved,
+                "indent": 1,
+                "is_total_row": 1
+            }
+            
+            if filters.get("compare_previous_year"):
+                total_row["last_year_amount"] = sp_total_last_year
+                total_row["growth_pct"] = sp_growth
+            
+            if filters.detailed_view:
+                total_row["total_qty"] = sp_total_qty
+                total_row["invoice_count"] = sp_total_invoices
+            
+            data.append(total_row)
+            
+            # Add to grand totals
+            grand_total_target += sp_total_target
+            grand_total_invoice += sp_total_invoice
+            grand_total_last_year += sp_total_last_year
     
-    # Add grand total
-    if data:
-        grand_total = get_grand_total(data, filters)
-        data.append(grand_total)
+    # Add grand total row
+    if grand_total_invoice > 0 or grand_total_target > 0:
+        grand_achieved = (grand_total_invoice / grand_total_target * 100) if grand_total_target else 0
+        grand_growth = ((grand_total_invoice - grand_total_last_year) / grand_total_last_year * 100) if grand_total_last_year else 0
+        
+        grand_total_row = {
+            "level": "1",
+            "customer_name": "<b>GRAND TOTAL</b>",
+            "monthly_target": grand_total_target,
+            "invoice_amount": grand_total_invoice,
+            "achieved_pct": grand_achieved,
+            "indent": 0,
+            "is_total_row": 1
+        }
+        
+        if filters.get("compare_previous_year"):
+            grand_total_row["last_year_amount"] = grand_total_last_year
+            grand_total_row["growth_pct"] = grand_growth
+        
+        data.append(grand_total_row)
     
     return data
 
@@ -296,11 +393,9 @@ def get_sales_persons(filters):
             name,
             sales_person_name,
             parent_sales_person,
-            custom_head_sales_code,
             custom_region as region,
             custom_location as location,
-            custom_territory as territory,
-            custom_sales_person_code as sales_person_code
+            custom_territory as territory
         FROM `tabSales Person`
         WHERE {where_clause}
         ORDER BY parent_sales_person, name
@@ -319,25 +414,16 @@ def get_targets(filters, sales_persons):
         return {}
     
     month_field = get_month_field(filters.month)
-    quarter_fields = get_quarter_fields(filters.month)
     
-    targets = frappe.db.sql("""
+    targets = frappe.db.sql(f"""
         SELECT 
             sales_person,
-            customer,
-            {month_field} as monthly_target,
-            {quarter_fields} as quarterly_target,
-            (custom_april + custom_may_ + custom_june + custom_july + 
-             custom_august + custom_september + custom_october + 
-             custom_november + custom_december + custom_january + 
-             custom_february + custom_march) as yearly_target
+            parent as customer,
+            {month_field} as monthly_target
         FROM `tabSales Team`
         WHERE parenttype = 'Customer'
             AND sales_person IN %(sp_names)s
-    """.format(
-        month_field=month_field,
-        quarter_fields=quarter_fields
-    ), {
+    """, {
         "sp_names": sp_names
     }, as_dict=True)
     
@@ -346,11 +432,7 @@ def get_targets(filters, sales_persons):
     for t in targets:
         if t.sales_person not in target_dict:
             target_dict[t.sales_person] = {}
-        target_dict[t.sales_person][t.customer] = {
-            "monthly": flt(t.monthly_target),
-            "quarterly": flt(t.quarterly_target),
-            "yearly": flt(t.yearly_target)
-        }
+        target_dict[t.sales_person][t.customer] = flt(t.monthly_target)
     
     return target_dict
 
@@ -374,20 +456,6 @@ def get_month_field(month):
         12: "custom_december"
     }
     return month_fields.get(month, "custom_january")
-
-
-def get_quarter_fields(month):
-    """
-    Get fields for the quarter containing the given month
-    """
-    if month in [4, 5, 6]:  # Q1 (Apr-Jun)
-        return "(custom_april + custom_may_ + custom_june)"
-    elif month in [7, 8, 9]:  # Q2 (Jul-Sep)
-        return "(custom_july + custom_august + custom_september)"
-    elif month in [10, 11, 12]:  # Q3 (Oct-Dec)
-        return "(custom_october + custom_november + custom_december)"
-    else:  # Q4 (Jan-Mar)
-        return "(custom_january + custom_february + custom_march)"
 
 
 def get_invoice_data(filters):
@@ -422,10 +490,9 @@ def get_invoice_data(filters):
             st.sales_person,
             COUNT(DISTINCT si.name) as invoice_count,
             SUM(si.base_net_total) as total_amount,
-            SUM(sii.qty) as total_qty,
-            AVG(si.base_net_total) as avg_amount
+            SUM(sii.qty) as total_qty
         FROM `tabSales Invoice` si
-        JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        LEFT JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         {join_condition}
         WHERE {where_clause}
         GROUP BY si.customer, st.sales_person
@@ -443,8 +510,7 @@ def get_invoice_data(filters):
         invoice_dict[inv.sales_person][inv.customer] = {
             "amount": flt(inv.total_amount),
             "qty": flt(inv.total_qty),
-            "invoice_count": cint(inv.invoice_count),
-            "avg_amount": flt(inv.avg_amount)
+            "invoice_count": cint(inv.invoice_count)
         }
     
     return invoice_dict
@@ -457,7 +523,7 @@ def get_previous_year_data(filters):
     if not filters.get("ly_from_date") or not filters.get("ly_to_date"):
         return {}
     
-    return frappe.db.sql("""
+    data = frappe.db.sql("""
         SELECT 
             si.customer,
             st.sales_person,
@@ -473,6 +539,19 @@ def get_previous_year_data(filters):
         "from_date": filters.ly_from_date,
         "to_date": filters.ly_to_date
     }, as_dict=True)
+    
+    # Organize by sales person and customer
+    result = {}
+    for d in data:
+        if not d.sales_person:
+            continue
+        
+        if d.sales_person not in result:
+            result[d.sales_person] = {}
+        
+        result[d.sales_person][d.customer] = flt(d.amount)
+    
+    return result
 
 
 def get_customers_for_sales_person(sales_person, filters):
@@ -503,281 +582,78 @@ def get_customers_for_sales_person(sales_person, filters):
     return customers
 
 
-def create_detail_row(sp, customer, targets, invoices, last_year_data, filters):
-    """
-    Create a detailed row for a sales person-customer combination
-    """
-    # Get targets
-    monthly_target = 0
-    quarterly_target = 0
-    yearly_target = 0
-    
-    if filters.include_targets:
-        sp_targets = targets.get(sp.name, {})
-        customer_targets = sp_targets.get(customer.customer, {})
-        monthly_target = customer_targets.get("monthly", 0)
-        quarterly_target = customer_targets.get("quarterly", 0)
-        yearly_target = customer_targets.get("yearly", 0)
-    
-    # Get invoice data
-    sp_invoices = invoices.get(sp.name, {})
-    customer_invoice = sp_invoices.get(customer.customer, {})
-    invoice_amount = customer_invoice.get("amount", 0)
-    
-    # Calculate achievement percentage
-    achieved_pct = (invoice_amount / monthly_target * 100) if monthly_target else 0
-    
-    # Get previous year data
-    last_year_amount = 0
-    growth_pct = 0
-    if filters.get("compare_previous_year"):
-        for ly in last_year_data:
-            if ly.get("sales_person") == sp.name and ly.get("customer") == customer.customer:
-                last_year_amount = flt(ly.get("amount", 0))
-                break
-        
-        if last_year_amount:
-            growth_pct = ((invoice_amount - last_year_amount) / last_year_amount * 100)
-    
-    # Create row
-    row = {
-        "head_sales_person": sp.parent_sales_person,
-        "head_sales_code": sp.custom_head_sales_code,
-        "region": sp.region,
-        "location": sp.location,
-        "territory": sp.territory,
-        "sales_person": sp.name,
-        "sales_person_code": sp.sales_person_code,
-        "customer_name": customer.customer_name,
-        "customer_group": customer.customer_group,
-        "monthly_target": monthly_target,
-        "quarterly_target": quarterly_target,
-        "yearly_target": yearly_target,
-        "invoice_amount": invoice_amount,
-        "achieved_pct": achieved_pct,
-        "indent": 2
-    }
-    
-    if filters.get("compare_previous_year"):
-        row.update({
-            "last_year_amount": last_year_amount,
-            "growth_pct": growth_pct
-        })
-    
-    if filters.detailed_view:
-        row.update({
-            "total_qty": customer_invoice.get("qty", 0),
-            "invoice_count": customer_invoice.get("invoice_count", 0),
-            "avg_invoice_value": customer_invoice.get("avg_amount", 0)
-        })
-    
-    return row
-
-
-def get_sales_person_total(sp, customers, targets, invoices, last_year_data, filters):
-    """
-    Calculate totals for a sales person
-    """
-    if not customers:
-        return None
-    
-    total_monthly_target = 0
-    total_quarterly_target = 0
-    total_yearly_target = 0
-    total_invoice = 0
-    total_last_year = 0
-    total_qty = 0
-    total_invoice_count = 0
-    
-    sp_targets = targets.get(sp.name, {})
-    sp_invoices = invoices.get(sp.name, {})
-    
-    for customer in customers:
-        # Add targets
-        customer_targets = sp_targets.get(customer.customer, {})
-        total_monthly_target += customer_targets.get("monthly", 0)
-        total_quarterly_target += customer_targets.get("quarterly", 0)
-        total_yearly_target += customer_targets.get("yearly", 0)
-        
-        # Add invoices
-        customer_invoice = sp_invoices.get(customer.customer, {})
-        total_invoice += customer_invoice.get("amount", 0)
-        total_qty += customer_invoice.get("qty", 0)
-        total_invoice_count += customer_invoice.get("invoice_count", 0)
-        
-        # Add previous year
-        if filters.get("compare_previous_year"):
-            for ly in last_year_data:
-                if ly.get("sales_person") == sp.name and ly.get("customer") == customer.customer:
-                    total_last_year += flt(ly.get("amount", 0))
-                    break
-    
-    # Calculate percentages
-    achieved_pct = (total_invoice / total_monthly_target * 100) if total_monthly_target else 0
-    growth_pct = 0
-    if total_last_year:
-        growth_pct = ((total_invoice - total_last_year) / total_last_year * 100)
-    
-    # Create total row
-    row = {
-        "head_sales_person": sp.parent_sales_person,
-        "sales_person": sp.name + " - Total",
-        "sales_person_code": sp.sales_person_code,
-        "customer_name": f"<b>Total for {sp.sales_person_name}</b>",
-        "monthly_target": total_monthly_target,
-        "quarterly_target": total_quarterly_target,
-        "yearly_target": total_yearly_target,
-        "invoice_amount": total_invoice,
-        "achieved_pct": achieved_pct,
-        "is_total_row": 1
-    }
-    
-    if filters.get("compare_previous_year"):
-        row.update({
-            "last_year_amount": total_last_year,
-            "growth_pct": growth_pct
-        })
-    
-    if filters.detailed_view:
-        row.update({
-            "total_qty": total_qty,
-            "invoice_count": total_invoice_count,
-            "avg_invoice_value": (total_invoice / total_invoice_count) if total_invoice_count else 0
-        })
-    
-    return row
-
-
-def get_head_summary(head_name, sp_list, targets, invoices, last_year_data, filters):
-    """
-    Create summary row for a head sales person
-    """
-    if head_name == "No Head":
-        return None
-    
-    total_monthly_target = 0
-    total_quarterly_target = 0
-    total_yearly_target = 0
-    total_invoice = 0
-    total_last_year = 0
-    total_qty = 0
-    total_invoice_count = 0
-    
-    for sp in sp_list:
-        # Get customers for this sales person
-        customers = get_customers_for_sales_person(sp.name, filters)
-        
-        sp_targets = targets.get(sp.name, {})
-        sp_invoices = invoices.get(sp.name, {})
-        
-        for customer in customers:
-            # Add targets
-            customer_targets = sp_targets.get(customer.customer, {})
-            total_monthly_target += customer_targets.get("monthly", 0)
-            total_quarterly_target += customer_targets.get("quarterly", 0)
-            total_yearly_target += customer_targets.get("yearly", 0)
-            
-            # Add invoices
-            customer_invoice = sp_invoices.get(customer.customer, {})
-            total_invoice += customer_invoice.get("amount", 0)
-            total_qty += customer_invoice.get("qty", 0)
-            total_invoice_count += customer_invoice.get("invoice_count", 0)
-    
-    if total_invoice == 0 and total_monthly_target == 0:
-        return None
-    
-    achieved_pct = (total_invoice / total_monthly_target * 100) if total_monthly_target else 0
-    
-    row = {
-        "head_sales_person": head_name,
-        "customer_name": f"<b>HEAD: {head_name}</b>",
-        "monthly_target": total_monthly_target,
-        "quarterly_target": total_quarterly_target,
-        "yearly_target": total_yearly_target,
-        "invoice_amount": total_invoice,
-        "achieved_pct": achieved_pct,
-        "indent": 0,
-        "bold": 1
-    }
-    
-    if filters.detailed_view:
-        row.update({
-            "total_qty": total_qty,
-            "invoice_count": total_invoice_count,
-            "avg_invoice_value": (total_invoice / total_invoice_count) if total_invoice_count else 0
-        })
-    
-    return row
-
-
-def get_grand_total(data, filters):
-    """
-    Calculate grand total for the report
-    """
-    total_monthly_target = 0
-    total_quarterly_target = 0
-    total_yearly_target = 0
-    total_invoice = 0
-    total_last_year = 0
-    total_qty = 0
-    total_invoice_count = 0
-    
-    for row in data:
-        if row.get("is_total_row") or "HEAD:" in row.get("customer_name", ""):
-            continue
-            
-        total_monthly_target += flt(row.get("monthly_target", 0))
-        total_quarterly_target += flt(row.get("quarterly_target", 0))
-        total_yearly_target += flt(row.get("yearly_target", 0))
-        total_invoice += flt(row.get("invoice_amount", 0))
-        total_last_year += flt(row.get("last_year_amount", 0))
-        total_qty += flt(row.get("total_qty", 0))
-        total_invoice_count += cint(row.get("invoice_count", 0))
-    
-    achieved_pct = (total_invoice / total_monthly_target * 100) if total_monthly_target else 0
-    growth_pct = ((total_invoice - total_last_year) / total_last_year * 100) if total_last_year else 0
-    
-    grand_total = {
-        "customer_name": "<b>GRAND TOTAL</b>",
-        "monthly_target": total_monthly_target,
-        "quarterly_target": total_quarterly_target,
-        "yearly_target": total_yearly_target,
-        "invoice_amount": total_invoice,
-        "achieved_pct": achieved_pct,
-        "is_total_row": 1,
-        "bold": 1
-    }
-    
-    if filters.get("compare_previous_year"):
-        grand_total.update({
-            "last_year_amount": total_last_year,
-            "growth_pct": growth_pct
-        })
-    
-    if filters.detailed_view:
-        grand_total.update({
-            "total_qty": total_qty,
-            "invoice_count": total_invoice_count,
-            "avg_invoice_value": (total_invoice / total_invoice_count) if total_invoice_count else 0
-        })
-    
-    return grand_total
-
-
 @frappe.whitelist()
 def get_customer_details(customer, sales_person, month, year):
     """
     Get detailed invoice information for a specific customer and sales person
-    Used for drill-down functionality
+    Used for drill-down popup
     """
-    from_date = get_first_day(f"{year}-{month:02d}-01")
-    to_date = get_last_day(f"{year}-{month:02d}-01")
+    from_date = get_first_day(f"{year}-{int(month):02d}-01")
+    to_date = get_last_day(f"{year}-{int(month):02d}-01")
     
     details = frappe.db.sql("""
         SELECT 
             si.name as invoice_no,
             si.posting_date,
+            sii.item_code,
             sii.item_name,
             sii.qty,
+            sii.base_rate as rate,
             sii.base_net_amount as amount
-        FROM
+        FROM `tabSales Invoice` si
+        JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        LEFT JOIN `tabSales Team` st ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
+        WHERE si.docstatus = 1
+            AND si.customer = %(customer)s
+            AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
+            AND (st.sales_person = %(sales_person)s OR %(sales_person)s = '' OR %(sales_person)s IS NULL)
+        ORDER BY si.posting_date DESC, si.name
+    """, {
+        "customer": customer,
+        "sales_person": sales_person,
+        "from_date": from_date,
+        "to_date": to_date
+    }, as_dict=True)
+    
+    return details
+
+
+@frappe.whitelist()
+def get_invoice_breakdown(customer, sales_person, month, year):
+    """
+    Get invoice summary for a customer
+    """
+    from_date = get_first_day(f"{year}-{int(month):02d}-01")
+    to_date = get_last_day(f"{year}-{int(month):02d}-01")
+    
+    # Get all invoices
+    invoices = frappe.db.sql("""
+        SELECT 
+            si.name,
+            si.posting_date,
+            COUNT(DISTINCT sii.item_code) as item_count,
+            SUM(sii.qty) as total_qty,
+            SUM(sii.base_net_amount) as total_amount
+        FROM `tabSales Invoice` si
+        JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        LEFT JOIN `tabSales Team` st ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
+        WHERE si.docstatus = 1
+            AND si.customer = %(customer)s
+            AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
+            AND (st.sales_person = %(sales_person)s OR %(sales_person)s = '' OR %(sales_person)s IS NULL)
+        GROUP BY si.name, si.posting_date
+        ORDER BY si.posting_date DESC
+    """, {
+        "customer": customer,
+        "sales_person": sales_person,
+        "from_date": from_date,
+        "to_date": to_date
+    }, as_dict=True)
+    
+    # Calculate grand total
+    grand_total = sum([flt(inv.total_amount) for inv in invoices]) if invoices else 0
+    
+    return {
+        "invoices": invoices,
+        "grand_total": grand_total
+    }

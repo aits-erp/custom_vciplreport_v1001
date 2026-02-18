@@ -1,5 +1,6 @@
 # import frappe
 # from frappe.utils import flt
+# import json
 
 
 # def execute(filters=None):
@@ -26,6 +27,9 @@
 #             "fieldtype": "Currency",
 #             "width": 150
 #         })
+
+#     # hidden popup column
+#     columns.append({"fieldname": "popup_data", "hidden": 1})
 
 #     return columns
 
@@ -70,7 +74,10 @@
 #             i.custom_main_group,
 #             i.custom_sub_group,
 #             c.customer_name,
-#             SUM(sii.base_net_amount) AS amount
+#             sii.item_name,
+#             sii.qty,
+#             sii.base_net_amount AS amount,
+#             si.name AS invoice
 #         FROM `tabSales Invoice` si
 #         JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
 #         JOIN `tabItem` i ON i.name = sii.item_code
@@ -81,15 +88,6 @@
 #         WHERE si.docstatus = 1
 #           AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
 #           {conditions}
-#         GROUP BY
-#             i.item_group,
-#             i.custom_main_group,
-#             i.custom_sub_group,
-#             c.customer_name
-#         ORDER BY
-#             i.item_group,
-#             i.custom_main_group,
-#             i.custom_sub_group
 #         """,
 #         values,
 #         as_dict=True
@@ -99,6 +97,7 @@
 #     result = {}
 
 #     for row in raw_data:
+
 #         item_group = row.item_group or "Undefined"
 #         main_group = row.custom_main_group or "Undefined"
 #         sub_group = row.custom_sub_group or "Undefined"
@@ -110,44 +109,26 @@
 #             result[key] = {
 #                 "item_group": item_group,
 #                 "custom_main_group": main_group,
-#                 "custom_sub_group": sub_group
+#                 "custom_sub_group": sub_group,
+#                 "popup_data": {}
 #             }
 #             for c in customers:
 #                 result[key][frappe.scrub(c)] = 0
+#                 result[key]["popup_data"][frappe.scrub(c)] = []
 
 #         result[key][frappe.scrub(customer)] += flt(row.amount)
 
+#         result[key]["popup_data"][frappe.scrub(customer)].append({
+#             "invoice": row.invoice,
+#             "item_name": row.item_name,
+#             "qty": row.qty,
+#             "amount": row.amount
+#         })
+
+#     for k in result:
+#         result[k]["popup_data"] = json.dumps(result[k]["popup_data"])
+
 #     return list(result.values()), customers
-
-
-# # ---------------- DRILLDOWN METHOD ----------------
-# @frappe.whitelist()
-# def get_customer_items(customer, item_group, main_group, sub_group):
-
-#     data = frappe.db.sql("""
-#         SELECT
-#             si.name AS invoice,
-#             sii.item_name,
-#             sii.qty,
-#             sii.base_net_amount AS amount
-#         FROM `tabSales Invoice` si
-#         JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-#         JOIN `tabItem` i ON i.name = sii.item_code
-#         JOIN `tabCustomer` c ON c.name = si.customer
-#         WHERE si.docstatus = 1
-#             AND c.customer_name = %(customer)s
-#             AND IFNULL(i.item_group,'Undefined') = %(item_group)s
-#             AND IFNULL(i.custom_main_group,'Undefined') = %(main_group)s
-#             AND IFNULL(i.custom_sub_group,'Undefined') = %(sub_group)s
-#         ORDER BY si.posting_date DESC
-#     """, {
-#         "customer": customer,
-#         "item_group": item_group,
-#         "main_group": main_group,
-#         "sub_group": sub_group
-#     }, as_dict=True)
-
-#     return data
 
 import frappe
 from frappe.utils import flt
@@ -179,7 +160,6 @@ def get_columns(customers):
             "width": 150
         })
 
-    # hidden popup column
     columns.append({"fieldname": "popup_data", "hidden": 1})
 
     return columns
@@ -227,8 +207,7 @@ def get_pivot_data(filters):
             c.customer_name,
             sii.item_name,
             sii.qty,
-            sii.base_net_amount AS amount,
-            si.name AS invoice
+            sii.base_net_amount AS amount
         FROM `tabSales Invoice` si
         JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         JOIN `tabItem` i ON i.name = sii.item_code
@@ -255,6 +234,7 @@ def get_pivot_data(filters):
         customer = row.customer_name
 
         key = f"{item_group}::{main_group}::{sub_group}"
+        cust = frappe.scrub(customer)
 
         if key not in result:
             result[key] = {
@@ -264,19 +244,38 @@ def get_pivot_data(filters):
                 "popup_data": {}
             }
             for c in customers:
-                result[key][frappe.scrub(c)] = 0
-                result[key]["popup_data"][frappe.scrub(c)] = []
+                sc = frappe.scrub(c)
+                result[key][sc] = 0
+                result[key]["popup_data"][sc] = {}
 
-        result[key][frappe.scrub(customer)] += flt(row.amount)
+        # pivot amount
+        result[key][cust] += flt(row.amount)
 
-        result[key]["popup_data"][frappe.scrub(customer)].append({
-            "invoice": row.invoice,
-            "item_name": row.item_name,
-            "qty": row.qty,
-            "amount": row.amount
-        })
+        # aggregate popup by item
+        items = result[key]["popup_data"][cust]
 
+        if row.item_name not in items:
+            items[row.item_name] = {"item_name": row.item_name, "qty": 0, "amount": 0}
+
+        items[row.item_name]["qty"] += flt(row.qty)
+        items[row.item_name]["amount"] += flt(row.amount)
+
+    # convert dict → list + totals
     for k in result:
+        for cust in result[k]["popup_data"]:
+            item_list = list(result[k]["popup_data"][cust].values())
+
+            total_qty = sum(i["qty"] for i in item_list)
+            total_amt = sum(i["amount"] for i in item_list)
+
+            item_list.append({
+                "item_name": "<b>Total</b>",
+                "qty": total_qty,
+                "amount": total_amt
+            })
+
+            result[k]["popup_data"][cust] = item_list
+
         result[k]["popup_data"] = json.dumps(result[k]["popup_data"])
 
     return list(result.values()), customers

@@ -4,8 +4,6 @@
 import frappe
 from frappe import _
 from frappe.utils import flt, get_first_day, get_last_day, add_years, nowdate, cint
-import json
-from calendar import monthrange
 
 def execute(filters=None):
     """
@@ -48,9 +46,6 @@ def set_default_filters(filters):
     # Default values for other filters
     if not filters.get("include_targets"):
         filters.include_targets = 1
-    
-    if not filters.get("detailed_view"):
-        filters.detailed_view = 0
 
 
 def get_columns(filters):
@@ -98,8 +93,8 @@ def get_columns(filters):
             "width": 150
         },
         {
-            "label": _("Territory"),
-            "fieldname": "territory",
+            "label": _("Territory Name"),
+            "fieldname": "territory_name",
             "fieldtype": "Data",
             "width": 140
         }
@@ -146,23 +141,6 @@ def get_columns(filters):
                 "fieldname": "growth_pct",
                 "fieldtype": "Percent",
                 "width": 120
-            }
-        ])
-    
-    # Add additional columns for detailed view
-    if filters.detailed_view:
-        columns.extend([
-            {
-                "label": _("Total Qty"),
-                "fieldname": "total_qty",
-                "fieldtype": "Float",
-                "width": 120
-            },
-            {
-                "label": _("No. of Invoices"),
-                "fieldname": "invoice_count",
-                "fieldtype": "Int",
-                "width": 130
             }
         ])
     
@@ -241,8 +219,6 @@ def get_data(filters):
         sp_total_target = 0
         sp_total_invoice = 0
         sp_total_last_year = 0
-        sp_total_qty = 0
-        sp_total_invoices = 0
         
         # Add each customer
         for customer in customers:
@@ -256,8 +232,6 @@ def get_data(filters):
             sp_invoices = invoices.get(sp.name, {})
             customer_invoice = sp_invoices.get(customer.customer, {})
             invoice_amount = customer_invoice.get("amount", 0)
-            invoice_qty = customer_invoice.get("qty", 0)
-            invoice_count = customer_invoice.get("invoice_count", 0)
             
             # Get last year data
             last_year_amount = 0
@@ -281,7 +255,7 @@ def get_data(filters):
                 "customer_name": customer.customer_name,
                 "region": sp.region,
                 "location": sp.location,
-                "territory": sp.territory,
+                "territory_name": sp.territory_name,
                 "monthly_target": monthly_target,
                 "invoice_amount": invoice_amount,
                 "achieved_pct": achieved_pct,
@@ -292,18 +266,12 @@ def get_data(filters):
                 row["last_year_amount"] = last_year_amount
                 row["growth_pct"] = growth_pct
             
-            if filters.detailed_view:
-                row["total_qty"] = invoice_qty
-                row["invoice_count"] = invoice_count
-            
             data.append(row)
             
             # Add to totals
             sp_total_target += monthly_target
             sp_total_invoice += invoice_amount
             sp_total_last_year += last_year_amount
-            sp_total_qty += invoice_qty
-            sp_total_invoices += invoice_count
         
         # Add sales person total row
         if sp_total_invoice > 0 or sp_total_target > 0:
@@ -323,10 +291,6 @@ def get_data(filters):
             if filters.get("compare_previous_year"):
                 total_row["last_year_amount"] = sp_total_last_year
                 total_row["growth_pct"] = sp_growth
-            
-            if filters.detailed_view:
-                total_row["total_qty"] = sp_total_qty
-                total_row["invoice_count"] = sp_total_invoices
             
             data.append(total_row)
             
@@ -382,9 +346,9 @@ def get_sales_persons(filters):
         conditions.append("custom_location = %(custom_location)s")
         values["custom_location"] = filters.custom_location
     
-    if filters.get("custom_territory"):
-        conditions.append("custom_territory = %(custom_territory)s")
-        values["custom_territory"] = filters.custom_territory
+    if filters.get("custom_territory_name"):
+        conditions.append("custom_territory_name = %(custom_territory_name)s")
+        values["custom_territory_name"] = filters.custom_territory_name
     
     where_clause = " AND ".join(conditions)
     
@@ -395,7 +359,7 @@ def get_sales_persons(filters):
             parent_sales_person,
             custom_region as region,
             custom_location as location,
-            custom_territory as territory
+            custom_territory_name as territory_name
         FROM `tabSales Person`
         WHERE {where_clause}
         ORDER BY parent_sales_person, name
@@ -475,26 +439,14 @@ def get_invoice_data(filters):
         conditions.append("si.customer = %(customer)s")
         values["customer"] = filters.customer
     
-    # Join with Sales Team to get sales person
-    join_condition = """
-        LEFT JOIN `tabSales Team` st 
-            ON st.parent = si.name 
-            AND st.parenttype = 'Sales Invoice'
-    """
-    
-    where_clause = " AND ".join(conditions)
-    
     invoices = frappe.db.sql(f"""
         SELECT 
             si.customer,
             st.sales_person,
-            COUNT(DISTINCT si.name) as invoice_count,
-            SUM(si.base_net_total) as total_amount,
-            SUM(sii.qty) as total_qty
+            SUM(si.base_net_total) as total_amount
         FROM `tabSales Invoice` si
-        LEFT JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        {join_condition}
-        WHERE {where_clause}
+        LEFT JOIN `tabSales Team` st ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
+        WHERE {" AND ".join(conditions)}
         GROUP BY si.customer, st.sales_person
     """, values, as_dict=True)
     
@@ -508,9 +460,7 @@ def get_invoice_data(filters):
             invoice_dict[inv.sales_person] = {}
         
         invoice_dict[inv.sales_person][inv.customer] = {
-            "amount": flt(inv.total_amount),
-            "qty": flt(inv.total_qty),
-            "invoice_count": cint(inv.invoice_count)
+            "amount": flt(inv.total_amount)
         }
     
     return invoice_dict
@@ -529,9 +479,7 @@ def get_previous_year_data(filters):
             st.sales_person,
             SUM(si.base_net_total) as amount
         FROM `tabSales Invoice` si
-        LEFT JOIN `tabSales Team` st 
-            ON st.parent = si.name 
-            AND st.parenttype = 'Sales Invoice'
+        LEFT JOIN `tabSales Team` st ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
         WHERE si.docstatus = 1
             AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
         GROUP BY si.customer, st.sales_person
@@ -570,9 +518,7 @@ def get_customers_for_sales_person(sales_person, filters):
     customers = frappe.db.sql(f"""
         SELECT 
             st.parent as customer,
-            c.customer_name,
-            c.customer_group,
-            c.territory
+            c.customer_name
         FROM `tabSales Team` st
         JOIN `tabCustomer` c ON c.name = st.parent
         WHERE {where_clause}
@@ -580,80 +526,3 @@ def get_customers_for_sales_person(sales_person, filters):
     """, values, as_dict=True)
     
     return customers
-
-
-@frappe.whitelist()
-def get_customer_details(customer, sales_person, month, year):
-    """
-    Get detailed invoice information for a specific customer and sales person
-    Used for drill-down popup
-    """
-    from_date = get_first_day(f"{year}-{int(month):02d}-01")
-    to_date = get_last_day(f"{year}-{int(month):02d}-01")
-    
-    details = frappe.db.sql("""
-        SELECT 
-            si.name as invoice_no,
-            si.posting_date,
-            sii.item_code,
-            sii.item_name,
-            sii.qty,
-            sii.base_rate as rate,
-            sii.base_net_amount as amount
-        FROM `tabSales Invoice` si
-        JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        LEFT JOIN `tabSales Team` st ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
-        WHERE si.docstatus = 1
-            AND si.customer = %(customer)s
-            AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
-            AND (st.sales_person = %(sales_person)s OR %(sales_person)s = '' OR %(sales_person)s IS NULL)
-        ORDER BY si.posting_date DESC, si.name
-    """, {
-        "customer": customer,
-        "sales_person": sales_person,
-        "from_date": from_date,
-        "to_date": to_date
-    }, as_dict=True)
-    
-    return details
-
-
-@frappe.whitelist()
-def get_invoice_breakdown(customer, sales_person, month, year):
-    """
-    Get invoice summary for a customer
-    """
-    from_date = get_first_day(f"{year}-{int(month):02d}-01")
-    to_date = get_last_day(f"{year}-{int(month):02d}-01")
-    
-    # Get all invoices
-    invoices = frappe.db.sql("""
-        SELECT 
-            si.name,
-            si.posting_date,
-            COUNT(DISTINCT sii.item_code) as item_count,
-            SUM(sii.qty) as total_qty,
-            SUM(sii.base_net_amount) as total_amount
-        FROM `tabSales Invoice` si
-        JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        LEFT JOIN `tabSales Team` st ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
-        WHERE si.docstatus = 1
-            AND si.customer = %(customer)s
-            AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
-            AND (st.sales_person = %(sales_person)s OR %(sales_person)s = '' OR %(sales_person)s IS NULL)
-        GROUP BY si.name, si.posting_date
-        ORDER BY si.posting_date DESC
-    """, {
-        "customer": customer,
-        "sales_person": sales_person,
-        "from_date": from_date,
-        "to_date": to_date
-    }, as_dict=True)
-    
-    # Calculate grand total
-    grand_total = sum([flt(inv.total_amount) for inv in invoices]) if invoices else 0
-    
-    return {
-        "invoices": invoices,
-        "grand_total": grand_total
-    }

@@ -54,10 +54,17 @@ def get_columns(filters):
 
 
 # --------------------------------------------------
-# DATA (Sales Invoice BASE)
+# DATA
 # --------------------------------------------------
 def get_data(filters):
     selected_month = filters.get("month")
+    selected_year = filters.get("year")
+
+    if not selected_year:
+        frappe.throw("Year is required")
+
+    from_date = f"{selected_year}-01-01"
+    to_date = f"{selected_year}-12-31"
 
     invoices = frappe.db.sql("""
         SELECT
@@ -67,12 +74,16 @@ def get_data(filters):
             si.grand_total
         FROM `tabSales Invoice` si
         WHERE si.docstatus = 1
-    """, as_dict=True)
+        AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
+    """, {
+        "from_date": from_date,
+        "to_date": to_date
+    }, as_dict=True)
 
     customer_map = {}
 
     for inv in invoices:
-        customer = inv.customer_name   # ✅ CUSTOMER NAME
+        customer = inv.customer_name
         month_no = getdate(inv.posting_date).month
         amount = inv.grand_total
 

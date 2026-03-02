@@ -1,4 +1,4 @@
-# Copyright (c) 2024, Your Organization and contributors
+# Copyright (c) 2026, Your Organization and contributors
 # For license information, please see license.txt
 
 import frappe
@@ -42,8 +42,8 @@ def get_columns():
             "width": 150
         },
         {
-            "label": _("Custom Customer Name"),
-            "fieldname": "custom_customer_name",
+            "label": _("Customer Name"),
+            "fieldname": "customer_name",
             "fieldtype": "Data",
             "width": 200
         },
@@ -73,28 +73,10 @@ def get_columns():
             "width": 120
         },
         {
-            "label": _("Discount Percentage"),
+            "label": _("Discount %"),
             "fieldname": "discount_percentage",
             "fieldtype": "Percent",
-            "width": 120
-        },
-        {
-            "label": _("Min Qty"),
-            "fieldname": "min_qty",
-            "fieldtype": "Float",
-            "width": 80
-        },
-        {
-            "label": _("Max Qty"),
-            "fieldname": "max_qty",
-            "fieldtype": "Float",
-            "width": 80
-        },
-        {
-            "label": _("Valid For"),
-            "fieldname": "valid_for",
-            "fieldtype": "Data",
-            "width": 150
+            "width": 100
         },
         {
             "label": _("Company"),
@@ -104,184 +86,119 @@ def get_columns():
             "width": 150
         },
         {
-            "label": _("Currency"),
-            "fieldname": "currency",
-            "fieldtype": "Link",
-            "options": "Currency",
+            "label": _("Selling"),
+            "fieldname": "selling",
+            "fieldtype": "Check",
+            "width": 70
+        },
+        {
+            "label": _("Buying"),
+            "fieldname": "buying",
+            "fieldtype": "Check",
+            "width": 70
+        },
+        {
+            "label": _("Status"),
+            "fieldname": "status",
+            "fieldtype": "Data",
             "width": 100
-        },
-        {
-            "label": _("Created By"),
-            "fieldname": "created_by",
-            "fieldtype": "Data",
-            "width": 150
-        },
-        {
-            "label": _("Modified By"),
-            "fieldname": "modified_by",
-            "fieldtype": "Data",
-            "width": 150
-        },
-        {
-            "label": _("Created On"),
-            "fieldname": "creation",
-            "fieldtype": "Date",
-            "width": 100
-        },
-        {
-            "label": _("Tags"),
-            "fieldname": "_user_tags",
-            "fieldtype": "Data",
-            "width": 150
         }
     ]
 
 def get_data(filters):
-    conditions = get_conditions(filters)
+    conditions = []
+    values = {}
     
-    # Get pricing rules with customer information
-    query = """
-        SELECT 
+    # Customer filter
+    if filters.get("customer"):
+        conditions.append("pr.customer = %(customer)s")
+        values["customer"] = filters["customer"]
+    
+    # Customer Name filter
+    if filters.get("customer_name"):
+        conditions.append("EXISTS (SELECT 1 FROM `tabCustomer` c WHERE c.name = pr.customer AND c.customer_name LIKE %(customer_name)s)")
+        values["customer_name"] = f"%{filters['customer_name']}%"
+    
+    # Date filters
+    if filters.get("from_date"):
+        conditions.append("(pr.valid_from >= %(from_date)s OR pr.valid_from IS NULL)")
+        values["from_date"] = filters["from_date"]
+    
+    if filters.get("to_date"):
+        conditions.append("(pr.valid_upto <= %(to_date)s OR pr.valid_upto IS NULL)")
+        values["to_date"] = filters["to_date"]
+    
+    # Valid on date
+    if filters.get("valid_on_date"):
+        conditions.append("""
+            ((pr.valid_from <= %(valid_on_date)s OR pr.valid_from IS NULL) 
+            AND (pr.valid_upto >= %(valid_on_date)s OR pr.valid_upto IS NULL))
+        """)
+        values["valid_on_date"] = filters["valid_on_date"]
+    
+    # Company filter
+    if filters.get("company"):
+        conditions.append("pr.company = %(company)s")
+        values["company"] = filters["company"]
+    
+    # Item Group filter
+    if filters.get("item_group"):
+        conditions.append("pr.item_group = %(item_group)s")
+        values["item_group"] = filters["item_group"]
+    
+    # Selling/Buying filters
+    if filters.get("selling"):
+        conditions.append("pr.selling = 1")
+    
+    if filters.get("buying"):
+        conditions.append("pr.buying = 1")
+    
+    # Active/Disabled filter
+    if filters.get("show_disabled") and filters.get("show_disabled") == 1:
+        # Show all
+        pass
+    else:
+        conditions.append("(pr.disable = 0 OR pr.disable IS NULL)")
+    
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+    
+    query = f"""
+        SELECT
             pr.name,
             pr.title,
             pr.apply_on,
             pr.customer,
-            cust.custom_customer_name,
+            (SELECT customer_name FROM `tabCustomer` WHERE name = pr.customer) as customer_name,
             pr.item_group,
             pr.valid_from,
             pr.valid_upto,
             pr.rate,
             pr.discount_percentage,
-            pr.min_qty,
-            pr.max_qty,
-            CONCAT(IFNULL(pr.valid_from, ''), ' to ', IFNULL(pr.valid_upto, '')) as valid_for,
             pr.company,
-            pr.currency,
-            pr.owner as created_by,
-            pr.modified_by,
-            pr.creation,
-            pr._user_tags,
-            pr.price_or_discount as price_discount_type,
-            pr.warehouse,
-            pr.brand,
-            pr.customer_group,
-            pr.territory,
             pr.selling,
             pr.buying,
-            pr.applicable_for,
-            pr.free_item,
-            pr.free_qty,
-            pr.threshold_percentage,
-            pr.priority,
-            pr.coupon_code,
-            pr.condition,
-            pr.is_cumulative,
-            pr.disable,
-            pr.mixed_conditions,
-            pr.is_conditional,
-            pr.same_item,
-            pr.rule_description
-        FROM 
+            CASE 
+                WHEN pr.disable = 1 THEN 'Disabled'
+                WHEN pr.valid_upto IS NOT NULL AND pr.valid_upto < CURDATE() THEN 'Expired'
+                WHEN pr.valid_from IS NOT NULL AND pr.valid_from > CURDATE() THEN 'Future'
+                ELSE 'Active'
+            END as status
+        FROM
             `tabPricing Rule` pr
-        LEFT JOIN 
-            `tabCustomer` cust ON pr.customer = cust.name
-        WHERE 
-            1=1 {conditions}
-        ORDER BY 
-            pr.creation DESC, pr.valid_from DESC
-    """.format(conditions=conditions)
+        WHERE
+            {where_clause}
+        ORDER BY
+            pr.modified DESC
+        LIMIT 1000
+    """
     
-    data = frappe.db.sql(query, filters, as_dict=1)
+    data = frappe.db.sql(query, values, as_dict=1)
     
-    # Format the data
+    # Format dates
     for row in data:
-        # Format valid_for string
-        if row.valid_from and row.valid_upto:
-            row.valid_for = f"{row.valid_from} to {row.valid_upto}"
-        elif row.valid_from:
-            row.valid_for = f"From {row.valid_from}"
-        elif row.valid_upto:
-            row.valid_for = f"Until {row.valid_upto}"
-        else:
-            row.valid_for = "Always Valid"
-        
-        # Get user full names
-        if row.created_by:
-            user = frappe.db.get_value("User", row.created_by, "full_name")
-            row.created_by = user or row.created_by
-        
-        if row.modified_by:
-            user = frappe.db.get_value("User", row.modified_by, "full_name")
-            row.modified_by = user or row.modified_by
+        if row.valid_from:
+            row.valid_from = frappe.utils.formatdate(row.valid_from)
+        if row.valid_upto:
+            row.valid_upto = frappe.utils.formatdate(row.valid_upto)
     
     return data
-
-def get_conditions(filters):
-    conditions = ""
-    
-    # Customer filter
-    if filters.get("customer"):
-        conditions += " AND pr.customer = %(customer)s"
-    
-    # Custom customer name filter (searches in Customer doctype)
-    if filters.get("custom_customer_name"):
-        conditions += """ AND EXISTS (
-            SELECT 1 FROM `tabCustomer` c 
-            WHERE c.name = pr.customer 
-            AND c.custom_customer_name LIKE %(custom_customer_name)s
-        )"""
-    
-    # Date filters
-    if filters.get("from_date"):
-        conditions += " AND (pr.valid_from >= %(from_date)s OR pr.valid_from IS NULL OR pr.valid_from = '')"
-    
-    if filters.get("to_date"):
-        conditions += " AND (pr.valid_upto <= %(to_date)s OR pr.valid_upto IS NULL OR pr.valid_upto = '')"
-    
-    # Active period filter (rules valid during a specific date)
-    if filters.get("valid_on_date"):
-        conditions += """ AND (
-            (pr.valid_from <= %(valid_on_date)s AND pr.valid_upto >= %(valid_on_date)s)
-            OR (pr.valid_from <= %(valid_on_date)s AND pr.valid_upto IS NULL)
-            OR (pr.valid_from IS NULL AND pr.valid_upto >= %(valid_on_date)s)
-            OR (pr.valid_from IS NULL AND pr.valid_upto IS NULL)
-        )"""
-    
-    # Additional filters
-    if filters.get("item_group"):
-        conditions += " AND pr.item_group = %(item_group)s"
-    
-    if filters.get("apply_on"):
-        conditions += " AND pr.apply_on = %(apply_on)s"
-    
-    if filters.get("company"):
-        conditions += " AND pr.company = %(company)s"
-    
-    if filters.get("selling") and filters.get("selling") == 1:
-        conditions += " AND pr.selling = 1"
-    
-    if filters.get("buying") and filters.get("buying") == 1:
-        conditions += " AND pr.buying = 1"
-    
-    if filters.get("disable") is not None:
-        conditions += " AND pr.disable = %(disable)s"
-    
-    if filters.get("has_coupon"):
-        conditions += " AND pr.coupon_code IS NOT NULL AND pr.coupon_code != ''"
-    
-    if filters.get("priority"):
-        conditions += " AND pr.priority = %(priority)s"
-    
-    # Tags filter
-    if filters.get("tags"):
-        conditions += " AND pr._user_tags LIKE %(tags)s"
-    
-    # Search by ID or Title
-    if filters.get("search_text"):
-        conditions += """ AND (
-            pr.name LIKE %(search_text)s 
-            OR pr.title LIKE %(search_text)s
-            OR pr.rule_description LIKE %(search_text)s
-        )"""
-    
-    return conditions

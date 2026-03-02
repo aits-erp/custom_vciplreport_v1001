@@ -1,3 +1,37 @@
+frappe.query_reports["Stock Report - Cumulative"] = {
+    filters: [
+        {
+            fieldname: "custom_item_type",
+            label: __("Item Type"),
+            fieldtype: "Data",
+            default: "Finished Goods"
+        },
+        {
+            fieldname: "custom_main_group",
+            label: __("Main Group"),
+            fieldtype: "Data"
+        },
+        {
+            fieldname: "item_group",
+            label: __("Item Group"),
+            fieldtype: "Link",
+            options: "Item Group"
+        },
+        {
+            fieldname: "from_date",
+            label: __("From Date"),
+            fieldtype: "Date",
+            default: "2025-04-01"
+        },
+        {
+            fieldname: "to_date",
+            label: __("To Date"),
+            fieldtype: "Date",
+            default: frappe.datetime.get_today()
+        }
+    ]
+};
+
 import frappe
 
 
@@ -25,6 +59,7 @@ def get_columns():
         {"label": "Item Group", "fieldname": "item_group", "fieldtype": "Link", "options": "Item Group", "width": 160},
 
         {"label": "Current Stock", "fieldname": "current_stock", "fieldtype": "Float", "width": 130},
+        {"label": "Min Stock Level", "fieldname": "safety_stock", "fieldtype": "Float", "width": 130},
         {"label": "Rate", "fieldname": "rate", "fieldtype": "Currency", "width": 120},
         {"label": "Amount", "fieldname": "amount", "fieldtype": "Currency", "width": 150},
 
@@ -63,6 +98,9 @@ def get_data(item_type, item_group, main_group):
             i.custom_main_group,
             i.item_name,
             i.item_group,
+            
+            -- SAFETY STOCK (MIN STOCK LEVEL)
+            COALESCE(i.safety_stock, 0) AS safety_stock,
 
             -- TOTAL STOCK (NULL SAFE)
             COALESCE(SUM(b.actual_qty), 0) AS current_stock,
@@ -104,7 +142,7 @@ def get_data(item_type, item_group, main_group):
             {conditions}
 
         GROUP BY
-            i.name, i.custom_main_group, i.item_name, i.item_group, rate.rate
+            i.name, i.custom_main_group, i.item_name, i.item_group, i.safety_stock, rate.rate
 
         ORDER BY
             current_stock DESC

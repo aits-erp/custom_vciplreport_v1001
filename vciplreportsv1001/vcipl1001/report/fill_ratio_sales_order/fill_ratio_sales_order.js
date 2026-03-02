@@ -22,14 +22,14 @@ frappe.query_reports["FILL RATIO SALES ORDER"] = {
 
     filters: [
 
-        {
-            fieldname: "company",
-            label: __("Company"),
-            fieldtype: "Link",
-            options: "Company",
-            default: "Vinod Cookware India Private Limited",
-            reqd: 1
-        },
+		{
+		    fieldname: "company",
+		    label: __("Company"),
+		    fieldtype: "Link",
+		    options: "Company",
+		    default: frappe.defaults.get_user_default("Company"),
+		    reqd: 1
+		},
 
         {
             fieldname: "from_date",

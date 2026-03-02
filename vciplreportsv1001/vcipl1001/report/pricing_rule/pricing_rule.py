@@ -1,4 +1,4 @@
-# Copyright (c) 2026, Your Organization and contributors
+# Copyright (c) 2024, Your Organization and contributors
 # For license information, please see license.txt
 
 import frappe
@@ -98,10 +98,10 @@ def get_columns():
             "width": 70
         },
         {
-            "label": _("Status"),
-            "fieldname": "status",
-            "fieldtype": "Data",
-            "width": 100
+            "label": _("Disabled"),
+            "fieldname": "disable",
+            "fieldtype": "Check",
+            "width": 70
         }
     ]
 
@@ -114,7 +114,7 @@ def get_data(filters):
         conditions.append("pr.customer = %(customer)s")
         values["customer"] = filters["customer"]
     
-    # Customer Name filter
+    # Customer Name filter - USING STANDARD FIELD
     if filters.get("customer_name"):
         conditions.append("EXISTS (SELECT 1 FROM `tabCustomer` c WHERE c.name = pr.customer AND c.customer_name LIKE %(customer_name)s)")
         values["customer_name"] = f"%{filters['customer_name']}%"
@@ -153,7 +153,7 @@ def get_data(filters):
     if filters.get("buying"):
         conditions.append("pr.buying = 1")
     
-    # Active/Disabled filter
+    # Disabled filter
     if filters.get("show_disabled") and filters.get("show_disabled") == 1:
         # Show all
         pass
@@ -177,12 +177,7 @@ def get_data(filters):
             pr.company,
             pr.selling,
             pr.buying,
-            CASE 
-                WHEN pr.disable = 1 THEN 'Disabled'
-                WHEN pr.valid_upto IS NOT NULL AND pr.valid_upto < CURDATE() THEN 'Expired'
-                WHEN pr.valid_from IS NOT NULL AND pr.valid_from > CURDATE() THEN 'Future'
-                ELSE 'Active'
-            END as status
+            pr.disable
         FROM
             `tabPricing Rule` pr
         WHERE

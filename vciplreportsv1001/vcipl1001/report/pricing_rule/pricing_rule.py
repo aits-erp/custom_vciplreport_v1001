@@ -42,6 +42,12 @@ def get_columns():
             "width": 150
         },
         {
+            "label": _("Customer Name"),
+            "fieldname": "customer_name",
+            "fieldtype": "Data",
+            "width": 200
+        },
+        {
             "label": _("Supplier"),
             "fieldname": "supplier",
             "fieldtype": "Link",
@@ -50,21 +56,21 @@ def get_columns():
         },
         {
             "label": _("Item Group"),
-            "fieldname": "item_group",  # Changed from apply_on_item_group
+            "fieldname": "item_group",
             "fieldtype": "Link",
             "options": "Item Group",
             "width": 150
         },
         {
             "label": _("Item Code"),
-            "fieldname": "item_code",  # Changed from apply_on_item_code
+            "fieldname": "item_code",
             "fieldtype": "Link",
             "options": "Item",
             "width": 150
         },
         {
             "label": _("Brand"),
-            "fieldname": "brand",  # Changed from apply_on_brand
+            "fieldname": "brand",
             "fieldtype": "Link",
             "options": "Brand",
             "width": 150
@@ -218,6 +224,7 @@ def get_data(filters):
             pr.title,
             pr.apply_on,
             pr.customer,
+            (SELECT customer_name FROM `tabCustomer` WHERE name = pr.customer) as customer_name,
             pr.supplier,
             pr.valid_from,
             pr.valid_upto,
@@ -264,5 +271,7 @@ def get_data(filters):
             row.creation = frappe.utils.formatdate(row.creation)
         if row.modified:
             row.modified = frappe.utils.formatdate(row.modified)
+        if not row.customer_name:
+            row.customer_name = ""
     
     return data

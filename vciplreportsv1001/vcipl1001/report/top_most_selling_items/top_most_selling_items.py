@@ -62,7 +62,15 @@ def get_columns():
 
 # -------------------- DATA --------------------
 def get_data(filters):
-    limit = int(filters.get("record_limit") or 50)
+    # Check if "Show All Items" is checked
+    show_all = filters.get("show_all_items", 0)
+    
+    # Set limit based on checkbox
+    if show_all:
+        limit_clause = ""  # No limit when show all is checked
+    else:
+        limit = int(filters.get("record_limit") or 50)
+        limit_clause = f"LIMIT {limit}"
 
     params = {
         "docstatus": 1,
@@ -88,7 +96,7 @@ def get_data(filters):
             AND (%(item_type)s IS NULL OR i.custom_item_type = %(item_type)s)
         GROUP BY sii.item_code, i.item_name, i.item_group
         ORDER BY total_amount DESC
-        LIMIT {limit}
+        {limit_clause}
     """
 
     rows = frappe.db.sql(sales_query, params, as_dict=True)

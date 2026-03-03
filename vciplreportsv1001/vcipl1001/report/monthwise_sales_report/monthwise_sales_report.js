@@ -33,10 +33,10 @@ frappe.query_reports["Monthwise Sales Report"] = {
             fieldtype: "Select",
             options: [
                 "",
-                "January","February","March",
                 "April","May","June",
                 "July","August","September",
-                "October","November","December"
+                "October","November","December",
+                "January","February","March"
             ]
         }
     ],
@@ -48,7 +48,8 @@ frappe.query_reports["Monthwise Sales Report"] = {
             column.fieldtype === "Currency" &&
             data &&
             data[column.fieldname + "_drill"] &&
-            value
+            value &&
+            !data.is_total_row
         ) {
             return `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
                 onclick='frappe.query_reports["Monthwise Sales Report"]
@@ -100,4 +101,4 @@ frappe.query_reports["Monthwise Sales Report"] = {
             wide: true
         });
     }
-};
+}

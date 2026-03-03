@@ -42,16 +42,31 @@ def get_columns():
             "width": 150
         },
         {
-            "label": _("Customer Name"),
-            "fieldname": "customer_name",
-            "fieldtype": "Data",
-            "width": 200
+            "label": _("Supplier"),
+            "fieldname": "supplier",
+            "fieldtype": "Link",
+            "options": "Supplier",
+            "width": 150
         },
         {
             "label": _("Item Group"),
-            "fieldname": "item_group",
+            "fieldname": "apply_on_item_group",
             "fieldtype": "Link",
             "options": "Item Group",
+            "width": 150
+        },
+        {
+            "label": _("Item Code"),
+            "fieldname": "apply_on_item_code",
+            "fieldtype": "Link",
+            "options": "Item",
+            "width": 150
+        },
+        {
+            "label": _("Brand"),
+            "fieldname": "apply_on_brand",
+            "fieldtype": "Link",
+            "options": "Brand",
             "width": 150
         },
         {
@@ -79,6 +94,18 @@ def get_columns():
             "width": 100
         },
         {
+            "label": _("Discount Amount"),
+            "fieldname": "discount_amount",
+            "fieldtype": "Currency",
+            "width": 120
+        },
+        {
+            "label": _("Rate or Discount"),
+            "fieldname": "rate_or_discount",
+            "fieldtype": "Data",
+            "width": 120
+        },
+        {
             "label": _("Company"),
             "fieldname": "company",
             "fieldtype": "Link",
@@ -98,10 +125,77 @@ def get_columns():
             "width": 70
         },
         {
+            "label": _("Priority"),
+            "fieldname": "priority",
+            "fieldtype": "Int",
+            "width": 80
+        },
+        {
             "label": _("Disabled"),
             "fieldname": "disable",
             "fieldtype": "Check",
             "width": 70
+        },
+        {
+            "label": _("Price or Product Discount"),
+            "fieldname": "price_or_product_discount",
+            "fieldtype": "Data",
+            "width": 150
+        },
+        {
+            "label": _("Free Item"),
+            "fieldname": "free_item",
+            "fieldtype": "Link",
+            "options": "Item",
+            "width": 150
+        },
+        {
+            "label": _("Free Qty"),
+            "fieldname": "free_qty",
+            "fieldtype": "Float",
+            "width": 100
+        },
+        {
+            "label": _("Min Qty"),
+            "fieldname": "min_qty",
+            "fieldtype": "Float",
+            "width": 80
+        },
+        {
+            "label": _("Max Qty"),
+            "fieldname": "max_qty",
+            "fieldtype": "Float",
+            "width": 80
+        },
+        {
+            "label": _("Valid From"),
+            "fieldname": "valid_from",
+            "fieldtype": "Date",
+            "width": 100
+        },
+        {
+            "label": _("Valid Upto"),
+            "fieldname": "valid_upto",
+            "fieldtype": "Date",
+            "width": 100
+        },
+        {
+            "label": _("Created By"),
+            "fieldname": "owner",
+            "fieldtype": "Data",
+            "width": 150
+        },
+        {
+            "label": _("Created On"),
+            "fieldname": "creation",
+            "fieldtype": "Date",
+            "width": 100
+        },
+        {
+            "label": _("Modified On"),
+            "fieldname": "modified",
+            "fieldtype": "Date",
+            "width": 100
         }
     ]
 
@@ -109,17 +203,7 @@ def get_data(filters):
     conditions = []
     values = {}
     
-    # Customer filter
-    if filters.get("customer"):
-        conditions.append("pr.customer = %(customer)s")
-        values["customer"] = filters["customer"]
-    
-    # Customer Name filter - USING STANDARD FIELD
-    if filters.get("customer_name"):
-        conditions.append("EXISTS (SELECT 1 FROM `tabCustomer` c WHERE c.name = pr.customer AND c.customer_name LIKE %(customer_name)s)")
-        values["customer_name"] = f"%{filters['customer_name']}%"
-    
-    # Date filters
+    # Period filters (from-to date) based on valid_from and valid_upto
     if filters.get("from_date"):
         conditions.append("(pr.valid_from >= %(from_date)s OR pr.valid_from IS NULL)")
         values["from_date"] = filters["from_date"]
@@ -128,37 +212,13 @@ def get_data(filters):
         conditions.append("(pr.valid_upto <= %(to_date)s OR pr.valid_upto IS NULL)")
         values["to_date"] = filters["to_date"]
     
-    # Valid on date
-    if filters.get("valid_on_date"):
+    # Optional: Add active on date filter
+    if filters.get("active_on_date"):
         conditions.append("""
-            ((pr.valid_from <= %(valid_on_date)s OR pr.valid_from IS NULL) 
-            AND (pr.valid_upto >= %(valid_on_date)s OR pr.valid_upto IS NULL))
+            ((pr.valid_from <= %(active_on_date)s OR pr.valid_from IS NULL) 
+            AND (pr.valid_upto >= %(active_on_date)s OR pr.valid_upto IS NULL))
         """)
-        values["valid_on_date"] = filters["valid_on_date"]
-    
-    # Company filter
-    if filters.get("company"):
-        conditions.append("pr.company = %(company)s")
-        values["company"] = filters["company"]
-    
-    # Item Group filter
-    if filters.get("item_group"):
-        conditions.append("pr.item_group = %(item_group)s")
-        values["item_group"] = filters["item_group"]
-    
-    # Selling/Buying filters
-    if filters.get("selling"):
-        conditions.append("pr.selling = 1")
-    
-    if filters.get("buying"):
-        conditions.append("pr.buying = 1")
-    
-    # Disabled filter
-    if filters.get("show_disabled") and filters.get("show_disabled") == 1:
-        # Show all
-        pass
-    else:
-        conditions.append("(pr.disable = 0 OR pr.disable IS NULL)")
+        values["active_on_date"] = filters["active_on_date"]
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     
@@ -168,22 +228,36 @@ def get_data(filters):
             pr.title,
             pr.apply_on,
             pr.customer,
-            (SELECT customer_name FROM `tabCustomer` WHERE name = pr.customer) as customer_name,
-            pr.item_group,
+            pr.supplier,
+            pr.apply_on_item_group,
+            pr.apply_on_item_code,
+            pr.apply_on_brand,
             pr.valid_from,
             pr.valid_upto,
             pr.rate,
             pr.discount_percentage,
+            pr.discount_amount,
+            pr.rate_or_discount,
             pr.company,
             pr.selling,
             pr.buying,
-            pr.disable
+            pr.priority,
+            pr.disable,
+            pr.price_or_product_discount,
+            pr.free_item,
+            pr.free_qty,
+            pr.min_qty,
+            pr.max_qty,
+            pr.owner,
+            pr.creation,
+            pr.modified
         FROM
             `tabPricing Rule` pr
         WHERE
             {where_clause}
         ORDER BY
-            pr.modified DESC
+            pr.creation DESC,
+            pr.valid_from DESC
         LIMIT 1000
     """
     
@@ -195,5 +269,9 @@ def get_data(filters):
             row.valid_from = frappe.utils.formatdate(row.valid_from)
         if row.valid_upto:
             row.valid_upto = frappe.utils.formatdate(row.valid_upto)
+        if row.creation:
+            row.creation = frappe.utils.formatdate(row.creation)
+        if row.modified:
+            row.modified = frappe.utils.formatdate(row.modified)
     
     return data

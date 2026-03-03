@@ -50,25 +50,6 @@ frappe.query_reports["Pricing Rule"] = {
             frappe.query_report.print_report();
         });
         
-        // Insights Banner (as shown in your image)
-        setTimeout(function() {
-            if (!$(report.page.wrapper).find('.insights-banner').length) {
-                $(`
-                    <div class="alert alert-info alert-dismissible fade show insights-banner" role="alert" style="margin: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div>
-                                <strong><i class="fa fa-line-chart" style="margin-right: 8px;"></i> Get more insights with Frape Insights →</strong>
-                                <span style="margin-left: 15px; opacity: 0.9;">Analyze pricing trends and rule effectiveness</span>
-                            </div>
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close" style="color: white; opacity: 0.8;">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                    </div>
-                `).insertAfter(report.page.wrapper.find('.page-form'));
-            }
-        }, 500);
-        
         // Quick date filters
         var quick_filters = $(`
             <div class="row" style="margin: 10px 20px;">

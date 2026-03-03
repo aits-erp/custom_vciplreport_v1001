@@ -1,10 +1,9 @@
 import frappe
-from frappe.utils import getdate
+from frappe.utils import getdate, flt
+import json
 
+# Months ordered from April to March (Financial Year)
 MONTHS = [
-    (1, "jan", "January"),
-    (2, "feb", "February"),
-    (3, "mar", "March"),
     (4, "apr", "April"),
     (5, "may", "May"),
     (6, "jun", "June"),
@@ -14,12 +13,23 @@ MONTHS = [
     (10, "oct", "October"),
     (11, "nov", "November"),
     (12, "dec", "December"),
+    (1, "jan", "January"),
+    (2, "feb", "February"),
+    (3, "mar", "March"),
 ]
 
 
 def execute(filters=None):
     filters = filters or {}
-    return get_columns(filters), get_data(filters)
+    validate_filters(filters)
+    columns = get_columns(filters)
+    data = get_data(filters)
+    return columns, data
+
+
+def validate_filters(filters):
+    if not filters.get("year"):
+        frappe.throw("Year is required")
 
 
 # --------------------------------------------------
@@ -29,12 +39,13 @@ def get_columns(filters):
     columns = [{
         "label": "Customer",
         "fieldname": "customer_name",
+        "fieldtype": "Data",
         "width": 280
     }]
 
     selected_month = filters.get("month")
 
-    for _, key, label in MONTHS:
+    for month_no, key, label in MONTHS:
         if not selected_month or selected_month == label:
             columns.append({
                 "label": label,
@@ -57,59 +68,112 @@ def get_columns(filters):
 # DATA
 # --------------------------------------------------
 def get_data(filters):
-    selected_month = filters.get("month")
     selected_year = filters.get("year")
+    selected_month = filters.get("month")
+    customer_group = filters.get("customer_group")
+    customer = filters.get("customer")
 
-    if not selected_year:
-        frappe.throw("Year is required")
+    # Financial year: April to March
+    from_date = f"{selected_year}-04-01"
+    to_date = f"{int(selected_year) + 1}-03-31"
 
-    from_date = f"{selected_year}-01-01"
-    to_date = f"{selected_year}-12-31"
+    # Build conditions
+    conditions = ["si.docstatus = 1"]
+    if customer_group:
+        conditions.append(f"si.customer_group = '{customer_group}'")
+    if customer:
+        conditions.append(f"si.customer = '{customer}'")
+    
+    where_clause = " AND ".join(conditions)
 
-    invoices = frappe.db.sql("""
+    # Get all sales invoices for the period
+    invoices = frappe.db.sql(f"""
         SELECT
             si.name AS invoice,
             si.customer_name,
+            si.customer,
             si.posting_date,
-            si.grand_total
+            si.grand_total as amount,
+            MONTH(si.posting_date) as month_no
         FROM `tabSales Invoice` si
-        WHERE si.docstatus = 1
+        WHERE {where_clause}
         AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
+        ORDER BY si.customer_name, si.posting_date
     """, {
         "from_date": from_date,
         "to_date": to_date
     }, as_dict=True)
 
-    customer_map = {}
+    # Organize data by customer and month
+    customer_data = {}
+    month_totals = {key: 0 for _, key, _ in MONTHS}
 
     for inv in invoices:
-        customer = inv.customer_name
-        month_no = getdate(inv.posting_date).month
-        amount = inv.grand_total
+        customer_name = inv.customer_name
+        month_no = inv.month_no
+        amount = flt(inv.amount)
 
-        if customer not in customer_map:
-            customer_map[customer] = {
-                "customer_name": customer,
+        # Initialize customer if not exists
+        if customer_name not in customer_data:
+            customer_data[customer_name] = {
+                "customer_name": customer_name,
                 "total": 0
             }
-            for _, key, _ in MONTHS:
-                customer_map[customer][key] = 0
-                customer_map[customer][key + "_drill"] = []
+            # Initialize all months and drill fields
+            for m_no, key, label in MONTHS:
+                customer_data[customer_name][key] = 0
+                customer_data[customer_name][f"{key}_drill"] = []
 
+        # Find which month this invoice belongs to
         for m_no, key, label in MONTHS:
-            if month_no == m_no and (not selected_month or selected_month == label):
-                customer_map[customer][key] += amount
-                customer_map[customer]["total"] += amount
-                customer_map[customer][key + "_drill"].append({
+            if month_no == m_no:
+                # Add to customer month total
+                customer_data[customer_name][key] += amount
+                customer_data[customer_name]["total"] += amount
+                
+                # Add drill-down data
+                customer_data[customer_name][f"{key}_drill"].append({
                     "invoice": inv.invoice,
                     "date": str(inv.posting_date),
-                    "amount": float(amount)
+                    "amount": amount
                 })
+                
+                # Add to month totals (for summary row)
+                month_totals[key] += amount
+                break
 
+    # Prepare final data
     result = []
-    for row in customer_map.values():
-        for _, key, _ in MONTHS:
-            row[key + "_drill"] = frappe.as_json(row[key + "_drill"])
+    
+    # Add customer rows
+    for customer_name, data in customer_data.items():
+        row = {
+            "customer_name": customer_name,
+            "total": data["total"]
+        }
+        
+        # Add month data and drill-down JSON
+        for m_no, key, label in MONTHS:
+            row[key] = data[key]
+            # Convert drill-down list to JSON string
+            row[f"{key}_drill"] = json.dumps(data[f"{key}_drill"], default=str)
+        
         result.append(row)
+
+    # Add summary row (only if there are customers)
+    if result:
+        summary_row = {
+            "customer_name": "<b>GRAND TOTAL</b>",
+            "is_total_row": 1,
+            "total": sum(row["total"] for row in result)
+        }
+        
+        # Add month totals to summary row
+        for m_no, key, label in MONTHS:
+            summary_row[key] = month_totals[key]
+            # Empty drill for summary row
+            summary_row[f"{key}_drill"] = json.dumps([])
+        
+        result.append(summary_row)
 
     return result

@@ -56,7 +56,7 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
             "/app/query-report/Stock%20Report%20-%20Cumulative",
 
         "Pricing Rule Report":
-            "/app/pricing-rule/view/report",
+            "/app/query-report/Pricing%20Rule",
 
         "Item Category Wise - Report": "/app/query-report/Item%20Category%20Wise%20-%20Report?from_date=2026-01-01&to_date=2026-01-31",   
             

@@ -19,13 +19,14 @@ frappe.query_reports["Monthwise Sales Report"] = {
             options: (function () {
                 let years = [];
                 let current_year = new Date().getFullYear();
+                // Show years from current year back to 2020
                 for (let y = current_year; y >= 2020; y--) {
                     years.push(y.toString());
                 }
                 return years;
             })(),
             default: new Date().getFullYear().toString(),
-            reqd: 1
+            reqd: 0  // Not required anymore since we have default
         },
         {
             fieldname: "month",
@@ -41,6 +42,13 @@ frappe.query_reports["Monthwise Sales Report"] = {
         }
     ],
 
+    onload: function(report) {
+        // Set default year to current year if not set
+        if (!report.filters[2].value) {
+            report.set_filter_value('year', new Date().getFullYear().toString());
+        }
+    },
+
     formatter(value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
 
@@ -52,13 +60,18 @@ frappe.query_reports["Monthwise Sales Report"] = {
             !data.is_total_row
         ) {
             // Parse the drill data to check if it has items
-            let drill_data = JSON.parse(data[column.fieldname + "_drill"]);
-            if (drill_data && drill_data.length > 0) {
-                return `<a style="font-weight:bold;color:#1674E0;cursor:pointer;text-decoration:underline;"
-                    onclick='frappe.query_reports["Monthwise Sales Report"]
-                    .show_drill_down(${JSON.stringify(drill_data)}, "${column.label}", "${data.customer_name}")'>
-                    ${value}
-                </a>`;
+            try {
+                let drill_data = JSON.parse(data[column.fieldname + "_drill"]);
+                if (drill_data && drill_data.length > 0) {
+                    return `<a style="font-weight:bold;color:#1674E0;cursor:pointer;text-decoration:underline;"
+                        onclick='frappe.query_reports["Monthwise Sales Report"]
+                        .show_drill_down(${JSON.stringify(drill_data)}, "${column.label}", "${data.customer_name}")'>
+                        ${value}
+                    </a>`;
+                }
+            } catch(e) {
+                // If parsing fails, just return the value
+                return value;
             }
         }
         // For total row, just show bold text without link
@@ -80,9 +93,11 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
         let html = `
         <div style="max-height:500px;overflow:auto">
-            <h4 style="margin-bottom:15px;">
+            <h4 style="margin-bottom:15px; padding-bottom:10px; border-bottom:2px solid #1674E0;">
                 ${customer} - ${month}
-                <span style="float:right; color:#1674E0;">Total: ${format_currency(total_amount)}</span>
+                <span style="float:right; color:#1674E0; background:#e8f0fe; padding:5px 10px; border-radius:4px;">
+                    Total: ${format_currency(total_amount)}
+                </span>
             </h4>
             <table class="table table-bordered table-hover">
                 <thead style="background-color:#f0f0f0;">
@@ -115,7 +130,7 @@ frappe.query_reports["Monthwise Sales Report"] = {
                 <tfoot style="background-color:#e8e8e8; font-weight:bold;">
                     <tr>
                         <td colspan="2" style="text-align:right;">Total:</td>
-                        <td style="text-align:right;">${format_currency(total_amount)}</td>
+                        <td style="text-align:right; color:#1674E0;">${format_currency(total_amount)}</td>
                     </tr>
                 </tfoot>
             </table>

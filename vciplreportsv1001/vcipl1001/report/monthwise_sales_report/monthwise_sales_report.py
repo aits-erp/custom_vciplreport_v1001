@@ -1,6 +1,7 @@
 import frappe
-from frappe.utils import getdate, flt
+from frappe.utils import getdate, flt, nowdate
 import json
+from datetime import datetime
 
 # Months ordered from April to March (Financial Year)
 MONTHS = [
@@ -21,6 +22,17 @@ MONTHS = [
 
 def execute(filters=None):
     filters = filters or {}
+    
+    # Set default year to current year if not provided
+    if not filters.get("year"):
+        current_date = datetime.now()
+        current_year = current_date.year
+        # If current month is Jan-Mar, show previous year's financial year
+        if current_date.month <= 3:
+            filters["year"] = str(current_year - 1)
+        else:
+            filters["year"] = str(current_year)
+    
     validate_filters(filters)
     columns = get_columns(filters)
     data = get_data(filters)
@@ -156,9 +168,15 @@ def get_data(filters):
         for m_no, key, label in MONTHS:
             row[key] = data[key]
             # Convert drill-down list to JSON string
-            row[f"{key}_drill"] = json.dumps(data[f"{key}_drill"], default=str)
+            if data[f"{key}_drill"]:
+                row[f"{key}_drill"] = json.dumps(data[f"{key}_drill"], default=str)
+            else:
+                row[f"{key}_drill"] = json.dumps([])
         
         result.append(row)
+
+    # Sort customers alphabetically
+    result.sort(key=lambda x: x["customer_name"])
 
     # Add summary row (only if there are customers)
     if result:

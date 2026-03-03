@@ -50,21 +50,21 @@ def get_columns():
         },
         {
             "label": _("Item Group"),
-            "fieldname": "apply_on_item_group",
+            "fieldname": "item_group",  # Changed from apply_on_item_group
             "fieldtype": "Link",
             "options": "Item Group",
             "width": 150
         },
         {
             "label": _("Item Code"),
-            "fieldname": "apply_on_item_code",
+            "fieldname": "item_code",  # Changed from apply_on_item_code
             "fieldtype": "Link",
             "options": "Item",
             "width": 150
         },
         {
             "label": _("Brand"),
-            "fieldname": "apply_on_brand",
+            "fieldname": "brand",  # Changed from apply_on_brand
             "fieldtype": "Link",
             "options": "Brand",
             "width": 150
@@ -168,18 +168,6 @@ def get_columns():
             "width": 80
         },
         {
-            "label": _("Valid From"),
-            "fieldname": "valid_from",
-            "fieldtype": "Date",
-            "width": 100
-        },
-        {
-            "label": _("Valid Upto"),
-            "fieldname": "valid_upto",
-            "fieldtype": "Date",
-            "width": 100
-        },
-        {
             "label": _("Created By"),
             "fieldname": "owner",
             "fieldtype": "Data",
@@ -222,6 +210,8 @@ def get_data(filters):
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     
+    # Note: The Pricing Rule stores item details in child tables
+    # We need to get them from the appropriate child tables based on apply_on
     query = f"""
         SELECT
             pr.name,
@@ -229,9 +219,6 @@ def get_data(filters):
             pr.apply_on,
             pr.customer,
             pr.supplier,
-            pr.apply_on_item_group,
-            pr.apply_on_item_code,
-            pr.apply_on_brand,
             pr.valid_from,
             pr.valid_upto,
             pr.rate,
@@ -250,7 +237,11 @@ def get_data(filters):
             pr.max_qty,
             pr.owner,
             pr.creation,
-            pr.modified
+            pr.modified,
+            -- Get item details from child tables
+            (SELECT item_code FROM `tabPricing Rule Item Code` WHERE parent = pr.name LIMIT 1) as item_code,
+            (SELECT item_group FROM `tabPricing Rule Item Group` WHERE parent = pr.name LIMIT 1) as item_group,
+            (SELECT brand FROM `tabPricing Rule Brand` WHERE parent = pr.name LIMIT 1) as brand
         FROM
             `tabPricing Rule` pr
         WHERE

@@ -112,293 +112,383 @@
 
 // Copyright (c) 2024, your company and contributors
 // For license information, please see license.txt
+# Copyright (c) 2024, your company and contributors
+# For license information, please see license.txt
 
-frappe.query_reports["Sales Person Report"] = {
-    filters: [
-        // ---------------- PERIOD TYPE ----------------
+import frappe
+from frappe import _
+from frappe.utils import flt, get_first_day, get_last_day, add_years, nowdate, getdate
+import json
+
+
+def execute(filters=None):
+    """
+    Main execute function - required entry point for Frappe reports
+    """
+    if not filters:
+        filters = {}
+    
+    filters = frappe._dict(filters or {})
+    set_default_filters(filters)
+    
+    columns = get_columns()
+    data = get_data(filters)
+    
+    return columns, data
+
+
+# --------------------------------------------------
+# DEFAULT FILTERS
+# --------------------------------------------------
+def set_default_filters(filters):
+    today = nowdate()
+    year = int(today[:4])
+    month = int(today[5:7])
+
+    filters.period_type = filters.get("period_type") or "Month"
+    filters.year = int(filters.get("year") or year)
+    filters.month = int(filters.get("month") or month)
+    filters.quarter = filters.get("quarter") or "Q1"
+    filters.half_year = filters.get("half_year") or "H1"
+
+
+# --------------------------------------------------
+# COLUMNS - ADDED TERRITORY CODE COLUMN
+# --------------------------------------------------
+def get_columns():
+    return [
         {
-            fieldname: "period_type",
-            label: __("Period Type"),
-            fieldtype: "Select",
-            options: ["Month", "Quarter", "Half Year"],
-            default: "Month",
-            reqd: 1
+            "label": _("Head Sales Person"),
+            "fieldname": "head_sales_person",
+            "fieldtype": "Link",
+            "options": "Sales Person",
+            "width": 180
         },
-
-        // ---------------- MONTH ----------------
         {
-            fieldname: "month",
-            label: __("Month"),
-            fieldtype: "Select",
-            options: [
-                { label: __("January"), value: 1 },
-                { label: __("February"), value: 2 },
-                { label: __("March"), value: 3 },
-                { label: __("April"), value: 4 },
-                { label: __("May"), value: 5 },
-                { label: __("June"), value: 6 },
-                { label: __("July"), value: 7 },
-                { label: __("August"), value: 8 },
-                { label: __("September"), value: 9 },
-                { label: __("October"), value: 10 },
-                { label: __("November"), value: 11 },
-                { label: __("December"), value: 12 }
-            ],
-            default: new Date().getMonth() + 1,
-            depends_on: "eval:doc.period_type=='Month'"
+            "label": _("Head Sales Code"),
+            "fieldname": "custom_head_sales_code",
+            "fieldtype": "Data",
+            "width": 140
         },
-
-        // ---------------- QUARTER (FY STYLE) ----------------
         {
-            fieldname: "quarter",
-            label: __("Quarter"),
-            fieldtype: "Select",
-            options: [
-                { label: __("Q1 (Apr–Jun)"), value: "Q1" },
-                { label: __("Q2 (Jul–Sep)"), value: "Q2" },
-                { label: __("Q3 (Oct–Dec)"), value: "Q3" },
-                { label: __("Q4 (Jan–Mar)"), value: "Q4" }
-            ],
-            default: "Q1",
-            depends_on: "eval:doc.period_type=='Quarter'"
+            "label": _("Region"),
+            "fieldname": "region",
+            "fieldtype": "Data",
+            "width": 120
         },
-
-        // ---------------- HALF YEAR ----------------
         {
-            fieldname: "half_year",
-            label: __("Half Year"),
-            fieldtype: "Select",
-            options: [
-                { label: __("H1 (Apr–Sep)"), value: "H1" },
-                { label: __("H2 (Oct–Mar)"), value: "H2" }
-            ],
-            default: "H1",
-            depends_on: "eval:doc.period_type=='Half Year'"
+            "label": _("Location"),
+            "fieldname": "location",
+            "fieldtype": "Data",
+            "width": 150
         },
-
-        // ---------------- YEAR ----------------
+        # NEW COLUMN: Territory Code (before Territory Name)
         {
-            fieldname: "year",
-            label: __("Year"),
-            fieldtype: "Select",
-            options: ["2023", "2024", "2025", "2026"],
-            default: new Date().getFullYear().toString(),
-            reqd: 1
+            "label": _("Territory Code"),
+            "fieldname": "custom_territory",
+            "fieldtype": "Data",
+            "width": 120
         },
-
-        // ---------------- REGION ----------------
         {
-            fieldname: "custom_region",
-            label: __("Region"),
-            fieldtype: "Data"
+            "label": _("Territory Name"),
+            "fieldname": "custom_territory_name",
+            "fieldtype": "Data",
+            "width": 140
         },
-
-        // ---------------- LOCATION ----------------
         {
-            fieldname: "custom_location",
-            label: __("Location"),
-            fieldtype: "Data"
+            "label": _("Sales Person"),
+            "fieldname": "sales_person",
+            "fieldtype": "Link",
+            "options": "Sales Person",
+            "width": 180
         },
-
-        // ---------------- TERRITORY ----------------
         {
-            fieldname: "custom_territory_name",
-            label: __("Territory"),
-            fieldtype: "Data"
+            "label": _("Customer Name"),
+            "fieldname": "customer_name",
+            "fieldtype": "Data",
+            "width": 220
         },
-
-        // ---------------- HEAD SALES PERSON ----------------
         {
-            fieldname: "parent_sales_person",
-            label: __("Head Sales Person"),
-            fieldtype: "Link",
-            options: "Sales Person"
+            "label": _("Target"),
+            "fieldname": "target",
+            "fieldtype": "Currency",
+            "width": 130
         },
-
-        // ---------------- CUSTOMER ----------------
         {
-            fieldname: "customer",
-            label: __("Customer"),
-            fieldtype: "Link",
-            options: "Customer"
+            "label": _("Invoice Amount"),
+            "fieldname": "invoice_amount",
+            "fieldtype": "Currency",
+            "width": 150
+        },
+        {
+            "label": _("Achieved %"),
+            "fieldname": "achieved_pct",
+            "fieldtype": "Percent",
+            "width": 140
+        },
+        {
+            "label": _("Last Year Achievement"),
+            "fieldname": "last_year_amount",
+            "fieldtype": "Currency",
+            "width": 170
+        },
+        # Hidden columns for drill down data
+        {
+            "label": _("From Date"),
+            "fieldname": "from_date",
+            "fieldtype": "Date",
+            "hidden": 1
+        },
+        {
+            "label": _("To Date"),
+            "fieldname": "to_date",
+            "fieldtype": "Date",
+            "hidden": 1
         }
-    ],
+    ]
 
-    // Formatter for clickable invoice amounts
-    formatter: function(value, row, column, data, default_formatter) {
-        value = default_formatter(value, row, column, data);
+
+# --------------------------------------------------
+# FINANCIAL YEAR MONTH MAPPING
+# --------------------------------------------------
+def get_months(filters):
+    if filters.period_type == "Quarter":
+        q_map = {
+            "Q1": [4, 5, 6],    # Apr-Jun
+            "Q2": [7, 8, 9],    # Jul-Sep
+            "Q3": [10, 11, 12], # Oct-Dec
+            "Q4": [1, 2, 3],    # Jan-Mar
+        }
+        return q_map.get(filters.quarter, [4, 5, 6])
+
+    if filters.period_type == "Half Year":
+        return [4, 5, 6, 7, 8, 9] if filters.half_year == "H1" else [10, 11, 12, 1, 2, 3]
+
+    return [int(filters.month)]
+
+
+# --------------------------------------------------
+# DATE RANGE
+# --------------------------------------------------
+def get_date_range(filters):
+    months = get_months(filters)
+    year = int(filters.year)
+    
+    # Handle year transition for periods crossing calendar year
+    if max(months) < min(months):  # Period crosses year boundary (e.g., Oct-Mar)
+        # First part of period (Oct-Dec) in current year
+        from_date = get_first_day(f"{year}-{months[0]}-01")
         
-        if (column.fieldname == "invoice_amount" && data && data.customer_name !== "TOTAL" && data.invoice_amount > 0) {
-            value = `<a href="#" 
-                        data-customer="${data.customer_name}" 
-                        data-sales-person="${data.sales_person}"
-                        data-from-date="${data.from_date}" 
-                        data-to-date="${data.to_date}"
-                        onclick="show_invoice_details(event, '${data.customer_name}', '${data.sales_person}', '${data.from_date}', '${data.to_date}')"
-                        style="text-decoration: underline; color: #2490ef;">
-                        ${value}
-                    </a>`;
-        }
-        return value;
-    },
+        # Last part of period (Jan-Mar) in next year
+        to_date = get_last_day(f"{year + 1}-{months[-1]}-01")
+    else:
+        from_date = get_first_day(f"{year}-{months[0]}-01")
+        to_date = get_last_day(f"{year}-{months[-1]}-01")
+    
+    return from_date, to_date
 
-    onload: function(report) {
-        // Add custom CSS
-        const style = document.createElement('style');
-        style.innerHTML = `
-            .invoice-details-dialog .modal-dialog {
-                max-width: 80%;
-            }
-            .invoice-details-table {
-                max-height: 400px;
-                overflow-y: auto;
-            }
-            .invoice-details-table table {
-                margin-bottom: 0;
-            }
-            .invoice-details-table tfoot {
-                background-color: #f8f9fa;
-                font-weight: bold;
-            }
-            .invoice-link {
-                color: #2490ef;
-                text-decoration: none;
-            }
-            .invoice-link:hover {
-                text-decoration: underline;
-            }
-        `;
-        document.head.appendChild(style);
 
-        // Define the click handler globally
-        window.show_invoice_details = function(event, customer, sales_person, from_date, to_date) {
-            event.preventDefault();
-            
-            // Create dialog
-            const dialog = new frappe.ui.Dialog({
-                title: __('Invoice Details - {0}', [customer]),
-                size: 'large',
-                fields: [
-                    {
-                        fieldtype: 'HTML',
-                        fieldname: 'invoice_details',
-                        options: '<div class="text-muted text-center">Loading...</div>'
-                    }
-                ],
-                primary_action_label: __('Close'),
-                primary_action: function() {
-                    dialog.hide();
-                }
-            });
-            
-            dialog.show();
-            
-            // Fetch invoice details
-            frappe.call({
-                method: "vciplreportsv1001.vcipl1001.report.sales_person_report.sales_person_report.get_invoice_details",
-                args: {
-                    customer: customer,
-                    sales_person: sales_person,
-                    from_date: from_date,
-                    to_date: to_date
-                },
-                callback: function(response) {
-                    if (response.message && response.message.length > 0) {
-                        let html = build_invoice_table(response.message);
-                        dialog.fields_dict.invoice_details.$wrapper.html(html);
-                    } else {
-                        dialog.fields_dict.invoice_details.$wrapper.html(`
-                            <div class="alert alert-warning text-center">
-                                No invoices found for this period.
-                            </div>
-                        `);
-                    }
-                },
-                error: function(r) {
-                    dialog.fields_dict.invoice_details.$wrapper.html(`
-                        <div class="alert alert-danger text-center">
-                            Error loading invoice details: ${r.message}
-                        </div>
-                    `);
-                }
-            });
-        };
+# --------------------------------------------------
+# DATA - UPDATED TO INCLUDE TERRITORY CODE
+# --------------------------------------------------
+def get_data(filters):
 
-        // Helper function to build invoice table
-        function build_invoice_table(invoices) {
-            if (!invoices || invoices.length === 0) {
-                return '<div class="alert alert-info text-center">No invoices found</div>';
-            }
+    from_date, to_date = get_date_range(filters)
 
-            let total = 0;
-            let rows = '';
-            
-            invoices.forEach(inv => {
-                total += inv.amount;
-                rows += `
-                    <tr>
-                        <td>
-                            <a href="/app/sales-invoice/${inv.name}" 
-                               target="_blank" 
-                               class="invoice-link">
-                                ${inv.name}
-                            </a>
-                        </td>
-                        <td>${frappe.datetime.str_to_user(inv.posting_date)}</td>
-                        <td>${inv.customer}</td>
-                        <td class="text-right">${format_currency(inv.amount, inv.currency || 'INR')}</td>
-                        <td>
-                            <span class="indicator ${get_status_color(inv.status)}">
-                                ${__(inv.status)}
-                            </span>
-                        </td>
-                    </tr>
-                `;
-            });
+    ly_from = add_years(from_date, -1)
+    ly_to = add_years(to_date, -1)
 
-            return `
-                <div class="invoice-details-table">
-                    <table class="table table-bordered table-hover">
-                        <thead>
-                            <tr>
-                                <th>${__('Invoice No')}</th>
-                                <th>${__('Posting Date')}</th>
-                                <th>${__('Customer')}</th>
-                                <th class="text-right">${__('Amount')}</th>
-                                <th>${__('Status')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rows}
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <th colspan="3" class="text-right">${__('Total')}:</th>
-                                <th class="text-right">${format_currency(total)}</th>
-                                <th></th>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            `;
-        }
+    f_region = filters.get("custom_region")
+    f_location = filters.get("custom_location")
+    f_territory = filters.get("custom_territory_name")
+    f_parent = filters.get("parent_sales_person")
+    f_customer = filters.get("customer")
 
-        // Helper function for status colors
-        function get_status_color(status) {
-            const colors = {
-                'Paid': 'green',
-                'Unpaid': 'red',
-                'Overdue': 'orange',
-                'Draft': 'grey',
-                'Return': 'blue',
-                'Credit Note Issued': 'blue'
-            };
-            return colors[status] || 'grey';
-        }
+    # UPDATED: Added custom_territory to the SELECT query
+    sales_persons = frappe.db.sql("""
+        SELECT 
+            name, 
+            parent_sales_person, 
+            custom_head_sales_code,
+            custom_region, 
+            custom_location, 
+            custom_territory_name,
+            custom_territory  /* Added territory code field */
+        FROM `tabSales Person`
+        WHERE enabled = 1
+    """, as_dict=True)
 
-        // Helper function to format currency
-        function format_currency(amount, currency = 'INR') {
-            return frappe.format(amount, {fieldtype: 'Currency', currency: currency});
-        }
+    sp_map = {sp.name: sp for sp in sales_persons}
+
+    month_fields = {
+        1: "custom_january", 2: "custom_february", 3: "custom_march",
+        4: "custom_april", 5: "custom_may_", 6: "custom_june",
+        7: "custom_july", 8: "custom_august", 9: "custom_september",
+        10: "custom_october", 11: "custom_november", 12: "custom_december",
     }
-};
+
+    months = get_months(filters)
+    target_expr = " + ".join([f"COALESCE(st.{month_fields[m]},0)" for m in months])
+
+    targets = frappe.db.sql(f"""
+        SELECT
+            st.sales_person,
+            c.name AS customer,
+            c.customer_name,
+            ({target_expr}) AS target
+        FROM `tabSales Team` st
+        JOIN `tabCustomer` c ON c.name = st.parent
+        WHERE st.parenttype = 'Customer'
+    """, as_dict=True)
+
+    invoices = frappe.db.sql("""
+        SELECT customer, SUM(base_net_total) amount
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1
+          AND posting_date BETWEEN %(f)s AND %(t)s
+        GROUP BY customer
+    """, {"f": from_date, "t": to_date}, as_dict=True)
+
+    invoice_map = {i.customer: flt(i.amount) for i in invoices}
+
+    last_year = frappe.db.sql("""
+        SELECT customer, SUM(base_net_total) amount
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1
+          AND posting_date BETWEEN %(f)s AND %(t)s
+        GROUP BY customer
+    """, {"f": ly_from, "t": ly_to}, as_dict=True)
+
+    last_year_map = {i.customer: flt(i.amount) for i in last_year}
+
+    data = []
+    total_target = total_invoice = 0
+
+    for t in targets:
+        sp = sp_map.get(t.sales_person)
+        if not sp:
+            continue
+
+        if f_region and sp.custom_region != f_region:
+            continue
+        if f_location and sp.custom_location != f_location:
+            continue
+        if f_territory and sp.custom_territory_name != f_territory:
+            continue
+        if f_parent and sp.parent_sales_person != f_parent:
+            continue
+        if f_customer and t.customer != f_customer:
+            continue
+
+        parent_sp = sp_map.get(sp.parent_sales_person)
+
+        target = flt(t.target)
+        invoice = invoice_map.get(t.customer, 0)
+        achieved_pct = (invoice / target * 100) if target else 0
+
+        total_target += target
+        total_invoice += invoice
+
+        # UPDATED: Added custom_territory to the data dictionary
+        data.append({
+            "head_sales_person": sp.parent_sales_person,
+            "custom_head_sales_code": parent_sp.custom_head_sales_code if parent_sp else None,
+            "region": sp.custom_region,
+            "location": sp.custom_location,
+            "custom_territory": sp.custom_territory,  # Added territory code
+            "custom_territory_name": sp.custom_territory_name,
+            "sales_person": t.sales_person,
+            "customer_name": t.customer_name,
+            "target": target,
+            "invoice_amount": invoice,
+            "achieved_pct": round(achieved_pct, 2),
+            "last_year_amount": last_year_map.get(t.customer, 0),
+            "from_date": from_date,  # For drill down
+            "to_date": to_date        # For drill down
+        })
+
+    if data:
+        total_achieved_pct = (total_invoice / total_target * 100) if total_target else 0
+        data.append({
+            "customer_name": "<b>TOTAL</b>",
+            "target": total_target,
+            "invoice_amount": total_invoice,
+            "achieved_pct": round(total_achieved_pct, 2),
+            "indent": 0,
+            "bold": 1
+        })
+
+    return data
+
+
+# --------------------------------------------------
+# INVOICE DETAILS FOR DRILL DOWN
+# --------------------------------------------------
+@frappe.whitelist()
+def get_invoice_details(customer, sales_person=None, from_date=None, to_date=None):
+    """
+    Fetch invoice details for drill down
+    This method is called when clicking on invoice amount
+    """
+    try:
+        # Parse dates if they're strings
+        if from_date and isinstance(from_date, str):
+            from_date = from_date
+        if to_date and isinstance(to_date, str):
+            to_date = to_date
+        
+        # Build query conditions
+        conditions = ["si.docstatus = 1", "si.customer = %(customer)s"]
+        params = {"customer": customer}
+        
+        if from_date and to_date:
+            conditions.append("si.posting_date BETWEEN %(from_date)s AND %(to_date)s")
+            params["from_date"] = from_date
+            params["to_date"] = to_date
+        
+        # If sales person filter is applied, join with Sales Team
+        if sales_person:
+            conditions.append("""
+                EXISTS (
+                    SELECT 1 
+                    FROM `tabSales Team` st 
+                    WHERE st.parent = si.name 
+                        AND st.parenttype = 'Sales Invoice' 
+                        AND st.sales_person = %(sales_person)s
+                )
+            """)
+            params["sales_person"] = sales_person
+        
+        where_clause = " AND ".join(conditions)
+        
+        # Fetch invoice details
+        query = f"""
+            SELECT 
+                si.name,
+                si.posting_date,
+                si.customer,
+                si.base_net_total as amount,
+                si.currency,
+                si.status,
+                si.remarks
+            FROM `tabSales Invoice` si
+            WHERE {where_clause}
+            ORDER BY si.posting_date DESC
+        """
+        
+        invoices = frappe.db.sql(query, params, as_dict=True)
+        
+        # Format amounts
+        for inv in invoices:
+            inv.amount = flt(inv.amount)
+            # Add formatted date for display
+            inv.posting_date = getdate(inv.posting_date).strftime('%Y-%m-%d')
+        
+        return invoices
+        
+    except Exception as e:
+        frappe.log_error(
+            message=frappe.get_traceback(),
+            title="Sales Person Report - Invoice Details Error"
+        )
+        return {"error": str(e)}

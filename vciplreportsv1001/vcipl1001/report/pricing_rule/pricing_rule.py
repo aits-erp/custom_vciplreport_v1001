@@ -261,16 +261,10 @@ def get_data(filters):
     
     data = frappe.db.sql(query, values, as_dict=1)
     
-    # Format dates
+    # Format dates - IMPORTANT: Don't reformat dates, let them display as stored in database
     for row in data:
-        if row.valid_from:
-            row.valid_from = frappe.utils.formatdate(row.valid_from)
-        if row.valid_upto:
-            row.valid_upto = frappe.utils.formatdate(row.valid_upto)
-        if row.creation:
-            row.creation = frappe.utils.formatdate(row.creation)
-        if row.modified:
-            row.modified = frappe.utils.formatdate(row.modified)
+        # Don't format dates with frappe.utils.formatdate()
+        # Just ensure customer_name is set
         if not row.customer_name:
             row.customer_name = ""
     

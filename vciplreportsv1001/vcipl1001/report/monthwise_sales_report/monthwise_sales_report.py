@@ -25,7 +25,6 @@ def execute(filters=None):
     filters = filters or {}
 
     if not filters.get("year"):
-
         today = datetime.now()
 
         if today.month <= 3:
@@ -41,14 +40,12 @@ def execute(filters=None):
 
 def get_columns(filters):
 
-    columns = [
-        {
-            "label": "Customer",
-            "fieldname": "customer_name",
-            "fieldtype": "Data",
-            "width": 280
-        }
-    ]
+    columns = [{
+        "label": "Customer",
+        "fieldname": "customer_name",
+        "fieldtype": "Data",
+        "width": 250
+    }]
 
     selected_month = filters.get("month")
 
@@ -60,7 +57,7 @@ def get_columns(filters):
                 "label": label,
                 "fieldname": key,
                 "fieldtype": "Currency",
-                "width": 130
+                "width": 120
             })
 
     columns.append({
@@ -75,12 +72,12 @@ def get_columns(filters):
 
 def get_data(filters):
 
-    selected_year = filters.get("year")
+    year = filters.get("year")
     customer_group = filters.get("customer_group")
     customer = filters.get("customer")
 
-    from_date = f"{selected_year}-04-01"
-    to_date = f"{int(selected_year) + 1}-03-31"
+    from_date = f"{year}-04-01"
+    to_date = f"{int(year)+1}-03-31"
 
     conditions = ["si.docstatus = 1"]
 
@@ -102,7 +99,7 @@ def get_data(filters):
         FROM `tabSales Invoice` si
         WHERE {where_clause}
         AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
-        ORDER BY si.customer_name, si.posting_date
+        ORDER BY si.customer_name
     """, {
         "from_date": from_date,
         "to_date": to_date,
@@ -115,29 +112,29 @@ def get_data(filters):
 
     for inv in invoices:
 
-        customer_name = inv.customer_name
+        cust = inv.customer_name
         month_no = inv.month_no
         amount = flt(inv.amount)
 
-        if customer_name not in customer_data:
+        if cust not in customer_data:
 
-            customer_data[customer_name] = {
-                "customer_name": customer_name,
+            customer_data[cust] = {
+                "customer_name": cust,
                 "total": 0
             }
 
             for m_no, key, label in MONTHS:
-                customer_data[customer_name][key] = 0
-                customer_data[customer_name][f"{key}_drill"] = []
+                customer_data[cust][key] = 0
+                customer_data[cust][f"{key}_drill"] = []
 
         for m_no, key, label in MONTHS:
 
             if month_no == m_no:
 
-                customer_data[customer_name][key] += amount
-                customer_data[customer_name]["total"] += amount
+                customer_data[cust][key] += amount
+                customer_data[cust]["total"] += amount
 
-                customer_data[customer_name][f"{key}_drill"].append({
+                customer_data[cust][f"{key}_drill"].append({
                     "invoice": inv.invoice,
                     "date": str(inv.posting_date),
                     "amount": amount

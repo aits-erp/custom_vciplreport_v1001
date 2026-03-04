@@ -19,14 +19,11 @@ frappe.query_reports["Monthwise Sales Report"] = {
             options: (function () {
                 let years = [];
                 let current_year = new Date().getFullYear();
-
                 for (let y = current_year; y >= 2020; y--) {
                     years.push(y.toString());
                 }
-
-                return years;
-            })(),
-            reqd: 0
+                return years.join("\n");
+            })()
         },
         {
             fieldname: "month",
@@ -38,7 +35,7 @@ frappe.query_reports["Monthwise Sales Report"] = {
                 "July","August","September",
                 "October","November","December",
                 "January","February","March"
-            ]
+            ].join("\n")
         }
     ],
 
@@ -53,10 +50,14 @@ frappe.query_reports["Monthwise Sales Report"] = {
             year = year - 1;
         }
 
+        // set default filters
         report.set_filter_value("year", year.toString());
         report.set_filter_value("month", "");
 
-        report.refresh();
+        // force report execution
+        setTimeout(() => {
+            report.refresh();
+        }, 500);
     },
 
     formatter(value, row, column, data, default_formatter) {
@@ -87,10 +88,10 @@ frappe.query_reports["Monthwise Sales Report"] = {
             } catch(e) {
                 return value;
             }
+        }
 
-        } else if (data && data.is_total_row) {
-
-            return `<span style="font-weight:bold;">${value}</span>`;
+        if (data && data.is_total_row) {
+            return `<b>${value}</b>`;
         }
 
         return value;
@@ -98,33 +99,28 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
     show_drill_down(invoices, month, customer) {
 
-        if (!invoices || invoices.length === 0) {
-            frappe.msgprint(__("No Sales Invoices found"));
+        if (!invoices.length) {
+            frappe.msgprint("No invoices found");
             return;
         }
 
-        let total_amount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
+        let total = invoices.reduce((sum, inv) => sum + inv.amount, 0);
 
         let html = `
         <div style="max-height:500px;overflow:auto">
 
-        <h4 style="margin-bottom:15px;border-bottom:2px solid #1674E0;padding-bottom:10px;">
-        ${customer} - ${month}
-        <span style="float:right;color:#1674E0;">
-        Total: ${format_currency(total_amount)}
-        </span>
+        <h4>${customer} - ${month}
+        <span style="float:right">Total: ${format_currency(total)}</span>
         </h4>
 
         <table class="table table-bordered">
-
         <thead>
         <tr>
         <th>Sales Invoice</th>
         <th>Date</th>
-        <th style="text-align:right;">Amount</th>
+        <th style="text-align:right">Amount</th>
         </tr>
         </thead>
-
         <tbody>
         `;
 
@@ -132,43 +128,27 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
             html += `
             <tr>
-
             <td>
             <a href="/app/sales-invoice/${inv.invoice}" target="_blank">
             ${inv.invoice}
             </a>
             </td>
-
             <td>${frappe.datetime.str_to_user(inv.date)}</td>
-
-            <td style="text-align:right">
-            ${format_currency(inv.amount)}
-            </td>
-
+            <td style="text-align:right">${format_currency(inv.amount)}</td>
             </tr>
             `;
         });
 
         html += `
         </tbody>
-
-        <tfoot>
-        <tr>
-        <td colspan="2" style="text-align:right"><b>Total</b></td>
-        <td style="text-align:right"><b>${format_currency(total_amount)}</b></td>
-        </tr>
-        </tfoot>
-
         </table>
         </div>
         `;
 
         frappe.msgprint({
-            title: __("Invoice Details"),
+            title: "Invoice Details",
             message: html,
             wide: true
         });
-
     }
-
 };

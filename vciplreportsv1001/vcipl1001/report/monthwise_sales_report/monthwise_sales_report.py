@@ -24,7 +24,9 @@ def execute(filters=None):
 
     filters = filters or {}
 
+    # default financial year
     if not filters.get("year"):
+
         today = datetime.now()
 
         if today.month <= 3:
@@ -44,7 +46,7 @@ def get_columns(filters):
         "label": "Customer",
         "fieldname": "customer_name",
         "fieldtype": "Data",
-        "width": 250
+        "width": 260
     }]
 
     selected_month = filters.get("month")
@@ -77,7 +79,7 @@ def get_data(filters):
     customer = filters.get("customer")
 
     from_date = f"{year}-04-01"
-    to_date = f"{int(year) + 1}-03-31"
+    to_date = f"{int(year)+1}-03-31"
 
     conditions = ["si.docstatus = 1"]
 

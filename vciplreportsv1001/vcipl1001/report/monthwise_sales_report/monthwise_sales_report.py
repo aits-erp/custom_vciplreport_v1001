@@ -77,7 +77,7 @@ def get_data(filters):
     customer = filters.get("customer")
 
     from_date = f"{year}-04-01"
-    to_date = f"{int(year)+1}-03-31"
+    to_date = f"{int(year) + 1}-03-31"
 
     conditions = ["si.docstatus = 1"]
 

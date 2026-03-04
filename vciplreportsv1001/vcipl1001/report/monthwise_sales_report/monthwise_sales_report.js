@@ -6,7 +6,8 @@ frappe.query_reports["Monthwise Sales Report"] = {
             fieldname: "customer_group",
             label: __("Customer Group"),
             fieldtype: "Link",
-            options: "Customer Group"
+            options: "Customer Group",
+            default: "Debtors Distributors"
         },
 
         {
@@ -18,7 +19,7 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
         {
             fieldname: "year",
-            label: __("Year"),
+            label: __("Financial Year"),
             fieldtype: "Select",
             options: (function () {
 
@@ -31,7 +32,8 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
                 return years.join("\n");
 
-            })()
+            })(),
+            reqd: 0
         },
 
         {
@@ -49,24 +51,23 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
     ],
 
+
     onload: function(report) {
 
         let today = new Date();
         let year = today.getFullYear();
         let month = today.getMonth() + 1;
 
-        // Financial Year logic
+        // Financial Year Logic
         if (month <= 3) {
             year = year - 1;
         }
 
         report.set_filter_value("year", year.toString());
-        report.set_filter_value("month", "");
 
-        // auto run report
         setTimeout(() => {
             report.refresh();
-        }, 400);
+        }, 500);
     },
 
 
@@ -86,12 +87,12 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
                 let drill_data = JSON.parse(data[column.fieldname + "_drill"]);
 
-                if (drill_data.length > 0) {
+                if (drill_data && drill_data.length > 0) {
 
-                    return `<a style="font-weight:bold;color:#1674E0;text-decoration:underline;cursor:pointer"
-                    onclick='frappe.query_reports["Monthwise Sales Report"]
-                    .show_drill_down(${JSON.stringify(drill_data)}, "${column.label}", "${data.customer_name}")'>
-                    ${value}
+                    return `<a style="font-weight:bold;color:#1674E0;cursor:pointer;text-decoration:underline;"
+                        onclick='frappe.query_reports["Monthwise Sales Report"]
+                        .show_drill_down(${JSON.stringify(drill_data)}, "${column.label}", "${data.customer_name}")'>
+                        ${value}
                     </a>`;
                 }
 
@@ -100,8 +101,8 @@ frappe.query_reports["Monthwise Sales Report"] = {
             }
         }
 
-        if (data && data.is_total_row) {
-            return `<b>${value}</b>`;
+        else if (data && data.is_total_row) {
+            return `<span style="font-weight:bold;">${value}</span>`;
         }
 
         return value;
@@ -110,73 +111,64 @@ frappe.query_reports["Monthwise Sales Report"] = {
 
     show_drill_down(invoices, month, customer) {
 
-        if (!invoices.length) {
-            frappe.msgprint("No invoices found");
+        if (!invoices || invoices.length === 0) {
+            frappe.msgprint(__("No Sales Invoices for this period"));
             return;
         }
 
-        let total = invoices.reduce((sum, inv) => sum + inv.amount, 0);
+        let total_amount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
 
         let html = `
         <div style="max-height:500px;overflow:auto">
+            <h4 style="margin-bottom:15px; padding-bottom:10px; border-bottom:2px solid #1674E0;">
+                ${customer} - ${month}
+                <span style="float:right; color:#1674E0; background:#e8f0fe; padding:5px 10px; border-radius:4px;">
+                    Total: ${format_currency(total_amount)}
+                </span>
+            </h4>
+            <table class="table table-bordered table-hover">
+                <thead style="background-color:#f0f0f0;">
+                    <tr>
+                        <th style="width:40%;">Sales Invoice</th>
+                        <th style="width:30%;">Date</th>
+                        <th style="width:30%; text-align:right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>`;
 
-        <h4>${customer} - ${month}
-        <span style="float:right">Total: ${format_currency(total)}</span>
-        </h4>
-
-        <table class="table table-bordered">
-
-        <thead>
-        <tr>
-        <th>Sales Invoice</th>
-        <th>Date</th>
-        <th style="text-align:right">Amount</th>
-        </tr>
-        </thead>
-
-        <tbody>
-        `;
-
-        invoices.forEach(inv => {
+        invoices.forEach((inv, index) => {
 
             html += `
-            <tr>
-            <td>
-            <a href="/app/sales-invoice/${inv.invoice}" target="_blank">
-            ${inv.invoice}
-            </a>
-            </td>
-
-            <td>${frappe.datetime.str_to_user(inv.date)}</td>
-
-            <td style="text-align:right">
-            ${format_currency(inv.amount)}
-            </td>
-
-            </tr>
-            `;
+            <tr ${index % 2 === 0 ? 'style="background-color:#fafafa;"' : ''}>
+                <td>
+                    <a href="/app/sales-invoice/${inv.invoice}"
+                       target="_blank"
+                       style="font-weight:500; color:#1674E0; text-decoration:none;">
+                       ${inv.invoice}
+                    </a>
+                </td>
+                <td>${frappe.datetime.str_to_user(inv.date)}</td>
+                <td style="text-align:right; font-weight:500;">${format_currency(inv.amount)}</td>
+            </tr>`;
         });
 
         html += `
-        </tbody>
-
-        <tfoot>
-        <tr>
-        <td colspan="2" style="text-align:right"><b>Total</b></td>
-        <td style="text-align:right"><b>${format_currency(total)}</b></td>
-        </tr>
-        </tfoot>
-
-        </table>
-        </div>
-        `;
+                </tbody>
+                <tfoot style="background-color:#e8e8e8; font-weight:bold;">
+                    <tr>
+                        <td colspan="2" style="text-align:right;">Total:</td>
+                        <td style="text-align:right; color:#1674E0;">${format_currency(total_amount)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>`;
 
         frappe.msgprint({
-            title: "Invoice Details",
+            title: __("Invoice Details: {0} - {1}", [customer, month]),
             message: html,
-            wide: true
+            wide: true,
+            indicator: "green"
         });
-
     }
 
 };

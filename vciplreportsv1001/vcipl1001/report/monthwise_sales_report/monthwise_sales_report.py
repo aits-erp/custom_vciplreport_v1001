@@ -2,7 +2,7 @@ import frappe
 from frappe.utils import flt
 import json
 from datetime import datetime
-## comment
+
 
 MONTHS = [
     (4, "apr", "April"),
@@ -24,7 +24,6 @@ def execute(filters=None):
 
     filters = filters or {}
 
-    # default financial year
     if not filters.get("year"):
 
         today = datetime.now()
@@ -46,7 +45,7 @@ def get_columns(filters):
         "label": "Customer",
         "fieldname": "customer_name",
         "fieldtype": "Data",
-        "width": 260
+        "width": 280
     }]
 
     selected_month = filters.get("month")
@@ -59,14 +58,14 @@ def get_columns(filters):
                 "label": label,
                 "fieldname": key,
                 "fieldtype": "Currency",
-                "width": 120
+                "width": 130
             })
 
     columns.append({
         "label": "Total",
         "fieldname": "total",
         "fieldtype": "Currency",
-        "width": 150
+        "width": 160
     })
 
     return columns
@@ -74,12 +73,13 @@ def get_columns(filters):
 
 def get_data(filters):
 
-    year = filters.get("year")
+    selected_year = filters.get("year")
+    selected_month = filters.get("month")
     customer_group = filters.get("customer_group")
     customer = filters.get("customer")
 
-    from_date = f"{year}-04-01"
-    to_date = f"{int(year)+1}-03-31"
+    from_date = f"{selected_year}-04-01"
+    to_date = f"{int(selected_year) + 1}-03-31"
 
     conditions = ["si.docstatus = 1"]
 
@@ -95,13 +95,14 @@ def get_data(filters):
         SELECT
             si.name AS invoice,
             si.customer_name,
+            si.customer,
             si.posting_date,
             si.grand_total AS amount,
-            MONTH(si.posting_date) AS month_no
+            MONTH(si.posting_date) as month_no
         FROM `tabSales Invoice` si
         WHERE {where_clause}
         AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
-        ORDER BY si.customer_name
+        ORDER BY si.customer_name, si.posting_date
     """, {
         "from_date": from_date,
         "to_date": to_date,
@@ -114,29 +115,29 @@ def get_data(filters):
 
     for inv in invoices:
 
-        cust = inv.customer_name
+        customer_name = inv.customer_name
         month_no = inv.month_no
         amount = flt(inv.amount)
 
-        if cust not in customer_data:
+        if customer_name not in customer_data:
 
-            customer_data[cust] = {
-                "customer_name": cust,
+            customer_data[customer_name] = {
+                "customer_name": customer_name,
                 "total": 0
             }
 
             for m_no, key, label in MONTHS:
-                customer_data[cust][key] = 0
-                customer_data[cust][f"{key}_drill"] = []
+                customer_data[customer_name][key] = 0
+                customer_data[customer_name][f"{key}_drill"] = []
 
         for m_no, key, label in MONTHS:
 
             if month_no == m_no:
 
-                customer_data[cust][key] += amount
-                customer_data[cust]["total"] += amount
+                customer_data[customer_name][key] += amount
+                customer_data[customer_name]["total"] += amount
 
-                customer_data[cust][f"{key}_drill"].append({
+                customer_data[customer_name][f"{key}_drill"].append({
                     "invoice": inv.invoice,
                     "date": str(inv.posting_date),
                     "amount": amount

@@ -3,7 +3,7 @@ from frappe.utils import flt
 import json
 from datetime import datetime
 
-//changes
+
 MONTHS = [
     (4, "apr", "April"),
     (5, "may", "May"),
@@ -24,7 +24,6 @@ def execute(filters=None):
 
     filters = filters or {}
 
-    # Default Financial Year
     if not filters.get("year"):
 
         today = datetime.now()
@@ -39,11 +38,6 @@ def execute(filters=None):
 
     return columns, data
 
-
-
-# --------------------------
-# COLUMNS
-# --------------------------
 
 def get_columns(filters):
 
@@ -79,11 +73,6 @@ def get_columns(filters):
     return columns
 
 
-
-# --------------------------
-# DATA
-# --------------------------
-
 def get_data(filters):
 
     selected_year = filters.get("year")
@@ -91,7 +80,7 @@ def get_data(filters):
     customer = filters.get("customer")
 
     from_date = f"{selected_year}-04-01"
-    to_date = f"{int(selected_year)+1}-03-31"
+    to_date = f"{int(selected_year) + 1}-03-31"
 
     conditions = ["si.docstatus = 1"]
 
@@ -104,119 +93,88 @@ def get_data(filters):
     where_clause = " AND ".join(conditions)
 
     invoices = frappe.db.sql(f"""
-
         SELECT
             si.name AS invoice,
             si.customer_name,
             si.posting_date,
             si.grand_total AS amount,
             MONTH(si.posting_date) AS month_no
-
         FROM `tabSales Invoice` si
-
         WHERE {where_clause}
         AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
-
         ORDER BY si.customer_name, si.posting_date
-
-    """,{
-
+    """, {
         "from_date": from_date,
         "to_date": to_date,
         "customer_group": customer_group,
         "customer": customer
-
-    },as_dict=True)
-
-
+    }, as_dict=True)
 
     customer_data = {}
-    month_totals = {key:0 for _,key,_ in MONTHS}
-
-
+    month_totals = {key: 0 for _, key, _ in MONTHS}
 
     for inv in invoices:
 
-        customer = inv.customer_name
+        customer_name = inv.customer_name
         month_no = inv.month_no
         amount = flt(inv.amount)
 
+        if customer_name not in customer_data:
 
-        if customer not in customer_data:
-
-            customer_data[customer] = {
-                "customer_name": customer,
-                "total":0
+            customer_data[customer_name] = {
+                "customer_name": customer_name,
+                "total": 0
             }
 
-            for m_no,key,label in MONTHS:
+            for m_no, key, label in MONTHS:
+                customer_data[customer_name][key] = 0
+                customer_data[customer_name][f"{key}_drill"] = []
 
-                customer_data[customer][key] = 0
-                customer_data[customer][f"{key}_drill"] = []
-
-
-        for m_no,key,label in MONTHS:
+        for m_no, key, label in MONTHS:
 
             if month_no == m_no:
 
-                customer_data[customer][key] += amount
-                customer_data[customer]["total"] += amount
+                customer_data[customer_name][key] += amount
+                customer_data[customer_name]["total"] += amount
 
-                customer_data[customer][f"{key}_drill"].append({
-
-                    "invoice":inv.invoice,
-                    "date":str(inv.posting_date),
-                    "amount":amount
-
+                customer_data[customer_name][f"{key}_drill"].append({
+                    "invoice": inv.invoice,
+                    "date": str(inv.posting_date),
+                    "amount": amount
                 })
 
                 month_totals[key] += amount
-
                 break
-
-
 
     result = []
 
-
-    for cust,data in customer_data.items():
+    for cust, data in customer_data.items():
 
         row = {
-            "customer_name":cust,
-            "total":data["total"]
+            "customer_name": cust,
+            "total": data["total"]
         }
 
-        for m_no,key,label in MONTHS:
-
+        for m_no, key, label in MONTHS:
             row[key] = data[key]
             row[f"{key}_drill"] = json.dumps(data[f"{key}_drill"])
 
-
         result.append(row)
 
-
-
-    result.sort(key=lambda x:x["customer_name"])
-
-
+    result.sort(key=lambda x: x["customer_name"])
 
     if result:
 
         summary = {
-
-            "customer_name":"<b>GRAND TOTAL</b>",
-            "is_total_row":1,
-            "total":sum(x["total"] for x in result)
-
+            "customer_name": "<b>GRAND TOTAL</b>",
+            "is_total_row": 1,
+            "total": sum(x["total"] for x in result)
         }
 
-        for m_no,key,label in MONTHS:
-
+        for m_no, key, label in MONTHS:
             summary[key] = month_totals[key]
             summary[f"{key}_drill"] = json.dumps([])
 
-
         result.append(summary)
-
 
     return result

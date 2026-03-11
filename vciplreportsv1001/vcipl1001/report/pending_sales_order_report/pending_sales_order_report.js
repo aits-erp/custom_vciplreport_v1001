@@ -116,21 +116,85 @@ window.print_pending_popup = function () {
 
     let content = document.getElementById("pending-popup").innerHTML;
 
-    let w = window.open("", "", "width=900,height=700");
+    let w = window.open("", "", "width=1200,height=800");
+
     w.document.write(`
         <html>
         <head>
             <title>Pending Items</title>
+
             <style>
-                body { font-family: Arial; padding: 20px; }
-                table { border-collapse: collapse; width: 100%; }
-                table, th, td { border: 1px solid black; padding: 6px; }
+
+                body{
+                    font-family: Arial, sans-serif;
+                    padding:20px;
+                    width:100%;
+                }
+
+                h4,h5{
+                    margin:4px 0;
+                }
+
+                table{
+                    border-collapse:collapse;
+                    width:100%;
+                    font-size:14px;
+                }
+
+                table, th, td{
+                    border:1px solid #000;
+                }
+
+                th,td{
+                    padding:8px;
+                    text-align:left;
+                }
+
+                th{
+                    background:#f2f2f2;
+                }
+
+                button{
+                    display:none;
+                }
+
+                @media print{
+                    body{
+                        margin:0;
+                    }
+
+                    table{
+                        width:100%;
+                        page-break-inside:auto;
+                    }
+
+                    tr{
+                        page-break-inside:avoid;
+                        page-break-after:auto;
+                    }
+
+                    thead{
+                        display:table-header-group;
+                    }
+                }
+
             </style>
+
         </head>
-        <body>${content}</body>
+
+        <body>
+            ${content}
+        </body>
+
         </html>
     `);
 
     w.document.close();
-    w.print();
+
+    w.focus();
+
+    setTimeout(function(){
+        w.print();
+    },500);
+
 };

@@ -114,11 +114,20 @@ frappe.query_reports["Pending Sales Order Report"] = {
 
 window.print_pending_popup = function () {
 
-    let content = document.getElementById("pending-popup").innerHTML;
+    let popup = document.getElementById("pending-popup").cloneNode(true);
 
-    let w = window.open("", "", "width=1200,height=800");
+    // remove print button before printing
+    let btn = popup.querySelector("button");
+    if (btn) btn.remove();
+
+    let content = popup.outerHTML;
+
+    let w = window.open("", "_blank", "width=1200,height=800");
+
+    w.document.open();
 
     w.document.write(`
+        <!DOCTYPE html>
         <html>
         <head>
             <title>Pending Items</title>
@@ -127,38 +136,37 @@ window.print_pending_popup = function () {
 
                 body{
                     font-family: Arial, sans-serif;
-                    padding:20px;
-                    width:100%;
+                    margin:20px;
                 }
 
-                h4,h5{
-                    margin:4px 0;
+                h4{
+                    margin-bottom:5px;
+                }
+
+                h5{
+                    margin-top:0;
+                    margin-bottom:15px;
                 }
 
                 table{
-                    border-collapse:collapse;
                     width:100%;
-                    font-size:14px;
+                    border-collapse:collapse;
+                    table-layout:fixed;
                 }
 
-                table, th, td{
-                    border:1px solid #000;
-                }
-
-                th,td{
+                th, td{
+                    border:1px solid black;
                     padding:8px;
                     text-align:left;
+                    word-wrap:break-word;
                 }
 
                 th{
                     background:#f2f2f2;
                 }
 
-                button{
-                    display:none;
-                }
-
                 @media print{
+
                     body{
                         margin:0;
                     }
@@ -176,6 +184,7 @@ window.print_pending_popup = function () {
                     thead{
                         display:table-header-group;
                     }
+
                 }
 
             </style>
@@ -183,18 +192,17 @@ window.print_pending_popup = function () {
         </head>
 
         <body>
-            ${content}
-        </body>
 
+        ${content}
+
+        </body>
         </html>
     `);
 
     w.document.close();
 
-    w.focus();
-
-    setTimeout(function(){
+    w.onload = function () {
+        w.focus();
         w.print();
-    },500);
-
+    };
 };

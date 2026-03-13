@@ -89,6 +89,8 @@ def get_data(filters):
         LEFT JOIN `tabSales Person` sp
         ON sp.name = st.sales_person
 
+        WHERE st.parenttype = 'Customer'
+
     """, as_dict=True)
 
     data = []
@@ -97,7 +99,7 @@ def get_data(filters):
 
         for month_no, month_name, field in months:
 
-            target = row.get(field) or 0
+            target = float(row.get(field) or 0)
 
             achieved = frappe.db.sql(f"""
 
@@ -129,11 +131,10 @@ def get_data(filters):
                 "parent_sales_person": filters.get("parent_sales_person")
             })
 
-            achieved = achieved[0][0] or 0
+            achieved = float(achieved[0][0] or 0)
 
             percentage = 0
-
-            if target:
+            if target > 0:
                 percentage = (achieved / target) * 100
 
             data.append({

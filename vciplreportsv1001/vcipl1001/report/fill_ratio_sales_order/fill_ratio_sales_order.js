@@ -1,56 +1,33 @@
-// Auto Financial Year calculation (Apr → Mar)
-function get_default_fy_dates() {
-    const today = frappe.datetime.get_today();
-    const d = frappe.datetime.str_to_obj(today);
-
-    let fy_start, fy_end;
-
-    if ((d.getMonth() + 1) > 3) {
-        fy_start = `${d.getFullYear()}-04-01`;
-        fy_end = `${d.getFullYear() + 1}-03-31`;
-    } else {
-        fy_start = `${d.getFullYear() - 1}-04-01`;
-        fy_end = `${d.getFullYear()}-03-31`;
-    }
-
-    return { fy_start, fy_end };
-}
-
-const fy = get_default_fy_dates();
-
 frappe.query_reports["FILL RATIO SALES ORDER"] = {
 
     filters: [
 
-		{
-		    fieldname: "company",
-		    label: __("Company"),
-		    fieldtype: "Link",
-		    options: "Company",
-		    default: frappe.defaults.get_user_default("Company"),
-		    reqd: 1
-		},
+        {
+            fieldname: "company",
+            label: __("Company"),
+            fieldtype: "Link",
+            options: "Company",
+            default: frappe.defaults.get_user_default("Company"),
+            reqd: 1
+        },
 
         {
             fieldname: "from_date",
             label: __("From Date"),
-            fieldtype: "Date",
-            default: fy.fy_start
+            fieldtype: "Date"
         },
 
         {
             fieldname: "to_date",
             label: __("To Date"),
-            fieldtype: "Date",
-            default: fy.fy_end
+            fieldtype: "Date"
         },
 
         {
             fieldname: "risk_filter",
             label: __("Risk Level"),
             fieldtype: "Select",
-            options: ["", "HIGH", "Medium", "OK"],
-            default: ""
+            options: ["", "HIGH", "Medium", "OK"]
         }
 
     ],
@@ -61,32 +38,65 @@ frappe.query_reports["FILL RATIO SALES ORDER"] = {
 
         if (!data) return value;
 
-        if (column.fieldname === "risk") {
+        // Clickable Available Qty
+        if (column.fieldname === "available_qty") {
 
-            if (data.risk === "Critical") {
-                value = `<span style="color:red;font-weight:bold">🔴 HIGH</span>`;
-            }
-
-            if (data.risk === "Warning") {
-                value = `<span style="color:orange;font-weight:bold">🟠 Medium</span>`;
-            }
-
-            if (data.risk === "OK") {
-                value = `<span style="color:green;font-weight:bold">🟢 OK</span>`;
-            }
-        }
-
-        if (column.fieldname === "fill_ratio") {
-
-            if (data.fill_ratio < 50) {
-                value = `<span style="color:red;font-weight:bold">${data.fill_ratio}%</span>`;
-            } else if (data.fill_ratio < 80) {
-                value = `<span style="color:orange;font-weight:bold">${data.fill_ratio}%</span>`;
-            } else {
-                value = `<span style="color:green;font-weight:bold">${data.fill_ratio}%</span>`;
-            }
+            value = `<a href="#" class="view-stock"
+                        data-item="${data.item_code}">
+                        ${data.available_qty || 0}
+                    </a>`;
         }
 
         return value;
     }
 };
+
+
+// -------- WAREHOUSE POPUP --------
+
+$(document).on("click", ".view-stock", function (e) {
+
+    e.preventDefault();
+
+    const item_code = $(this).data("item");
+
+    frappe.call({
+        method: "frappe.client.get_list",
+        args: {
+            doctype: "Bin",
+            filters: { item_code: item_code },
+            fields: ["warehouse", "actual_qty"]
+        },
+
+        callback: function (r) {
+
+            const rows = r.message || [];
+
+            let html = `
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Warehouse</th>
+                        <th>Stock Qty</th>
+                    </tr>`;
+
+            rows.forEach(row => {
+
+                html += `
+                    <tr>
+                        <td>${row.warehouse}</td>
+                        <td>${row.actual_qty}</td>
+                    </tr>`;
+            });
+
+            html += "</table>";
+
+            frappe.msgprint({
+                title: "Warehouse Stock",
+                message: html,
+                wide: true
+            });
+
+        }
+    });
+
+});

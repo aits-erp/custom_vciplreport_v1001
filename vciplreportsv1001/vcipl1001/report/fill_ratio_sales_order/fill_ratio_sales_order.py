@@ -9,7 +9,7 @@ def execute(filters=None):
     if not filters:
         filters = {}
 
-    # ✅ Default Financial Year (Apr → Mar)
+    # Default Financial Year
     today = date.today()
     fy_year = today.year if today.month > 3 else today.year - 1
 
@@ -19,7 +19,6 @@ def execute(filters=None):
     if not filters.get("to_date"):
         filters["to_date"] = date(fy_year + 1, 3, 31)
 
-    # ✅ Default Company
     if not filters.get("company"):
         filters["company"] = "Vinod Cookware India Private Limited"
 
@@ -61,24 +60,23 @@ def get_data(filters):
             SUM(soi.qty - soi.delivered_qty) as total_pending,
             COUNT(DISTINCT so.name) as order_count,
 
-            COALESCE(SUM(bin.actual_qty),0) as available_qty
+            (
+                SELECT SUM(actual_qty)
+                FROM `tabBin`
+                WHERE item_code = soi.item_code
+            ) as available_qty
 
         FROM `tabSales Order` so
 
-        INNER JOIN `tabSales Order Item` soi 
+        INNER JOIN `tabSales Order Item` soi
             ON soi.parent = so.name
-
-        LEFT JOIN `tabBin` bin 
-            ON bin.item_code = soi.item_code
 
         WHERE so.docstatus = 1
         AND so.status NOT IN ('Completed','Closed','Stopped','On Hold')
         {conditions}
 
         GROUP BY soi.item_code
-
         HAVING total_pending > 0
-
         ORDER BY total_pending DESC
 
     """, filters, as_dict=True)
@@ -121,7 +119,6 @@ def get_data(filters):
 def get_columns():
 
     return [
-
         {"label": _("Item Code"), "fieldname": "item_code", "width": 140},
 
         {"label": _("Item Name"), "fieldname": "item_name", "width": 220},

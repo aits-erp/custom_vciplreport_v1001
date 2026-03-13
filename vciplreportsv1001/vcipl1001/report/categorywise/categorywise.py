@@ -13,7 +13,11 @@ def get_columns():
 
     return [
 
-        {"label": "Month", "fieldname": "month", "fieldtype": "Data", "width": 110},
+        {"label": "Month", "fieldname": "month", "fieldtype": "Data", "width": 100},
+
+        {"label": "Main Group", "fieldname": "main_group", "fieldtype": "Data", "width": 160},
+
+        {"label": "Parent Sales Person", "fieldname": "parent_sales_person", "fieldtype": "Data", "width": 200},
 
         {"label": "Customer", "fieldname": "customer", "fieldtype": "Link", "options": "Customer", "width": 200},
 
@@ -23,15 +27,15 @@ def get_columns():
 
         {"label": "Location", "fieldname": "location", "fieldtype": "Data", "width": 130},
 
-        {"label": "Territory", "fieldname": "territory", "fieldtype": "Data", "width": 170},
+        {"label": "Territory", "fieldname": "territory", "fieldtype": "Data", "width": 160},
 
-        {"label": "Head Sales Code", "fieldname": "head_sales", "fieldtype": "Data", "width": 140},
+        {"label": "Head Sales Code", "fieldname": "head_sales", "fieldtype": "Data", "width": 130},
 
         {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 120},
 
         {"label": "Achieved", "fieldname": "achieved", "fieldtype": "Currency", "width": 120},
 
-        {"label": "Achieved %", "fieldname": "percentage", "fieldtype": "Percent", "width": 120}
+        {"label": "Achieved %", "fieldname": "percentage", "fieldtype": "Percent", "width": 110}
 
     ]
 
@@ -85,9 +89,7 @@ def get_data(filters):
             sp.custom_head_sales_code
 
         FROM `tabSales Team` st
-
-        LEFT JOIN `tabSales Person` sp
-        ON sp.name = st.sales_person
+        LEFT JOIN `tabSales Person` sp ON sp.name = st.sales_person
 
         WHERE st.parenttype = 'Customer'
 
@@ -101,55 +103,55 @@ def get_data(filters):
 
             target = float(row.get(field) or 0)
 
-            achieved = frappe.db.sql(f"""
+            achieved_data = frappe.db.sql(f"""
 
-                SELECT SUM(sii.base_net_amount)
+                SELECT
+                    SUM(sii.base_net_amount) as achieved,
+                    item.custom_main_group
 
                 FROM `tabSales Invoice` si
-
-                JOIN `tabSales Invoice Item` sii
-                ON sii.parent = si.name
-
-                JOIN `tabItem` item
-                ON item.name = sii.item_code
-
-                JOIN `tabSales Team` st
-                ON st.parent = si.name
-
-                JOIN `tabSales Person` sp
-                ON sp.name = st.sales_person
+                JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+                JOIN `tabItem` item ON item.name = sii.item_code
+                JOIN `tabSales Team` st ON st.parent = si.name
+                JOIN `tabSales Person` sp ON sp.name = st.sales_person
 
                 WHERE si.docstatus = 1
                 AND st.sales_person = %(sales_person)s
                 AND MONTH(si.posting_date) = %(month)s
                 {conditions}
 
+                GROUP BY item.custom_main_group
+
             """, {
                 "sales_person": row.sales_person,
                 "month": month_no,
                 "custom_main_group": filters.get("custom_main_group"),
                 "parent_sales_person": filters.get("parent_sales_person")
-            })
+            }, as_dict=True)
 
-            achieved = float(achieved[0][0] or 0)
+            for d in achieved_data:
 
-            percentage = 0
-            if target > 0:
-                percentage = (achieved / target) * 100
+                achieved = float(d.achieved or 0)
 
-            data.append({
+                percentage = 0
+                if target > 0:
+                    percentage = (achieved / target) * 100
 
-                "month": month_name,
-                "customer": row.customer,
-                "sales_person": row.sales_person,
-                "region": row.custom_region,
-                "location": row.custom_location,
-                "territory": row.custom_territory_name,
-                "head_sales": row.custom_head_sales_code,
-                "target": target,
-                "achieved": achieved,
-                "percentage": percentage
+                data.append({
 
-            })
+                    "month": month_name,
+                    "main_group": d.custom_main_group,
+                    "parent_sales_person": row.parent_sales_person,
+                    "customer": row.customer,
+                    "sales_person": row.sales_person,
+                    "region": row.custom_region,
+                    "location": row.custom_location,
+                    "territory": row.custom_territory_name,
+                    "head_sales": row.custom_head_sales_code,
+                    "target": target,
+                    "achieved": achieved,
+                    "percentage": percentage
+
+                })
 
     return data

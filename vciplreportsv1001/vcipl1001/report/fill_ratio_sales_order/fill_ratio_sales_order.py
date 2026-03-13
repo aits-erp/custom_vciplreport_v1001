@@ -59,15 +59,28 @@ def get_data(filters):
             SUM(soi.qty) as total_ordered,
             SUM(soi.delivered_qty) as total_delivered,
             SUM(soi.qty - soi.delivered_qty) as total_pending,
-            COUNT(DISTINCT so.name) as order_count
+            COUNT(DISTINCT so.name) as order_count,
+
+            COALESCE(SUM(bin.actual_qty),0) as available_qty
+
         FROM `tabSales Order` so
-        INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+
+        INNER JOIN `tabSales Order Item` soi 
+            ON soi.parent = so.name
+
+        LEFT JOIN `tabBin` bin 
+            ON bin.item_code = soi.item_code
+
         WHERE so.docstatus = 1
         AND so.status NOT IN ('Completed','Closed','Stopped','On Hold')
         {conditions}
+
         GROUP BY soi.item_code
+
         HAVING total_pending > 0
+
         ORDER BY total_pending DESC
+
     """, filters, as_dict=True)
 
     filtered_data = []
@@ -108,12 +121,18 @@ def get_data(filters):
 def get_columns():
 
     return [
+
         {"label": _("Item Code"), "fieldname": "item_code", "width": 140},
+
         {"label": _("Item Name"), "fieldname": "item_name", "width": 220},
 
         {"label": _("Total Ordered"), "fieldname": "total_ordered", "fieldtype": "Float"},
+
         {"label": _("Delivered"), "fieldname": "total_delivered", "fieldtype": "Float"},
+
         {"label": _("Pending"), "fieldname": "total_pending", "fieldtype": "Float"},
+
+        {"label": _("Available Qty"), "fieldname": "available_qty", "fieldtype": "Float", "width": 130},
 
         {"label": _("Fill %"), "fieldname": "fill_ratio", "fieldtype": "Percent"},
 

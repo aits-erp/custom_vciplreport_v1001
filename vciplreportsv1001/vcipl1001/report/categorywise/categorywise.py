@@ -1,5 +1,4 @@
 import frappe
-from frappe.utils import getdate
 
 
 def execute(filters=None):
@@ -12,31 +11,29 @@ def execute(filters=None):
 
 def get_columns():
 
-    columns = [
+    return [
 
-        {"label": "Month", "fieldname": "month", "fieldtype": "Data", "width": 120},
+        {"label": "Month", "fieldname": "month", "fieldtype": "Data", "width": 110},
 
         {"label": "Customer", "fieldname": "customer", "fieldtype": "Link", "options": "Customer", "width": 200},
 
         {"label": "Sales Person", "fieldname": "sales_person", "fieldtype": "Link", "options": "Sales Person", "width": 180},
 
-        {"label": "Region", "fieldname": "region", "fieldtype": "Data", "width": 140},
+        {"label": "Region", "fieldname": "region", "fieldtype": "Data", "width": 130},
 
-        {"label": "Location", "fieldname": "location", "fieldtype": "Data", "width": 140},
+        {"label": "Location", "fieldname": "location", "fieldtype": "Data", "width": 130},
 
-        {"label": "Territory", "fieldname": "territory", "fieldtype": "Data", "width": 180},
+        {"label": "Territory", "fieldname": "territory", "fieldtype": "Data", "width": 170},
 
-        {"label": "Head Sales Code", "fieldname": "head_sales", "fieldtype": "Data", "width": 150},
+        {"label": "Head Sales Code", "fieldname": "head_sales", "fieldtype": "Data", "width": 140},
 
-        {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 130},
+        {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 120},
 
-        {"label": "Achieved", "fieldname": "achieved", "fieldtype": "Currency", "width": 130},
+        {"label": "Achieved", "fieldname": "achieved", "fieldtype": "Currency", "width": 120},
 
         {"label": "Achieved %", "fieldname": "percentage", "fieldtype": "Percent", "width": 120}
 
     ]
-
-    return columns
 
 
 def get_data(filters):
@@ -56,7 +53,13 @@ def get_data(filters):
         (12, "December", "custom_december"),
     ]
 
-    data = []
+    conditions = ""
+
+    if filters.get("parent_sales_person"):
+        conditions += " AND sp.parent_sales_person = %(parent_sales_person)s"
+
+    if filters.get("custom_main_group"):
+        conditions += " AND item.custom_main_group = %(custom_main_group)s"
 
     sales_team = frappe.db.sql("""
 
@@ -86,23 +89,17 @@ def get_data(filters):
         LEFT JOIN `tabSales Person` sp
         ON sp.name = st.sales_person
 
-    """, as_dict=1)
+    """, as_dict=True)
+
+    data = []
 
     for row in sales_team:
 
-        for month_no, month_name, month_field in months:
+        for month_no, month_name, field in months:
 
-            target = row.get(month_field) or 0
+            target = row.get(field) or 0
 
-            conditions = ""
-
-            if filters.get("custom_main_group"):
-                conditions += " AND item.custom_main_group = %(custom_main_group)s"
-
-            if filters.get("parent_sales_person"):
-                conditions += " AND sp.parent_sales_person = %(parent_sales_person)s"
-
-            achieved = frappe.db.sql("""
+            achieved = frappe.db.sql(f"""
 
                 SELECT SUM(sii.base_net_amount)
 
@@ -125,7 +122,7 @@ def get_data(filters):
                 AND MONTH(si.posting_date) = %(month)s
                 {conditions}
 
-            """.format(conditions=conditions), {
+            """, {
                 "sales_person": row.sales_person,
                 "month": month_no,
                 "custom_main_group": filters.get("custom_main_group"),
@@ -138,7 +135,6 @@ def get_data(filters):
 
             if target:
                 percentage = (achieved / target) * 100
-
 
             data.append({
 

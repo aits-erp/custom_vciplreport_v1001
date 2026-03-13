@@ -13,7 +13,33 @@ frappe.query_reports["CATEGORYWISE"] = {
         {
             fieldname: "custom_main_group",
             label: "Main Group",
-            fieldtype: "Data"
+            fieldtype: "Select",
+            options: `
+Hard Anodised
+Nonstick
+Horeca
+Pressure Cookers
+SS Cookware
+Healux
+Kraft
+Platinum
+Platinum Triply P.cooker
+Cast Iron
+Bottle
+Kraft Pressure Cooker
+Electrical Appliances
+Csd
+Raw Material
+Scrap
+Cookers Spare Parts
+Circle
+Other Spare
+Carton
+SFG
+Sticker & Warranty Card
+Trading SFG
+Machinery Spare Parts
+`
         },
 
         {

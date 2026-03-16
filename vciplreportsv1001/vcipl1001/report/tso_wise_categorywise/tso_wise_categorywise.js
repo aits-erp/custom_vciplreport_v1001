@@ -1,8 +1,11 @@
-// Copyright (c) 2026, AITS and contributors
-// For license information, please see license.txt
-
 frappe.query_reports["TSO WISE CATEGORYWISE"] = {
-	"filters": [
-
-	]
+    "filters": [
+        {
+            "fieldname": "parent_sales_person",
+            "label": "Sales Head",
+            "fieldtype": "Link",
+            "options": "Sales Person",
+            "reqd": 1
+        }
+    ]
 };

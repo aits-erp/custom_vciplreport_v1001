@@ -3,7 +3,7 @@ import frappe
 MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
           "Jul","Aug","Sep","Oct","Nov","Dec"]
 
-# ✅ YOUR CUSTOM MONTH FIELDS
+# ✅ Your month fields (Data type)
 MONTH_FIELD_MAP = {
     1: "custom_january",
     2: "custom_february",
@@ -41,7 +41,6 @@ def get_columns():
     ]
 
 
-# ✅ MAIN FUNCTION
 def get_data(filters):
 
     conditions = ""
@@ -56,11 +55,19 @@ def get_data(filters):
         conditions += " AND si.company = %(company)s"
         values["company"] = filters.get("company")
 
+    # ✅ CHECK IF custom_territory EXISTS
+    sales_person_fields = [f.fieldname for f in frappe.get_meta("Sales Person").fields]
+
+    if "custom_territory" in sales_person_fields:
+        tso_field = "sp.custom_territory"
+    else:
+        tso_field = "st.sales_person"
+
     # ✅ MAIN QUERY
     data = frappe.db.sql(f"""
         SELECT
             MONTH(si.posting_date) as month,
-            sp.custom_territory as tso,
+            {tso_field} as tso,
             st.sales_person as sales_person,
             si.customer as customer_id,
             si.customer_name as customer,
@@ -77,7 +84,7 @@ def get_data(filters):
         {conditions}
         GROUP BY
             MONTH(si.posting_date),
-            sp.custom_territory,
+            tso,
             st.sales_person,
             si.customer,
             sii.item_group,
@@ -92,11 +99,13 @@ def get_data(filters):
 
         month = int(row.month) if row.month else None
 
-        target = get_target(
-            row.customer_id,
-            row.sales_person,
-            month
-        )
+        target = get_target(row.customer_id, row.sales_person, month)
+
+        # ✅ 🔥 FIX: Convert string → float safely
+        try:
+            target = float(target)
+        except:
+            target = 0
 
         achieved = (row.amount / target * 100) if target else 0
 
@@ -116,7 +125,7 @@ def get_data(filters):
     return result
 
 
-# ✅ FINAL TARGET FUNCTION (CUSTOMER SALES TEAM)
+# ✅ TARGET FROM CUSTOMER → SALES TEAM
 def get_target(customer, sales_person, month):
 
     if not customer or not sales_person or not month:

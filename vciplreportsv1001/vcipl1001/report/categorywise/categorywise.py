@@ -21,12 +21,10 @@ MONTH_FIELD_MAP = {
 }
 
 
-# ✅ MAIN EXECUTE
+# ✅ EXECUTE
 def execute(filters=None):
     filters = frappe._dict(filters or {})
-    columns = get_columns()
-    data = get_data(filters)
-    return columns, data
+    return get_columns(), get_data(filters)
 
 
 # ✅ COLUMNS
@@ -34,6 +32,7 @@ def get_columns():
     return [
         {"label": "Month", "fieldname": "month", "width": 90},
         {"label": "TSO (Territory)", "fieldname": "tso", "width": 150},
+        {"label": "Parent Sales Person", "fieldname": "parent_sales_person", "width": 180},
         {"label": "Customer", "fieldname": "customer", "width": 200},
         {"label": "Category", "fieldname": "category", "width": 150},
         {"label": "Main Group", "fieldname": "main_group", "width": 150},
@@ -50,52 +49,46 @@ def get_data(filters):
     conditions = ""
     values = {}
 
-    # ✅ Date Filter
+    # ✅ Filters
     if filters.get("from_date") and filters.get("to_date"):
         conditions += " AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s"
         values["from_date"] = filters.get("from_date")
         values["to_date"] = filters.get("to_date")
 
-    # ✅ Company Filter
     if filters.get("company"):
         conditions += " AND si.company = %(company)s"
         values["company"] = filters.get("company")
 
-    # ✅ Territory Filter
     if filters.get("tso"):
         conditions += " AND sp.custom_territory = %(tso)s"
         values["tso"] = filters.get("tso")
 
-    # ✅ Customer Filter
     if filters.get("customer"):
         conditions += " AND si.customer = %(customer)s"
         values["customer"] = filters.get("customer")
 
-    # ✅ Category Filter
     if filters.get("item_group"):
         conditions += " AND sii.item_group = %(item_group)s"
         values["item_group"] = filters.get("item_group")
 
-    # ✅ Main Group Filter
     if filters.get("main_group"):
         conditions += " AND sii.custome_main_group = %(main_group)s"
         values["main_group"] = filters.get("main_group")
 
-    # ✅ Item Filter
     if filters.get("item"):
         conditions += " AND sii.item_code = %(item)s"
         values["item"] = filters.get("item")
 
-    # ✅ Warehouse Filter
     if filters.get("warehouse"):
         conditions += " AND sii.warehouse = %(warehouse)s"
         values["warehouse"] = filters.get("warehouse")
 
-    # 🔥 MAIN QUERY (FIXED + JOIN SALES PERSON)
+    # ✅ FINAL QUERY (WITH PARENT SALES PERSON)
     data = frappe.db.sql(f"""
         SELECT
             MONTH(si.posting_date) as month,
             sp.custom_territory as tso,
+            sp.parent_sales_person as parent_sales_person,
             si.customer_name as customer,
             sii.item_group as category,
             sii.custome_main_group as main_group,
@@ -110,6 +103,7 @@ def get_data(filters):
         GROUP BY
             MONTH(si.posting_date),
             sp.custom_territory,
+            sp.parent_sales_person,
             si.customer_name,
             sii.item_group,
             sii.custome_main_group,
@@ -130,6 +124,7 @@ def get_data(filters):
         result.append({
             "month": MONTHS[month - 1] if month else "",
             "tso": row.tso or "No Territory",
+            "parent_sales_person": row.parent_sales_person or "",
             "customer": row.customer or "",
             "category": row.category or "",
             "main_group": row.main_group or "",
@@ -154,9 +149,9 @@ def get_target(tso, category, month):
         return 0
 
     target = frappe.db.get_value(
-        "TSO Target",   # 👈 your doctype
+        "TSO Target",
         {
-            "territory": tso,   # 👈 IMPORTANT: match your doctype field
+            "custom_territory": tso,
             "item_group": category
         },
         fieldname

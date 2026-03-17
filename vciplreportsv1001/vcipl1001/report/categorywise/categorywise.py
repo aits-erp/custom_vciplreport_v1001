@@ -4,7 +4,7 @@ import frappe
 MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
           "Jul","Aug","Sep","Oct","Nov","Dec"]
 
-# ✅ Month → Field Mapping (Target)
+# ✅ Month → Target Field Mapping
 MONTH_FIELD_MAP = {
     1: "custom_january",
     2: "custom_february",
@@ -33,7 +33,7 @@ def execute(filters=None):
 def get_columns():
     return [
         {"label": "Month", "fieldname": "month", "width": 90},
-        {"label": "TSO", "fieldname": "tso", "width": 150},
+        {"label": "TSO (Territory)", "fieldname": "tso", "width": 150},
         {"label": "Customer", "fieldname": "customer", "width": 200},
         {"label": "Category", "fieldname": "category", "width": 150},
         {"label": "Main Group", "fieldname": "main_group", "width": 150},
@@ -56,9 +56,14 @@ def get_data(filters):
         values["from_date"] = filters.get("from_date")
         values["to_date"] = filters.get("to_date")
 
-    # ✅ TSO Filter
+    # ✅ Company Filter
+    if filters.get("company"):
+        conditions += " AND si.company = %(company)s"
+        values["company"] = filters.get("company")
+
+    # ✅ Territory Filter
     if filters.get("tso"):
-        conditions += " AND st.custome_territory_name = %(tso)s"
+        conditions += " AND sp.custom_territory = %(tso)s"
         values["tso"] = filters.get("tso")
 
     # ✅ Customer Filter
@@ -86,16 +91,11 @@ def get_data(filters):
         conditions += " AND sii.warehouse = %(warehouse)s"
         values["warehouse"] = filters.get("warehouse")
 
-    # ✅ Company Filter
-    if filters.get("company"):
-        conditions += " AND si.company = %(company)s"
-        values["company"] = filters.get("company")
-
-    # 🔥 MAIN QUERY
+    # 🔥 MAIN QUERY (FIXED + JOIN SALES PERSON)
     data = frappe.db.sql(f"""
         SELECT
             MONTH(si.posting_date) as month,
-            st.custome_territory_name as tso,
+            sp.custom_territory as tso,
             si.customer_name as customer,
             sii.item_group as category,
             sii.custome_main_group as main_group,
@@ -103,12 +103,13 @@ def get_data(filters):
             SUM(sii.amount) as amount
         FROM `tabSales Invoice` si
         INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        LEFT JOIN `tabSales Team` st ON st.parent = si.name
+        LEFT JOIN `tabSales Team` st ON st.parent = si.name AND st.idx = 1
+        LEFT JOIN `tabSales Person` sp ON sp.name = st.sales_person
         WHERE si.docstatus = 1
         {conditions}
         GROUP BY
             MONTH(si.posting_date),
-            st.custome_territory_name,
+            sp.custom_territory,
             si.customer_name,
             sii.item_group,
             sii.custome_main_group,
@@ -128,7 +129,7 @@ def get_data(filters):
 
         result.append({
             "month": MONTHS[month - 1] if month else "",
-            "tso": row.tso or "No TSO",
+            "tso": row.tso or "No Territory",
             "customer": row.customer or "",
             "category": row.category or "",
             "main_group": row.main_group or "",
@@ -141,7 +142,7 @@ def get_data(filters):
     return result
 
 
-# ✅ TARGET FUNCTION (MONTH-WISE)
+# ✅ TARGET FUNCTION
 def get_target(tso, category, month):
 
     if not tso or not month:
@@ -153,9 +154,9 @@ def get_target(tso, category, month):
         return 0
 
     target = frappe.db.get_value(
-        "TSO Target",   # 👈 Change if your doctype name is different
+        "TSO Target",   # 👈 your doctype
         {
-            "tso": tso,
+            "territory": tso,   # 👈 IMPORTANT: match your doctype field
             "item_group": category
         },
         fieldname

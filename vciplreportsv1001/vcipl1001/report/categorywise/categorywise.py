@@ -1,100 +1,164 @@
 import frappe
 
+# ✅ Month Names
+MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
+          "Jul","Aug","Sep","Oct","Nov","Dec"]
 
+# ✅ Month → Field Mapping (Target)
+MONTH_FIELD_MAP = {
+    1: "custom_january",
+    2: "custom_february",
+    3: "custom_march",
+    4: "custom_april",
+    5: "custom_may_",
+    6: "custom_june",
+    7: "custom_july",
+    8: "custom_august",
+    9: "custom_september",
+    10: "custom_october",
+    11: "custom_november",
+    12: "custom_december"
+}
+
+
+# ✅ MAIN EXECUTE
 def execute(filters=None):
-
+    filters = frappe._dict(filters or {})
     columns = get_columns()
     data = get_data(filters)
-
     return columns, data
 
 
+# ✅ COLUMNS
 def get_columns():
-
     return [
-
-        {"label": "Month", "fieldname": "month", "fieldtype": "Data", "width": 120},
-
-        {"label": "Main Group", "fieldname": "main_group", "fieldtype": "Data", "width": 160},
-
-        {"label": "Parent Sales Person", "fieldname": "parent_sales_person", "fieldtype": "Data", "width": 180},
-
-        {"label": "Customer", "fieldname": "customer", "fieldtype": "Link", "options": "Customer", "width": 180},
-
-        {"label": "Sales Person", "fieldname": "sales_person", "fieldtype": "Link", "options": "Sales Person", "width": 180},
-
-        {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 130},
-
-        {"label": "Achieved", "fieldname": "achieved", "fieldtype": "Currency", "width": 130},
-
-        {"label": "Achieved %", "fieldname": "percentage", "fieldtype": "Percent", "width": 120},
-
+        {"label": "Month", "fieldname": "month", "width": 90},
+        {"label": "TSO", "fieldname": "tso", "width": 150},
+        {"label": "Customer", "fieldname": "customer", "width": 200},
+        {"label": "Category", "fieldname": "category", "width": 150},
+        {"label": "Main Group", "fieldname": "main_group", "width": 150},
+        {"label": "Item", "fieldname": "item", "width": 180},
+        {"label": "Sales Amount", "fieldname": "amount", "fieldtype": "Currency", "width": 140},
+        {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 140},
+        {"label": "Achieved %", "fieldname": "achieved", "fieldtype": "Percent", "width": 120},
     ]
 
 
+# ✅ MAIN DATA FUNCTION
 def get_data(filters):
 
     conditions = ""
+    values = {}
 
-    if filters.get("parent_sales_person"):
-        conditions += " AND sp.parent_sales_person = %(parent_sales_person)s"
+    # ✅ Date Filter
+    if filters.get("from_date") and filters.get("to_date"):
+        conditions += " AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s"
+        values["from_date"] = filters.get("from_date")
+        values["to_date"] = filters.get("to_date")
 
-    if filters.get("custom_main_group"):
-        conditions += " AND item.custom_main_group = %(custom_main_group)s"
+    # ✅ TSO Filter
+    if filters.get("tso"):
+        conditions += " AND st.custome_territory_name = %(tso)s"
+        values["tso"] = filters.get("tso")
 
+    # ✅ Customer Filter
+    if filters.get("customer"):
+        conditions += " AND si.customer = %(customer)s"
+        values["customer"] = filters.get("customer")
 
+    # ✅ Category Filter
+    if filters.get("item_group"):
+        conditions += " AND sii.item_group = %(item_group)s"
+        values["item_group"] = filters.get("item_group")
+
+    # ✅ Main Group Filter
+    if filters.get("main_group"):
+        conditions += " AND sii.custome_main_group = %(main_group)s"
+        values["main_group"] = filters.get("main_group")
+
+    # ✅ Item Filter
+    if filters.get("item"):
+        conditions += " AND sii.item_code = %(item)s"
+        values["item"] = filters.get("item")
+
+    # ✅ Warehouse Filter
+    if filters.get("warehouse"):
+        conditions += " AND sii.warehouse = %(warehouse)s"
+        values["warehouse"] = filters.get("warehouse")
+
+    # ✅ Company Filter
+    if filters.get("company"):
+        conditions += " AND si.company = %(company)s"
+        values["company"] = filters.get("company")
+
+    # 🔥 MAIN QUERY
     data = frappe.db.sql(f"""
-
         SELECT
-
-            MONTHNAME(si.posting_date) AS month,
-
-            item.custom_main_group AS main_group,
-
-            sp.parent_sales_person,
-
-            st.parent AS customer,
-
-            st.sales_person,
-
-            SUM(sii.base_net_amount) AS achieved
-
+            MONTH(si.posting_date) as month,
+            st.custome_territory_name as tso,
+            si.customer_name as customer,
+            sii.item_group as category,
+            sii.custome_main_group as main_group,
+            sii.item_name as item,
+            SUM(sii.amount) as amount
         FROM `tabSales Invoice` si
-
-        JOIN `tabSales Invoice Item` sii
-        ON sii.parent = si.name
-
-        JOIN `tabItem` item
-        ON item.name = sii.item_code
-
-        JOIN `tabSales Team` st
-        ON st.parent = si.name
-
-        JOIN `tabSales Person` sp
-        ON sp.name = st.sales_person
-
+        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        LEFT JOIN `tabSales Team` st ON st.parent = si.name
         WHERE si.docstatus = 1
-
         {conditions}
-
         GROUP BY
             MONTH(si.posting_date),
-            item.custom_main_group,
-            sp.parent_sales_person,
-            st.parent,
-            st.sales_person
+            st.custome_territory_name,
+            si.customer_name,
+            sii.item_group,
+            sii.custome_main_group,
+            sii.item_name
+        ORDER BY MONTH(si.posting_date), tso
+    """, values, as_dict=1)
 
-        ORDER BY MONTH(si.posting_date)
-
-    """, filters, as_dict=True)
-
+    result = []
 
     for row in data:
 
-        row.target = 0
-        row.percentage = 0
+        month = int(row.month) if row.month else None
 
-        if row.target:
-            row.percentage = (row.achieved / row.target) * 100
+        target = get_target(row.tso, row.category, month)
 
-    return data
+        achieved = (row.amount / target * 100) if target else 0
+
+        result.append({
+            "month": MONTHS[month - 1] if month else "",
+            "tso": row.tso or "No TSO",
+            "customer": row.customer or "",
+            "category": row.category or "",
+            "main_group": row.main_group or "",
+            "item": row.item or "",
+            "amount": row.amount or 0,
+            "target": target,
+            "achieved": achieved
+        })
+
+    return result
+
+
+# ✅ TARGET FUNCTION (MONTH-WISE)
+def get_target(tso, category, month):
+
+    if not tso or not month:
+        return 0
+
+    fieldname = MONTH_FIELD_MAP.get(month)
+
+    if not fieldname:
+        return 0
+
+    target = frappe.db.get_value(
+        "TSO Target",   # 👈 Change if your doctype name is different
+        {
+            "tso": tso,
+            "item_group": category
+        },
+        fieldname
+    )
+
+    return target or 0

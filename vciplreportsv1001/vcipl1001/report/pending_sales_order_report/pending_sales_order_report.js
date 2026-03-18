@@ -78,6 +78,7 @@ frappe.query_reports["Pending Sales Order Report"] = {
         <div style="max-height:450px;overflow:auto">
         <table class="table table-bordered">
         <tr>
+            <th>Item Code</th>   <!-- ✅ ADDED -->
             <th>Item Name</th>
             <th>Pending</th>
             <th>Available</th>
@@ -90,6 +91,7 @@ frappe.query_reports["Pending Sales Order Report"] = {
 
             html += `
             <tr>
+                <td>${r.item_code}</td> <!-- ✅ ADDED -->
                 <td>${r.item_name}</td>
                 <td style="color:red;font-weight:bold">${r.pending_qty}</td>
                 <td style="color:green;font-weight:bold">${r.available_qty}</td>
@@ -112,17 +114,17 @@ frappe.query_reports["Pending Sales Order Report"] = {
     }
 };
 
+
 window.print_pending_popup = function () {
 
     let popup = document.getElementById("pending-popup").cloneNode(true);
 
-    // remove print button before printing
     let btn = popup.querySelector("button");
     if (btn) btn.remove();
 
     let content = popup.outerHTML;
 
-    let w = window.open("", "_blank", "width=1200,height=800");
+    let w = window.open("", "_blank");
 
     w.document.open();
 
@@ -134,9 +136,15 @@ window.print_pending_popup = function () {
 
             <style>
 
+                @page {
+                    size: A4;
+                    margin: 10mm;
+                }
+
                 body{
                     font-family: Arial, sans-serif;
-                    margin:20px;
+                    margin:0;
+                    width:100%;
                 }
 
                 h4{
@@ -151,7 +159,7 @@ window.print_pending_popup = function () {
                 table{
                     width:100%;
                     border-collapse:collapse;
-                    table-layout:fixed;
+                    table-layout:auto;
                 }
 
                 th, td{
@@ -168,21 +176,11 @@ window.print_pending_popup = function () {
                 @media print{
 
                     body{
-                        margin:0;
+                        width:100%;
                     }
 
                     table{
                         width:100%;
-                        page-break-inside:auto;
-                    }
-
-                    tr{
-                        page-break-inside:avoid;
-                        page-break-after:auto;
-                    }
-
-                    thead{
-                        display:table-header-group;
                     }
 
                 }

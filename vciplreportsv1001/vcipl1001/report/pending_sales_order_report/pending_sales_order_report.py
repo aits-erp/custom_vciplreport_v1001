@@ -99,11 +99,13 @@ def get_data(conditions, filters):
 
     so_popup = {}
 
+    # ✅ POPUP DATA WITH ITEM CODE
     for row in data:
 
         available = bin_map.get((row.item_code, row.warehouse), 0)
 
         so_popup.setdefault(row.sales_order, []).append({
+            "item_code": row.item_code,  # ✅ ADDED
             "item_name": row.item_name,
             "pending_qty": row.pending_qty,
             "available_qty": available,

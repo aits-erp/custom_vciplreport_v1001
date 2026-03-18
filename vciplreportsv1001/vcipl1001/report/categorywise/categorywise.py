@@ -39,6 +39,7 @@ def get_columns(filters):
         columns.append({"label": "Category", "fieldname": "category", "width": 150})
 
     if filters.get("show_item"):
+        columns.append({"label": "Item Code", "fieldname": "item_code", "width": 140})
         columns.append({"label": "Item", "fieldname": "item", "width": 180})
 
     columns += [
@@ -57,6 +58,7 @@ def get_data(filters):
     conditions = ""
     values = {}
 
+    # ✅ DATE
     if filters.get("from_date"):
         conditions += " AND si.posting_date >= %(from_date)s"
         values["from_date"] = filters.get("from_date")
@@ -65,31 +67,47 @@ def get_data(filters):
         conditions += " AND si.posting_date <= %(to_date)s"
         values["to_date"] = filters.get("to_date")
 
+    # ✅ COMPANY
     if filters.get("company"):
         conditions += " AND si.company = %(company)s"
         values["company"] = filters.get("company")
 
+    # ✅ CUSTOMER
     if filters.get("customer"):
         conditions += " AND si.customer = %(customer)s"
         values["customer"] = filters.get("customer")
 
+    # ✅ CATEGORY FILTER (FIXED)
     if filters.get("item_group"):
         conditions += " AND sii.item_group = %(item_group)s"
         values["item_group"] = filters.get("item_group")
 
+    # ✅ ITEM FILTER
     if filters.get("item"):
         conditions += " AND sii.item_code = %(item)s"
         values["item"] = filters.get("item")
 
+    # ✅ MAIN GROUP FILTER (FIXED)
+    if filters.get("main_group"):
+        conditions += " AND i.custom_main_group = %(main_group)s"
+        values["main_group"] = filters.get("main_group")
+
+    # ✅ WAREHOUSE
     if filters.get("warehouse"):
         conditions += " AND sii.warehouse = %(warehouse)s"
         values["warehouse"] = filters.get("warehouse")
 
+    # ✅ TSO
     if filters.get("tso"):
         conditions += " AND st.sales_person = %(tso)s"
         values["tso"] = filters.get("tso")
 
-    # ✅ dynamic fields
+    # ✅ Parent Sales Person
+    if filters.get("parent_sales_person"):
+        conditions += " AND sp.parent_sales_person = %(parent_sales_person)s"
+        values["parent_sales_person"] = filters.get("parent_sales_person")
+
+    # ✅ Dynamic Fields
     sp_fields = [f.fieldname for f in frappe.get_meta("Sales Person").fields]
     item_fields = [f.fieldname for f in frappe.get_meta("Item").fields]
 
@@ -97,11 +115,7 @@ def get_data(filters):
     parent_sp_field = "sp.parent_sales_person" if "parent_sales_person" in sp_fields else "''"
     main_group_field = "i.custom_main_group" if "custom_main_group" in item_fields else "''"
 
-    if filters.get("parent_sales_person"):
-        conditions += " AND sp.parent_sales_person = %(parent_sales_person)s"
-        values["parent_sales_person"] = filters.get("parent_sales_person")
-
-    # ✅ grouping logic
+    # ✅ GROUPING
     group_by = ["MONTH(si.posting_date)", "st.sales_person"]
 
     if filters.get("show_item"):
@@ -113,15 +127,17 @@ def get_data(filters):
 
     group_by = ", ".join(group_by)
 
+    # ✅ QUERY
     data = frappe.db.sql(f"""
         SELECT
             MONTH(si.posting_date) as month,
             {tso_field} as tso,
             {parent_sp_field} as parent_sales_person,
             st.sales_person as sales_person,
-            si.customer as customer,
+            si.customer_name as customer,   -- ✅ FIXED HERE
             sii.item_group as category,
             {main_group_field} as main_group,
+            sii.item_code as item_code,     -- ✅ NEW
             sii.item_name as item,
             SUM(sii.qty) as qty,
             SUM(sii.amount) as amount
@@ -176,10 +192,12 @@ def get_data(filters):
             d["category"] = row.category
 
         if filters.get("show_item"):
+            d["item_code"] = row.item_code
             d["item"] = row.item
 
         result.append(d)
 
+    # ✅ TOTAL
     overall = (total_amount / total_target * 100) if total_target else 0
 
     result.append({

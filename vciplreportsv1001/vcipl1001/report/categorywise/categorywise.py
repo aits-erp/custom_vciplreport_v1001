@@ -180,7 +180,7 @@ def execute(filters=None):
     return get_columns(), get_data(filters)
 
 
-# ✅ COLUMNS (ALL INCLUDED)
+# ✅ COLUMNS
 def get_columns():
     return [
         {"label": "Month", "fieldname": "month", "width": 90},
@@ -209,14 +209,14 @@ def get_data(filters):
         conditions += " AND si.company = %(company)s"
         values["company"] = filters.get("company")
 
-    # ✅ Dynamic fields
+    # ✅ Dynamic field handling
     sp_fields = [f.fieldname for f in frappe.get_meta("Sales Person").fields]
     item_fields = [f.fieldname for f in frappe.get_meta("Item").fields]
 
     tso_field = "sp.custom_territory" if "custom_territory" in sp_fields else "st.sales_person"
     main_group_field = "i.custom_main_group" if "custom_main_group" in item_fields else "''"
 
-    # ✅ MAIN QUERY (NO ITEM LEVEL)
+    # ✅ FETCH DATA (GROUPED — NO DUPLICATES)
     data = frappe.db.sql(f"""
         SELECT
             MONTH(si.posting_date) as month,
@@ -243,41 +243,62 @@ def get_data(filters):
             main_group
     """, values, as_dict=1)
 
+    # 👉 Organize data month-wise
+    month_map = {}
+    for row in data:
+        month_map.setdefault(row.month, []).append(row)
+
     result = []
 
     total_amount = 0
     total_target = 0
 
-    # ✅ SORT IN APR → MAR
-    data_sorted = sorted(data, key=lambda x: FINANCIAL_YEAR_ORDER.index(int(x.month)))
+    # ✅ LOOP APR → MAR
+    for m in FINANCIAL_YEAR_ORDER:
 
-    for row in data_sorted:
+        month_rows = month_map.get(m, [])
 
-        month = int(row.month)
+        # 👉 If no data → still show month row
+        if not month_rows:
+            result.append({
+                "month": MONTHS[m - 1],
+                "tso": "",
+                "sales_person": "",
+                "customer": "",
+                "category": "",
+                "main_group": "",
+                "amount": 0,
+                "target": 0,
+                "achieved": 0
+            })
+            continue
 
-        target = get_target(row.customer_id, row.sales_person, month)
+        # 👉 Show actual rows
+        for row in month_rows:
 
-        try:
-            target = float(target)
-        except:
-            target = 0
+            target = get_target(row.customer_id, row.sales_person, m)
 
-        achieved = (row.amount / target * 100) if target else 0
+            try:
+                target = float(target)
+            except:
+                target = 0
 
-        total_amount += row.amount
-        total_target += target
+            achieved = (row.amount / target * 100) if target else 0
 
-        result.append({
-            "month": MONTHS[month - 1],
-            "tso": row.tso or "",
-            "sales_person": row.sales_person or "",
-            "customer": row.customer or "",
-            "category": row.category or "",
-            "main_group": row.main_group or "",
-            "amount": row.amount or 0,
-            "target": target,
-            "achieved": achieved
-        })
+            total_amount += row.amount or 0
+            total_target += target or 0
+
+            result.append({
+                "month": MONTHS[m - 1],
+                "tso": row.tso or "",
+                "sales_person": row.sales_person or "",
+                "customer": row.customer or "",
+                "category": row.category or "",
+                "main_group": row.main_group or "",
+                "amount": row.amount or 0,
+                "target": target,
+                "achieved": achieved
+            })
 
     # ✅ TOTAL ROW
     overall_achieved = (total_amount / total_target * 100) if total_target else 0

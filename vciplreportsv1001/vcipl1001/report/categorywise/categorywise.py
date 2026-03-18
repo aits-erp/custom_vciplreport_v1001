@@ -32,7 +32,7 @@ def get_columns(filters):
         {"label": "TSO", "fieldname": "tso", "width": 150},
         {"label": "Parent Sales Person", "fieldname": "parent_sales_person", "width": 180},
         {"label": "Sales Person", "fieldname": "sales_person", "width": 180},
-        {"label": "Customer", "fieldname": "customer", "width": 200},
+        {"label": "Customer", "fieldname": "customer_name", "width": 220},
     ]
 
     if filters.get("show_category"):
@@ -40,7 +40,7 @@ def get_columns(filters):
 
     if filters.get("show_item"):
         columns.append({"label": "Item Code", "fieldname": "item_code", "width": 140})
-        columns.append({"label": "Item", "fieldname": "item", "width": 180})
+        columns.append({"label": "Item Name", "fieldname": "item", "width": 200})
 
     columns += [
         {"label": "Main Group", "fieldname": "main_group", "width": 150},
@@ -77,17 +77,17 @@ def get_data(filters):
         conditions += " AND si.customer = %(customer)s"
         values["customer"] = filters.get("customer")
 
-    # ✅ CATEGORY FILTER (FIXED)
+    # ✅ CATEGORY
     if filters.get("item_group"):
         conditions += " AND sii.item_group = %(item_group)s"
         values["item_group"] = filters.get("item_group")
 
-    # ✅ ITEM FILTER
+    # ✅ ITEM
     if filters.get("item"):
         conditions += " AND sii.item_code = %(item)s"
         values["item"] = filters.get("item")
 
-    # ✅ MAIN GROUP FILTER (FIXED)
+    # ✅ MAIN GROUP
     if filters.get("main_group"):
         conditions += " AND i.custom_main_group = %(main_group)s"
         values["main_group"] = filters.get("main_group")
@@ -102,12 +102,12 @@ def get_data(filters):
         conditions += " AND st.sales_person = %(tso)s"
         values["tso"] = filters.get("tso")
 
-    # ✅ Parent Sales Person
+    # ✅ PARENT SALES PERSON
     if filters.get("parent_sales_person"):
         conditions += " AND sp.parent_sales_person = %(parent_sales_person)s"
         values["parent_sales_person"] = filters.get("parent_sales_person")
 
-    # ✅ Dynamic Fields
+    # ✅ DYNAMIC FIELDS
     sp_fields = [f.fieldname for f in frappe.get_meta("Sales Person").fields]
     item_fields = [f.fieldname for f in frappe.get_meta("Item").fields]
 
@@ -134,10 +134,11 @@ def get_data(filters):
             {tso_field} as tso,
             {parent_sp_field} as parent_sales_person,
             st.sales_person as sales_person,
-            si.customer_name as customer,   -- ✅ FIXED HERE
+            si.customer as customer_id,          -- 🔥 IMPORTANT
+            si.customer_name as customer_name,   -- 🔥 DISPLAY
             sii.item_group as category,
             {main_group_field} as main_group,
-            sii.item_code as item_code,     -- ✅ NEW
+            sii.item_code as item_code,
             sii.item_name as item,
             SUM(sii.qty) as qty,
             SUM(sii.amount) as amount
@@ -162,7 +163,8 @@ def get_data(filters):
 
         month = int(row.month)
 
-        target = get_target(row.customer, row.sales_person, month)
+        # 🔥 USE CUSTOMER ID FOR TARGET
+        target = get_target(row.customer_id, row.sales_person, month)
 
         try:
             target = float(target)
@@ -180,7 +182,7 @@ def get_data(filters):
             "tso": row.tso,
             "parent_sales_person": row.parent_sales_person,
             "sales_person": row.sales_person,
-            "customer": row.customer,
+            "customer_name": row.customer_name,  # ✅ DISPLAY
             "main_group": row.main_group,
             "qty": row.qty,
             "amount": row.amount,

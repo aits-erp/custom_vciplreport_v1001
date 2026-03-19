@@ -2,23 +2,71 @@ frappe.query_reports["CATEGORYWISE"] = {
 
     filters: [
 
-        // ✅ Date
+        // ================= PERIOD TYPE =================
+        {
+            fieldname: "period_type",
+            label: "Period Type",
+            fieldtype: "Select",
+            options: ["Date Range", "Quarter", "Half Year", "Year"],
+            default: "Date Range"
+        },
+
+        // ---------------- DATE ----------------
         {
             fieldname: "from_date",
             label: "From Date",
             fieldtype: "Date",
-            reqd: 1,
-            default: frappe.datetime.month_start()
+            default: frappe.datetime.month_start(),
+            depends_on: "eval:doc.period_type=='Date Range'"
         },
         {
             fieldname: "to_date",
             label: "To Date",
             fieldtype: "Date",
-            reqd: 1,
-            default: frappe.datetime.month_end()
+            default: frappe.datetime.month_end(),
+            depends_on: "eval:doc.period_type=='Date Range'"
         },
 
-        // ✅ TSO
+        // ---------------- QUARTER ----------------
+        {
+            fieldname: "quarter",
+            label: "Quarter",
+            fieldtype: "Select",
+            options: [
+                { label: "Q1 (Apr–Jun)", value: "Q1" },
+                { label: "Q2 (Jul–Sep)", value: "Q2" },
+                { label: "Q3 (Oct–Dec)", value: "Q3" },
+                { label: "Q4 (Jan–Mar)", value: "Q4" }
+            ],
+            default: "Q1",
+            depends_on: "eval:doc.period_type=='Quarter'"
+        },
+
+        // ---------------- HALF YEAR ----------------
+        {
+            fieldname: "half_year",
+            label: "Half Year",
+            fieldtype: "Select",
+            options: [
+                { label: "H1 (Apr–Sep)", value: "H1" },
+                { label: "H2 (Oct–Mar)", value: "H2" }
+            ],
+            default: "H1",
+            depends_on: "eval:doc.period_type=='Half Year'"
+        },
+
+        // ---------------- YEAR ----------------
+        {
+            fieldname: "year",
+            label: "Year",
+            fieldtype: "Select",
+            options: ["2023", "2024", "2025", "2026"],
+            default: new Date().getFullYear().toString(),
+            reqd: 1
+        },
+
+        // ================= EXISTING FILTERS =================
+
         {
             fieldname: "tso",
             label: "TSO",
@@ -29,7 +77,6 @@ frappe.query_reports["CATEGORYWISE"] = {
             }
         },
 
-        // ✅ Parent Sales Person (🔥 NEW)
         {
             fieldname: "parent_sales_person",
             label: "Parent Sales Person",
@@ -37,7 +84,6 @@ frappe.query_reports["CATEGORYWISE"] = {
             options: "Sales Person"
         },
 
-        // ✅ Customer
         {
             fieldname: "customer",
             label: "Customer",
@@ -45,7 +91,15 @@ frappe.query_reports["CATEGORYWISE"] = {
             options: "Customer"
         },
 
-        // ✅ Category
+        // 🔥 NEW CUSTOMER GROUP FILTER
+        {
+            fieldname: "customer_group",
+            label: "Customer Group",
+            fieldtype: "Link",
+            options: "Customer Group",
+            default: "Debtors Distributors"
+        },
+
         {
             fieldname: "item_group",
             label: "Category",
@@ -53,14 +107,12 @@ frappe.query_reports["CATEGORYWISE"] = {
             options: "Item Group"
         },
 
-        // ✅ Main Group
         {
             fieldname: "main_group",
             label: "Main Group",
             fieldtype: "Data"
         },
 
-        // ✅ Item
         {
             fieldname: "item",
             label: "Item",
@@ -68,7 +120,6 @@ frappe.query_reports["CATEGORYWISE"] = {
             options: "Item"
         },
 
-        // ✅ Warehouse
         {
             fieldname: "warehouse",
             label: "Warehouse",
@@ -76,7 +127,6 @@ frappe.query_reports["CATEGORYWISE"] = {
             options: "Warehouse"
         },
 
-        // ✅ Company
         {
             fieldname: "company",
             label: "Company",
@@ -86,7 +136,15 @@ frappe.query_reports["CATEGORYWISE"] = {
             reqd: 1
         },
 
-        // 🔥 Toggle Category
+        // ================= TOGGLES =================
+
+        {
+            fieldname: "show_customer_group",
+            label: "Show Customer Group",
+            fieldtype: "Check",
+            default: 0
+        },
+
         {
             fieldname: "show_category",
             label: "Show Category",
@@ -94,7 +152,6 @@ frappe.query_reports["CATEGORYWISE"] = {
             default: 0
         },
 
-        // 🔥 Toggle Item
         {
             fieldname: "show_item",
             label: "Show Item",
@@ -104,21 +161,24 @@ frappe.query_reports["CATEGORYWISE"] = {
 
     ],
 
-    // 🔥 Drill Down
+    // ================= DRILL DOWN =================
     formatter: function (value, row, column, data, default_formatter) {
 
         value = default_formatter(value, row, column, data);
 
-        if (column.fieldname === "amount" && data && data.customer) {
-            return `<a href="#" onclick="open_invoice('${data.customer}')">${value}</a>`;
+        // 🔥 Click on amount → open invoice list
+        if (column.fieldname === "amount" && data && data.customer_name) {
+            return `<a href="#" onclick="open_invoice('${data.customer_name}')">${value}</a>`;
         }
 
         return value;
     }
 };
 
-function open_invoice(customer) {
+
+// 🔥 Drill function
+function open_invoice(customer_name) {
     frappe.set_route("List", "Sales Invoice", {
-        customer: customer
+        customer_name: customer_name
     });
 }

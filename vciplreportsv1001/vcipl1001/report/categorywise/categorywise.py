@@ -1,4 +1,5 @@
 import frappe
+from datetime import date
 
 MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
           "Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -19,12 +20,55 @@ MONTH_FIELD_MAP = {
 }
 
 
+# ================= PERIOD LOGIC (NEW) =================
+def apply_period_filters(filters):
+
+    year = int(filters.get("year") or date.today().year)
+
+    if filters.get("period_type") == "Quarter":
+
+        if filters.get("quarter") == "Q1":   # Apr-Jun
+            filters.from_date = f"{year}-04-01"
+            filters.to_date = f"{year}-06-30"
+
+        elif filters.get("quarter") == "Q2": # Jul-Sep
+            filters.from_date = f"{year}-07-01"
+            filters.to_date = f"{year}-09-30"
+
+        elif filters.get("quarter") == "Q3": # Oct-Dec
+            filters.from_date = f"{year}-10-01"
+            filters.to_date = f"{year}-12-31"
+
+        elif filters.get("quarter") == "Q4": # Jan-Mar
+            filters.from_date = f"{year}-01-01"
+            filters.to_date = f"{year}-03-31"
+
+    elif filters.get("period_type") == "Half Year":
+
+        if filters.get("half_year") == "H1":   # Apr-Sep
+            filters.from_date = f"{year}-04-01"
+            filters.to_date = f"{year}-09-30"
+
+        elif filters.get("half_year") == "H2": # Oct-Mar
+            filters.from_date = f"{year}-10-01"
+            filters.to_date = f"{year+1}-03-31"
+
+    elif filters.get("period_type") == "Year":
+
+        filters.from_date = f"{year}-01-01"
+        filters.to_date = f"{year}-12-31"
+
+
 def execute(filters=None):
     filters = frappe._dict(filters or {})
+
+    # 🔥 APPLY PERIOD FILTER
+    apply_period_filters(filters)
+
     return get_columns(filters), get_data(filters)
 
 
-# ✅ COLUMNS
+# ================= COLUMNS =================
 def get_columns(filters):
 
     columns = [
@@ -34,6 +78,13 @@ def get_columns(filters):
         {"label": "Sales Person", "fieldname": "sales_person", "width": 180},
         {"label": "Customer", "fieldname": "customer_name", "width": 220},
     ]
+
+    if filters.get("show_customer_group"):
+        columns.append({
+            "label": "Customer Group",
+            "fieldname": "customer_group",
+            "width": 180
+        })
 
     if filters.get("show_category"):
         columns.append({"label": "Category", "fieldname": "category", "width": 150})
@@ -53,12 +104,13 @@ def get_columns(filters):
     return columns
 
 
+# ================= DATA =================
 def get_data(filters):
 
     conditions = ""
     values = {}
 
-    # ✅ DATE
+    # DATE
     if filters.get("from_date"):
         conditions += " AND si.posting_date >= %(from_date)s"
         values["from_date"] = filters.get("from_date")
@@ -67,47 +119,52 @@ def get_data(filters):
         conditions += " AND si.posting_date <= %(to_date)s"
         values["to_date"] = filters.get("to_date")
 
-    # ✅ COMPANY
+    # COMPANY
     if filters.get("company"):
         conditions += " AND si.company = %(company)s"
         values["company"] = filters.get("company")
 
-    # ✅ CUSTOMER
+    # CUSTOMER
     if filters.get("customer"):
         conditions += " AND si.customer = %(customer)s"
         values["customer"] = filters.get("customer")
 
-    # ✅ CATEGORY
+    # CUSTOMER GROUP
+    if filters.get("customer_group"):
+        conditions += " AND c.customer_group = %(customer_group)s"
+        values["customer_group"] = filters.get("customer_group")
+
+    # CATEGORY
     if filters.get("item_group"):
         conditions += " AND sii.item_group = %(item_group)s"
         values["item_group"] = filters.get("item_group")
 
-    # ✅ ITEM
+    # ITEM
     if filters.get("item"):
         conditions += " AND sii.item_code = %(item)s"
         values["item"] = filters.get("item")
 
-    # ✅ MAIN GROUP
+    # MAIN GROUP
     if filters.get("main_group"):
         conditions += " AND i.custom_main_group = %(main_group)s"
         values["main_group"] = filters.get("main_group")
 
-    # ✅ WAREHOUSE
+    # WAREHOUSE
     if filters.get("warehouse"):
         conditions += " AND sii.warehouse = %(warehouse)s"
         values["warehouse"] = filters.get("warehouse")
 
-    # ✅ TSO
+    # TSO
     if filters.get("tso"):
         conditions += " AND st.sales_person = %(tso)s"
         values["tso"] = filters.get("tso")
 
-    # ✅ PARENT SALES PERSON
+    # PARENT SALES PERSON
     if filters.get("parent_sales_person"):
         conditions += " AND sp.parent_sales_person = %(parent_sales_person)s"
         values["parent_sales_person"] = filters.get("parent_sales_person")
 
-    # ✅ DYNAMIC FIELDS
+    # DYNAMIC FIELDS
     sp_fields = [f.fieldname for f in frappe.get_meta("Sales Person").fields]
     item_fields = [f.fieldname for f in frappe.get_meta("Item").fields]
 
@@ -115,27 +172,29 @@ def get_data(filters):
     parent_sp_field = "sp.parent_sales_person" if "parent_sales_person" in sp_fields else "''"
     main_group_field = "i.custom_main_group" if "custom_main_group" in item_fields else "''"
 
-    # ✅ GROUPING
+    # GROUPING
     group_by = ["MONTH(si.posting_date)", "st.sales_person"]
 
     if filters.get("show_item"):
         group_by.append("sii.item_code")
     elif filters.get("show_category"):
         group_by.append("sii.item_group")
+    elif filters.get("show_customer_group"):
+        group_by.append("c.customer_group")
     else:
         group_by.append("si.customer")
 
     group_by = ", ".join(group_by)
 
-    # ✅ QUERY
     data = frappe.db.sql(f"""
         SELECT
             MONTH(si.posting_date) as month,
             {tso_field} as tso,
             {parent_sp_field} as parent_sales_person,
             st.sales_person as sales_person,
-            si.customer as customer_id,          -- 🔥 IMPORTANT
-            si.customer_name as customer_name,   -- 🔥 DISPLAY
+            si.customer as customer_id,
+            si.customer_name as customer_name,
+            c.customer_group as customer_group,
             sii.item_group as category,
             {main_group_field} as main_group,
             sii.item_code as item_code,
@@ -145,6 +204,7 @@ def get_data(filters):
         FROM `tabSales Invoice` si
         INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         LEFT JOIN `tabItem` i ON i.name = sii.item_code
+        LEFT JOIN `tabCustomer` c ON c.name = si.customer
         LEFT JOIN `tabSales Team` st ON st.parent = si.name AND st.idx = 1
         LEFT JOIN `tabSales Person` sp ON sp.name = st.sales_person
         WHERE si.docstatus = 1
@@ -163,7 +223,6 @@ def get_data(filters):
 
         month = int(row.month)
 
-        # 🔥 USE CUSTOMER ID FOR TARGET
         target = get_target(row.customer_id, row.sales_person, month)
 
         try:
@@ -182,13 +241,16 @@ def get_data(filters):
             "tso": row.tso,
             "parent_sales_person": row.parent_sales_person,
             "sales_person": row.sales_person,
-            "customer_name": row.customer_name,  # ✅ DISPLAY
+            "customer_name": row.customer_name,
             "main_group": row.main_group,
             "qty": row.qty,
             "amount": row.amount,
             "target": target,
             "achieved": achieved
         }
+
+        if filters.get("show_customer_group"):
+            d["customer_group"] = row.customer_group
 
         if filters.get("show_category"):
             d["category"] = row.category
@@ -199,7 +261,6 @@ def get_data(filters):
 
         result.append(d)
 
-    # ✅ TOTAL
     overall = (total_amount / total_target * 100) if total_target else 0
 
     result.append({

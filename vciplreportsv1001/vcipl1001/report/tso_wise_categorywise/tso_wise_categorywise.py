@@ -164,112 +164,36 @@
 #         {"parent": customer, "sales_person": sales_person},
 #         fieldname
 #     ) or 0
-
 import frappe
-from frappe import _
+from frappe.utils import flt
 
-def execute(filters=None):
-    columns = get_columns()
-    categories = get_categories(filters)
-    data = get_data(filters, categories)
-    return columns, data
+@frappe.whitelist()
+def get_dashboard_data(from_date=None, to_date=None, sales_person=None):
 
+    conditions = ""
 
-# ✅ STEP 1: GET ITEM GROUPS (CATEGORIES)
-def get_categories(filters):
-    return frappe.db.sql("""
-        SELECT name FROM `tabItem Group`
-        WHERE is_group = 0
-        ORDER BY name
-    """, as_dict=1)
+    if from_date and to_date:
+        conditions += f" AND si.posting_date BETWEEN '{from_date}' AND '{to_date}'"
 
+    if sales_person:
+        conditions += f" AND st.sales_person = '{sales_person}'"
 
-# ✅ STEP 2: COLUMNS
-def get_columns():
-    columns = [
-        {"label": "Sales Person", "fieldname": "sales_person", "fieldtype": "Data", "width": 180},
-        {"label": "Region", "fieldname": "region", "fieldtype": "Data", "width": 120},
-    ]
-
-    categories = frappe.db.sql("""
-        SELECT name FROM `tabItem Group`
-        WHERE is_group = 0
-        ORDER BY name
-    """, as_dict=1)
-
-    for cat in categories:
-        field = frappe.scrub(cat.name)
-        columns.append({
-            "label": cat.name,
-            "fieldname": field,
-            "fieldtype": "Currency",
-            "width": 120
-        })
-
-    columns.extend([
-        {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 120},
-        {"label": "Achieved", "fieldname": "achieved", "fieldtype": "Currency", "width": 120},
-        {"label": "Ach %", "fieldname": "ach_percent", "fieldtype": "Percent", "width": 100},
-    ])
-
-    return columns
-
-
-# ✅ STEP 3: MAIN DATA
-def get_data(filters, categories):
-
-    raw_data = frappe.db.sql("""
-        SELECT
-            st.sales_person,
-            st.custom_region,
-            sii.item_group,
-            SUM(sii.base_net_amount) as amount
-
+    data = frappe.db.sql(f"""
+        SELECT 
+            i.item_group AS category,
+            SUM(sii.base_net_amount) AS achieved
         FROM `tabSales Invoice` si
+        JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
+        JOIN `tabItem` i ON i.name = sii.item_code
+        LEFT JOIN `tabSales Team` st ON st.parent = si.name
+        WHERE si.docstatus = 1
+        {conditions}
+        GROUP BY i.item_group
+    """, as_dict=True)
 
-        LEFT JOIN `tabSales Invoice Item` sii
-            ON sii.parent = si.name
+    # Add Target + Percentage
+    for d in data:
+        d["target"] = 100000  # 🔁 Replace later with dynamic target
+        d["percentage"] = (flt(d["achieved"]) / flt(d["target"]) * 100) if d["target"] else 0
 
-        LEFT JOIN `tabSales Team` st
-            ON st.parent = si.name
-
-        WHERE
-            si.docstatus = 1
-            AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
-
-        GROUP BY
-            st.sales_person,
-            st.custom_region,
-            sii.item_group
-    """, filters, as_dict=1)
-
-    # ✅ MAP DATA
-    result = {}
-
-    for row in raw_data:
-        key = (row.sales_person, row.custom_region)
-
-        if key not in result:
-            result[key] = {
-                "sales_person": row.sales_person,
-                "region": row.custom_region,
-                "target": 0,
-                "achieved": 0
-            }
-
-        field = frappe.scrub(row.item_group)
-        result[key][field] = row.amount
-        result[key]["achieved"] += row.amount
-
-    # ✅ ADD TARGET (Example logic - customize later)
-    for key in result:
-        result[key]["target"] = result[key]["achieved"] * 1.2  # dummy target
-
-        if result[key]["target"] > 0:
-            result[key]["ach_percent"] = (
-                result[key]["achieved"] / result[key]["target"]
-            ) * 100
-        else:
-            result[key]["ach_percent"] = 0
-
-    return list(result.values())
+    return data

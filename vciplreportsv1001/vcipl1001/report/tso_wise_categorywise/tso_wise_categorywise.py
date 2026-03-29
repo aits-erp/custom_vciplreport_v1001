@@ -191,7 +191,7 @@ MONTH_FIELD_MAP = {
 def execute(filters=None):
     filters = frappe._dict(filters or {})
 
-    categories = get_categories()
+    categories = get_categories(filters)
     columns = get_columns(categories)
     data = get_data(filters, categories)
 
@@ -199,9 +199,15 @@ def execute(filters=None):
 
 
 # ================= GET CATEGORIES =================
-def get_categories():
+def get_categories(filters):
+
+    # 🔥 If user selected categories → use only those
+    if filters.get("item_group"):
+        return filters.get("item_group")
+
+    # 🔥 Else fetch all categories
     return frappe.db.sql_list("""
-        SELECT DISTINCT item_group 
+        SELECT DISTINCT item_group
         FROM `tabItem`
         WHERE item_group IS NOT NULL
     """)
@@ -218,7 +224,6 @@ def get_columns(categories):
         {"label": "Customer Group", "fieldname": "customer_group", "width": 200},
     ]
 
-    # 🔥 Dynamic Category Columns
     for cat in categories:
         safe_cat = cat.replace(" ", "_")
 
@@ -228,6 +233,7 @@ def get_columns(categories):
             "fieldtype": "Currency",
             "width": 150
         })
+
         columns.append({
             "label": f"{cat} Achieved",
             "fieldname": f"{safe_cat}_achieved",
@@ -244,6 +250,7 @@ def get_data(filters, categories):
     conditions = ""
     values = {}
 
+    # 📅 Date
     if filters.get("from_date"):
         conditions += " AND si.posting_date >= %(from_date)s"
         values["from_date"] = filters.get("from_date")
@@ -252,9 +259,25 @@ def get_data(filters, categories):
         conditions += " AND si.posting_date <= %(to_date)s"
         values["to_date"] = filters.get("to_date")
 
+    # 👤 Sales Person
     if filters.get("sales_person"):
         conditions += " AND st.sales_person = %(sales_person)s"
         values["sales_person"] = filters.get("sales_person")
+
+    # 👥 Customer
+    if filters.get("customer"):
+        conditions += " AND si.customer = %(customer)s"
+        values["customer"] = filters.get("customer")
+
+    # 👥 Customer Group
+    if filters.get("customer_group"):
+        conditions += " AND c.customer_group = %(customer_group)s"
+        values["customer_group"] = filters.get("customer_group")
+
+    # 🔥 Category filter (multi)
+    if filters.get("item_group"):
+        conditions += " AND sii.item_group IN %(item_group)s"
+        values["item_group"] = tuple(filters.get("item_group"))
 
     data = frappe.db.sql(f"""
         SELECT
@@ -280,19 +303,13 @@ def get_data(filters, categories):
             si.customer,
             c.customer_group,
             sii.item_group
-        ORDER BY 
-            MONTH(si.posting_date), st.sales_person
     """, values, as_dict=1)
 
     result_dict = {}
 
     for row in data:
 
-        key = (
-            row.month,
-            row.tso,
-            row.customer
-        )
+        key = (row.month, row.tso, row.customer)
 
         if key not in result_dict:
             result_dict[key] = {
@@ -303,7 +320,6 @@ def get_data(filters, categories):
                 "customer_group": row.customer_group
             }
 
-            # initialize all categories
             for cat in categories:
                 safe_cat = cat.replace(" ", "_")
                 result_dict[key][f"{safe_cat}_target"] = 0
@@ -312,11 +328,12 @@ def get_data(filters, categories):
         month = int(row.month)
         safe_cat = row.category.replace(" ", "_")
 
-        target = get_target(row.customer_id, row.tso, month)
-        achieved = flt(row.achieved)
+        if row.category in categories:
+            target = get_target(row.customer_id, row.tso, month)
+            achieved = flt(row.achieved)
 
-        result_dict[key][f"{safe_cat}_target"] = target
-        result_dict[key][f"{safe_cat}_achieved"] = achieved
+            result_dict[key][f"{safe_cat}_target"] = target
+            result_dict[key][f"{safe_cat}_achieved"] = achieved
 
     return list(result_dict.values())
 

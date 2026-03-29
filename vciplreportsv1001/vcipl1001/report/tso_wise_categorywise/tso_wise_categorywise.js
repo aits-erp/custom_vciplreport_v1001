@@ -88,15 +88,8 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
         },
 
         {
-            fieldname: "company",
-            label: "Company",
-            fieldtype: "Link",
-            options: "Company"
-        },
-
-        {
             fieldname: "sales_person",
-            label: "TSO (Sales Person)",
+            label: "TSO",
             fieldtype: "Link",
             options: "Sales Person"
         },
@@ -113,6 +106,16 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             label: "Customer Group",
             fieldtype: "Link",
             options: "Customer Group"
+        },
+
+        // 🔥 MULTI CATEGORY FILTER
+        {
+            fieldname: "item_group",
+            label: "Category",
+            fieldtype: "MultiSelectList",
+            get_data: function(txt) {
+                return frappe.db.get_link_options("Item Group", txt);
+            }
         }
 
     ]

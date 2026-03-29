@@ -1,0 +1,76 @@
+/* =====================================================
+   ERPNext v15 FINAL NAVBAR TEXT FIX
+   (Accounting > Sales Invoice > ...)
+   ===================================================== */
+
+/* Navbar background */
+header.navbar {
+    background-color: #0077B6 !important;
+}
+
+/* =====================================================
+   MAIN FIX – PAGE TITLE / ROUTE TEXT
+   THIS IS THE REAL ELEMENT
+   ===================================================== */
+header.navbar .page-title .title-text,
+header.navbar .page-title .title-text *,
+header.navbar .page-title a {
+    color: #FFFFFF !important;        /* SAME AS HELP */
+    font-weight: 500 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Separator > */
+header.navbar .page-title .title-text span::before {
+    color: rgba(255,255,255,0.75) !important;
+}
+
+/* =====================================================
+   HELP TEXT (REFERENCE)
+   ===================================================== */
+header.navbar .help-dropdown-toggle,
+header.navbar .help-dropdown-toggle *,
+header.navbar .help-dropdown-toggle svg {
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+}
+
+/* =====================================================
+   ICONS (Search, Bell, Profile)
+   ===================================================== */
+header.navbar .nav-link,
+header.navbar svg {
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+}
+
+/* =====================================================
+   SEARCH BAR
+   ===================================================== */
+header.navbar input[type="text"] {
+    background-color: rgba(255,255,255,0.2) !important;
+    color: #FFFFFF !important;
+    border-radius: 20px;
+}
+
+header.navbar input::placeholder {
+    color: rgba(255,255,255,0.75) !important;
+}
+
+/* =====================================================
+   HOVER (MATCH HELP)
+   ===================================================== */
+header.navbar a:hover {
+    color: #90E0EF !important;
+}
+
+/* =====================================================
+   HARD OVERRIDE – ERPNext CORE KILLER
+   ===================================================== */
+header.navbar .page-title * {
+    text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+}
+.disabled{
+    background-color: aliceblue;
+}

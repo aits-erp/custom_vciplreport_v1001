@@ -1,0 +1,91 @@
+/* =====================================================
+   ERPNext NAVBAR – FULL FIX (v15)
+   Text visibility + Help-style color
+   ===================================================== */
+
+/* Navbar container */
+.navbar {
+    background-color: #0077B6 !important;
+    height: 60px !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+
+/* ---------------------------------
+   Breadcrumb / Page Title (MAIN FIX)
+   --------------------------------- */
+.navbar .breadcrumb,
+.navbar .breadcrumb a,
+.navbar .route-string,
+.navbar .page-title,
+.navbar .title-text {
+    color: #FFFFFF !important;          /* Same as Help */
+    font-weight: 500 !important;
+    opacity: 1 !important;
+    line-height: 1.4;
+}
+
+/* Breadcrumb separator ">" */
+.navbar .breadcrumb-item::before {
+    color: rgba(255,255,255,0.75) !important;
+}
+
+/* Active breadcrumb (current page) */
+.navbar .breadcrumb-item.active {
+    color: #CAF0F8 !important;
+    font-weight: 600 !important;
+}
+
+/* ---------------------------------
+   Help Text (REFERENCE STYLE)
+   --------------------------------- */
+.navbar .help-dropdown-toggle,
+.navbar .help-dropdown-toggle span,
+.navbar .help-dropdown-toggle svg {
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+    font-weight: 500;
+}
+
+/* ---------------------------------
+   Navbar Icons (Search, Bell, Profile)
+   --------------------------------- */
+.navbar .nav-link,
+.navbar .icon-btn,
+.navbar .navbar-text,
+.navbar svg {
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+}
+
+/* Hover effects – same as Help */
+.navbar .nav-link:hover,
+.navbar .breadcrumb a:hover,
+.navbar .help-dropdown-toggle:hover {
+    color: #90E0EF !important;
+}
+
+/* ---------------------------------
+   Search Box
+   --------------------------------- */
+.navbar .form-control {
+    background-color: rgba(255,255,255,0.15) !important;
+    color: #FFFFFF !important;
+    border-radius: 20px;
+}
+
+.navbar .form-control::placeholder {
+    color: rgba(255,255,255,0.7) !important;
+}
+
+/* ---------------------------------
+   Force visibility (anti-hide fix)
+   --------------------------------- */
+.navbar * {
+    opacity: 1 !important;
+}
+
+/* Optional clarity enhancement */
+.navbar .breadcrumb,
+.navbar .route-string {
+    text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+}

@@ -108,7 +108,7 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             options: "Customer Group"
         },
 
-        // 🔥 MULTI CATEGORY FILTER
+        // ✅ Multi Category Filter
         {
             fieldname: "item_group",
             label: "Category",
@@ -117,6 +117,5 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                 return frappe.db.get_link_options("Item Group", txt);
             }
         }
-
     ]
 };

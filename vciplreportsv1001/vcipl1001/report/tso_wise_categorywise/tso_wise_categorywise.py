@@ -187,7 +187,6 @@ MONTH_FIELD_MAP = {
 }
 
 
-# ================= EXECUTE =================
 def execute(filters=None):
     filters = frappe._dict(filters or {})
 
@@ -198,14 +197,11 @@ def execute(filters=None):
     return columns, data
 
 
-# ================= GET CATEGORIES =================
+# 🔹 Categories
 def get_categories(filters):
-
-    # 🔥 If user selected categories → use only those
     if filters.get("item_group"):
         return filters.get("item_group")
 
-    # 🔥 Else fetch all categories
     return frappe.db.sql_list("""
         SELECT DISTINCT item_group
         FROM `tabItem`
@@ -213,7 +209,7 @@ def get_categories(filters):
     """)
 
 
-# ================= COLUMNS =================
+# 🔹 Columns
 def get_columns(categories):
 
     columns = [
@@ -225,32 +221,21 @@ def get_columns(categories):
     ]
 
     for cat in categories:
-        safe_cat = cat.replace(" ", "_")
+        safe = cat.replace(" ", "_")
 
-        columns.append({
-            "label": f"{cat} Target",
-            "fieldname": f"{safe_cat}_target",
-            "fieldtype": "Currency",
-            "width": 150
-        })
-
-        columns.append({
-            "label": f"{cat} Achieved",
-            "fieldname": f"{safe_cat}_achieved",
-            "fieldtype": "Currency",
-            "width": 150
-        })
+        columns.append({"label": f"{cat} Target", "fieldname": f"{safe}_target", "fieldtype": "Currency"})
+        columns.append({"label": f"{cat} Achieved", "fieldname": f"{safe}_achieved", "fieldtype": "Currency"})
+        columns.append({"label": f"{cat} %", "fieldname": f"{safe}_percent", "fieldtype": "Percent"})
 
     return columns
 
 
-# ================= DATA =================
+# 🔹 Data
 def get_data(filters, categories):
 
     conditions = ""
     values = {}
 
-    # 📅 Date
     if filters.get("from_date"):
         conditions += " AND si.posting_date >= %(from_date)s"
         values["from_date"] = filters.get("from_date")
@@ -259,22 +244,10 @@ def get_data(filters, categories):
         conditions += " AND si.posting_date <= %(to_date)s"
         values["to_date"] = filters.get("to_date")
 
-    # 👤 Sales Person
     if filters.get("sales_person"):
         conditions += " AND st.sales_person = %(sales_person)s"
         values["sales_person"] = filters.get("sales_person")
 
-    # 👥 Customer
-    if filters.get("customer"):
-        conditions += " AND si.customer = %(customer)s"
-        values["customer"] = filters.get("customer")
-
-    # 👥 Customer Group
-    if filters.get("customer_group"):
-        conditions += " AND c.customer_group = %(customer_group)s"
-        values["customer_group"] = filters.get("customer_group")
-
-    # 🔥 Category filter (multi)
     if filters.get("item_group"):
         conditions += " AND sii.item_group IN %(item_group)s"
         values["item_group"] = tuple(filters.get("item_group"))
@@ -305,14 +278,14 @@ def get_data(filters, categories):
             sii.item_group
     """, values, as_dict=1)
 
-    result_dict = {}
+    result = {}
+    totals = {}
 
     for row in data:
-
         key = (row.month, row.tso, row.customer)
 
-        if key not in result_dict:
-            result_dict[key] = {
+        if key not in result:
+            result[key] = {
                 "month": MONTHS[int(row.month) - 1],
                 "parent_sales_person": row.parent_sales_person,
                 "tso": row.tso,
@@ -321,24 +294,47 @@ def get_data(filters, categories):
             }
 
             for cat in categories:
-                safe_cat = cat.replace(" ", "_")
-                result_dict[key][f"{safe_cat}_target"] = 0
-                result_dict[key][f"{safe_cat}_achieved"] = 0
+                safe = cat.replace(" ", "_")
+                result[key][f"{safe}_target"] = 0
+                result[key][f"{safe}_achieved"] = 0
+                result[key][f"{safe}_percent"] = 0
+
+                totals.setdefault(cat, {"target": 0, "achieved": 0})
 
         month = int(row.month)
-        safe_cat = row.category.replace(" ", "_")
+        cat = row.category
+        safe = cat.replace(" ", "_")
 
-        if row.category in categories:
-            target = get_target(row.customer_id, row.tso, month)
+        if cat in categories:
+            target = flt(get_target(row.customer_id, row.tso, month))
             achieved = flt(row.achieved)
+            percent = (achieved / target * 100) if target else 0
 
-            result_dict[key][f"{safe_cat}_target"] = target
-            result_dict[key][f"{safe_cat}_achieved"] = achieved
+            result[key][f"{safe}_target"] += target
+            result[key][f"{safe}_achieved"] += achieved
+            result[key][f"{safe}_percent"] = percent
 
-    return list(result_dict.values())
+            totals[cat]["target"] += target
+            totals[cat]["achieved"] += achieved
+
+    # 🔥 TOTAL ROW
+    total_row = {"month": "TOTAL"}
+
+    for cat in categories:
+        safe = cat.replace(" ", "_")
+
+        t = totals[cat]["target"]
+        a = totals[cat]["achieved"]
+        p = (a / t * 100) if t else 0
+
+        total_row[f"{safe}_target"] = t
+        total_row[f"{safe}_achieved"] = a
+        total_row[f"{safe}_percent"] = p
+
+    return list(result.values()) + [total_row]
 
 
-# ================= TARGET =================
+# 🔹 Target
 def get_target(customer, sales_person, month):
 
     fieldname = MONTH_FIELD_MAP.get(month)
@@ -348,9 +344,6 @@ def get_target(customer, sales_person, month):
 
     return frappe.db.get_value(
         "Sales Team",
-        {
-            "parent": customer,
-            "sales_person": sales_person
-        },
+        {"parent": customer, "sales_person": sales_person},
         fieldname
     ) or 0

@@ -43,6 +43,11 @@ frappe.query_reports["Most Selling Below MSL Report"] = {
             options: "Item Group"
         },
         {
+            fieldname: "custom_main_group",
+            label: __("Main Group"),
+            fieldtype: "Data"
+        },
+        {
             fieldname: "item_code",
             label: __("Item Code"),
             fieldtype: "Link",
@@ -65,7 +70,8 @@ frappe.query_reports["Most Selling Below MSL Report"] = {
     }
 };
 
-// Popup
+
+// -------- WAREHOUSE POPUP --------
 $(document).on("click", ".view-warehouses", function (e) {
     e.preventDefault();
 

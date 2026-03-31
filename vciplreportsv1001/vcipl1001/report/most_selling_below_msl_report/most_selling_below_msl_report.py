@@ -5,7 +5,7 @@ from datetime import date
 def execute(filters=None):
     filters = filters or {}
 
-    # Default Financial Year
+    # If user does not select date range → default Financial Year
     if not filters.get("from_date") or not filters.get("to_date"):
         today = date.today()
         fy_year = today.year if today.month > 3 else today.year - 1
@@ -94,9 +94,11 @@ def get_data(filters):
         "item_type": filters.get("custom_item_type"),
         "item_code": filters.get("item_code"),
         "item_group": filters.get("item_group"),
+        "main_group": filters.get("custom_main_group"),
         "include_all_items": filters.get("include_all_items", 0)
     }
 
+    # -------- INCLUDE ALL ITEMS --------
     if params["include_all_items"]:
         items_query = """
             SELECT DISTINCT
@@ -112,6 +114,7 @@ def get_data(filters):
                 AND (%(item_type)s IS NULL OR i.custom_item_type = %(item_type)s)
                 AND (%(item_code)s IS NULL OR i.name = %(item_code)s)
                 AND (%(item_group)s IS NULL OR i.item_group = %(item_group)s)
+                AND (%(main_group)s IS NULL OR i.custom_main_group = %(main_group)s)
             ORDER BY i.name
         """
 
@@ -181,6 +184,7 @@ def get_data(filters):
         final_rows.sort(key=lambda x: x["total_amount"], reverse=True)
         return final_rows
 
+    # -------- MOST SELLING --------
     else:
         sales_query = """
             SELECT
@@ -201,7 +205,13 @@ def get_data(filters):
                 AND (%(item_type)s IS NULL OR i.custom_item_type = %(item_type)s)
                 AND (%(item_code)s IS NULL OR sii.item_code = %(item_code)s)
                 AND (%(item_group)s IS NULL OR i.item_group = %(item_group)s)
-            GROUP BY sii.item_code, i.item_name, i.item_group, i.custom_main_group, i.safety_stock
+                AND (%(main_group)s IS NULL OR i.custom_main_group = %(main_group)s)
+            GROUP BY 
+                sii.item_code, 
+                i.item_name, 
+                i.item_group, 
+                i.custom_main_group, 
+                i.safety_stock
             ORDER BY total_amount DESC
         """
 

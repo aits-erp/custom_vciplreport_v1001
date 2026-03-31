@@ -2,7 +2,6 @@ frappe.query_reports["Most Selling Below MSL Report"] = {
     onload: function (report) {
         report.set_filter_value("custom_item_type", "Finished Goods");
 
-        // Default FY dates (April → March)
         let today = frappe.datetime.get_today();
         let d = frappe.datetime.str_to_obj(today);
 
@@ -29,7 +28,7 @@ frappe.query_reports["Most Selling Below MSL Report"] = {
             fieldname: "include_all_items",
             label: __("Include All Items Below Safety Stock"),
             fieldtype: "Check",
-            default: 0  // By default unchecked (false)
+            default: 0
         },
         {
             fieldname: "custom_item_type",
@@ -66,7 +65,7 @@ frappe.query_reports["Most Selling Below MSL Report"] = {
     }
 };
 
-// -------- WAREHOUSE POPUP --------
+// Popup
 $(document).on("click", ".view-warehouses", function (e) {
     e.preventDefault();
 

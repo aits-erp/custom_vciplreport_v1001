@@ -39,7 +39,7 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             options: "Customer Group"
         },
 
-        // 🔥 CATEGORY (FINAL FIX)
+        // 🔥 CATEGORY (MULTI + SINGLE SUPPORT)
         {
             fieldname: "custom_main_group",
             label: "Category",

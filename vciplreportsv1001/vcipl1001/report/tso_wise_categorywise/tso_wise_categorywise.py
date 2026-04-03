@@ -32,7 +32,7 @@ def execute(filters=None):
 
 # 🔹 Categories
 def get_categories(filters):
-    if filters.get("custom_main_group"):
+    if filters.get("custom_main_group") and len(filters.get("custom_main_group")) > 0:
         return filters.get("custom_main_group")
 
     return frappe.db.sql_list("""
@@ -81,10 +81,13 @@ def get_data(filters, categories):
         conditions += " AND st.sales_person = %(sales_person)s"
         values["sales_person"] = filters.get("sales_person")
 
-    # 🔥 CATEGORY FILTER (FINAL FIX)
-    if filters.get("custom_main_group"):
+    # 🔥 CATEGORY FILTER (FIXED)
+    if filters.get("custom_main_group") and len(filters.get("custom_main_group")) > 0:
         conditions += " AND i.custom_main_group IN %(custom_main_group)s"
         values["custom_main_group"] = tuple(filters.get("custom_main_group"))
+
+    # 🔥 ALWAYS APPLY → FINISHED GOODS
+    conditions += " AND i.custom_item_type = 'Finished Goods'"
 
     data = frappe.db.sql(f"""
         SELECT
@@ -182,5 +185,3 @@ def get_target(customer, sales_person, month):
         {"parent": customer, "sales_person": sales_person},
         fieldname
     ) or 0
-
-#changes 

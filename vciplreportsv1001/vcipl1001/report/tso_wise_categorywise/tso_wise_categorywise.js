@@ -109,13 +109,7 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
         },
 
         // ✅ Multi Category Filter
-        {
-            fieldname: "item_group",
-            label: "Category",
-            fieldtype: "MultiSelectList",
-            get_data: function(txt) {
-                return frappe.db.get_link_options("Item Group", txt);
-            }
-        }
+// NEW
+
     ]
 };

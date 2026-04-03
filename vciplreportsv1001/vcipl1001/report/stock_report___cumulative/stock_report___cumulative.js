@@ -1,6 +1,3 @@
-// Copyright (c) 2025, your company and contributors
-// For license information, please see license.txt
-
 frappe.query_reports["Stock Report - Cumulative"] = {
     filters: [
         {
@@ -32,5 +29,17 @@ frappe.query_reports["Stock Report - Cumulative"] = {
             fieldtype: "Date",
             default: frappe.datetime.get_today()
         }
-    ]
+    ],
+
+    formatter: function(value, row, column, data, default_formatter) {
+
+        // 🚀 FORCE ONLY ITEM CODE (NO ITEM NAME)
+        if (column.fieldname === "item_code") {
+            return `<a href="/app/item/${value}" target="_blank">${value}</a>`;
+        }
+
+        return default_formatter(value, row, column, data);
+    }
 };
+
+//changes

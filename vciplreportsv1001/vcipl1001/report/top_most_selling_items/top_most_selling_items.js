@@ -9,7 +9,7 @@ frappe.query_reports["Top Most Selling Items"] = {
         report.set_filter_value("record_limit", 50);
         report.set_filter_value("from_date", `${year}-04-01`);
         report.set_filter_value("to_date", `${year + 1}-03-31`);
-        report.set_filter_value("show_all_items", 0); // Default unchecked
+        report.set_filter_value("show_all_items", 0);
     },
 
     filters: [
@@ -47,7 +47,7 @@ frappe.query_reports["Top Most Selling Items"] = {
             ],
             default: 50,
             reqd: 1,
-            depends_on: "eval:!doc.show_all_items"  // Only show when checkbox is unchecked
+            depends_on: "eval:!doc.show_all_items"
         }
     ]
 };

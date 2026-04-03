@@ -22,7 +22,7 @@ def get_columns():
         {
             "label": "Item Code",
             "fieldname": "item_code",
-            "fieldtype": "Link",
+            "fieldtype": "Data",
             "options": "Item",
             "width": 150
         },

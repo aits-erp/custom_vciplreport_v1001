@@ -30,10 +30,9 @@ def execute(filters=None):
     return columns, data
 
 
-# 🔹 GET CATEGORIES
 def get_categories(filters):
 
-    if filters.get("custom_main_group") and len(filters.get("custom_main_group")) > 0:
+    if filters.get("custom_main_group"):
         return filters.get("custom_main_group")
 
     return frappe.db.sql_list("""
@@ -44,7 +43,6 @@ def get_categories(filters):
     """)
 
 
-# 🔹 COLUMNS
 def get_columns(categories):
 
     columns = [
@@ -67,7 +65,6 @@ def get_columns(categories):
     return columns
 
 
-# 🔹 DATA
 def get_data(filters, categories):
 
     conditions = ""
@@ -85,18 +82,16 @@ def get_data(filters, categories):
         conditions += " AND st.sales_person = %(sales_person)s"
         values["sales_person"] = filters.get("sales_person")
 
-    # 🔥 HEAD SALES PERSON MULTI FILTER
-    if filters.get("parent_sales_person") and len(filters.get("parent_sales_person")) > 0:
-        conditions += " AND sp.parent_sales_person IN %(parent_sales_person)s"
-        values["parent_sales_person"] = tuple(filters.get("parent_sales_person"))
+    # ✅ SINGLE HEAD SALES PERSON FILTER
+    if filters.get("parent_sales_person"):
+        conditions += " AND sp.parent_sales_person = %(parent_sales_person)s"
+        values["parent_sales_person"] = filters.get("parent_sales_person")
 
-    # 🔥 REGION FILTER
-    if filters.get("custom_region") and len(filters.get("custom_region")) > 0:
+    if filters.get("custom_region"):
         conditions += " AND sp.custom_region IN %(custom_region)s"
         values["custom_region"] = tuple(filters.get("custom_region"))
 
-    # 🔥 HEAD SALES CODE FILTER
-    if filters.get("custom_head_sales_code") and len(filters.get("custom_head_sales_code")) > 0:
+    if filters.get("custom_head_sales_code"):
         conditions += " AND sp.custom_head_sales_code IN %(custom_head_sales_code)s"
         values["custom_head_sales_code"] = tuple(filters.get("custom_head_sales_code"))
 
@@ -108,7 +103,7 @@ def get_data(filters, categories):
         conditions += " AND c.customer_group = %(customer_group)s"
         values["customer_group"] = filters.get("customer_group")
 
-    if filters.get("custom_main_group") and len(filters.get("custom_main_group")) > 0:
+    if filters.get("custom_main_group"):
         conditions += " AND i.custom_main_group IN %(custom_main_group)s"
         values["custom_main_group"] = tuple(filters.get("custom_main_group"))
 
@@ -148,77 +143,4 @@ def get_data(filters, categories):
             i.custom_main_group
     """, values, as_dict=1)
 
-    result = {}
-    totals = {}
-
-    for row in data:
-        key = (row.month, row.tso, row.customer)
-
-        if key not in result:
-            result[key] = {
-                "month": MONTHS[int(row.month) - 1],
-                "custom_region": row.custom_region,
-                "custom_head_sales_code": row.custom_head_sales_code,
-                "parent_sales_person": row.parent_sales_person,
-                "tso": row.tso,
-                "customer": row.customer,
-                "customer_group": row.customer_group
-            }
-
-            for cat in categories:
-                safe = cat.replace(" ", "_").replace(".", "").replace("-", "_")
-
-                result[key][f"{safe}_target"] = 0
-                result[key][f"{safe}_achieved"] = 0
-                result[key][f"{safe}_percent"] = 0
-
-                totals.setdefault(cat, {"target": 0, "achieved": 0})
-
-        cat = row.category
-
-        if cat in categories:
-            safe = cat.replace(" ", "_").replace(".", "").replace("-", "_")
-
-            target = flt(get_target(row.customer_id, row.tso, int(row.month)))
-            achieved = flt(row.achieved)
-            percent = (achieved / target * 100) if target else 0
-
-            result[key][f"{safe}_target"] += target
-            result[key][f"{safe}_achieved"] += achieved
-            result[key][f"{safe}_percent"] = percent
-
-            totals[cat]["target"] += target
-            totals[cat]["achieved"] += achieved
-
-    total_row = {
-        "month": "TOTAL",
-        "custom_region": "",
-        "custom_head_sales_code": ""
-    }
-
-    for cat in categories:
-        safe = cat.replace(" ", "_").replace(".", "").replace("-", "_")
-
-        t = totals[cat]["target"]
-        a = totals[cat]["achieved"]
-        p = (a / t * 100) if t else 0
-
-        total_row[f"{safe}_target"] = t
-        total_row[f"{safe}_achieved"] = a
-        total_row[f"{safe}_percent"] = p
-
-    return list(result.values()) + [total_row]
-
-
-def get_target(customer, sales_person, month):
-
-    fieldname = MONTH_FIELD_MAP.get(month)
-
-    if not fieldname:
-        return 0
-
-    return frappe.db.get_value(
-        "Sales Team",
-        {"parent": customer, "sales_person": sales_person},
-        fieldname
-    ) or 0
+    return data

@@ -45,22 +45,15 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             options: "Sales Person"
         },
 
-        // ✅ HEAD SALES PERSON (MULTI - NAME)
+        // ✅ HEAD SALES PERSON (SINGLE SELECT)
         {
             fieldname: "parent_sales_person",
             label: "Head Sales Person",
-            fieldtype: "MultiSelectList",
-            get_data: function(txt) {
-                return frappe.db.sql_list(`
-                    SELECT name
-                    FROM \`tabSales Person\`
-                    WHERE parent_sales_person IS NULL
-                    AND name LIKE %s
-                `, ["%" + txt + "%"]);
-            }
+            fieldtype: "Link",
+            options: "Sales Person"
         },
 
-        // 🔥 REGION
+        // ✅ REGION (MULTI)
         {
             fieldname: "custom_region",
             label: "Region",
@@ -76,7 +69,7 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             }
         },
 
-        // 🔥 HEAD SALES CODE
+        // ✅ HEAD SALES CODE (MULTI)
         {
             fieldname: "custom_head_sales_code",
             label: "Head Sales Code",

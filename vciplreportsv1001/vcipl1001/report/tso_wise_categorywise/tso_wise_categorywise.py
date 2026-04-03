@@ -30,6 +30,7 @@ def execute(filters=None):
     return columns, data
 
 
+# 🔹 GET CATEGORIES
 def get_categories(filters):
 
     if filters.get("custom_main_group") and len(filters.get("custom_main_group")) > 0:
@@ -43,6 +44,7 @@ def get_categories(filters):
     """)
 
 
+# 🔹 COLUMNS
 def get_columns(categories):
 
     columns = [
@@ -65,6 +67,7 @@ def get_columns(categories):
     return columns
 
 
+# 🔹 DATA
 def get_data(filters, categories):
 
     conditions = ""
@@ -81,6 +84,11 @@ def get_data(filters, categories):
     if filters.get("sales_person"):
         conditions += " AND st.sales_person = %(sales_person)s"
         values["sales_person"] = filters.get("sales_person")
+
+    # 🔥 HEAD SALES PERSON MULTI FILTER
+    if filters.get("parent_sales_person") and len(filters.get("parent_sales_person")) > 0:
+        conditions += " AND sp.parent_sales_person IN %(parent_sales_person)s"
+        values["parent_sales_person"] = tuple(filters.get("parent_sales_person"))
 
     # 🔥 REGION FILTER
     if filters.get("custom_region") and len(filters.get("custom_region")) > 0:

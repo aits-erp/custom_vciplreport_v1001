@@ -45,12 +45,26 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             options: "Sales Person"
         },
 
-        // 🔥 NEW FILTER - REGION
+        // ✅ HEAD SALES PERSON (MULTI - NAME)
+        {
+            fieldname: "parent_sales_person",
+            label: "Head Sales Person",
+            fieldtype: "MultiSelectList",
+            get_data: function(txt) {
+                return frappe.db.sql_list(`
+                    SELECT name
+                    FROM \`tabSales Person\`
+                    WHERE parent_sales_person IS NULL
+                    AND name LIKE %s
+                `, ["%" + txt + "%"]);
+            }
+        },
+
+        // 🔥 REGION
         {
             fieldname: "custom_region",
             label: "Region",
             fieldtype: "MultiSelectList",
-
             get_data: function(txt) {
                 return frappe.db.sql_list(`
                     SELECT DISTINCT custom_region
@@ -62,12 +76,11 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             }
         },
 
-        // 🔥 NEW FILTER - HEAD SALES CODE
+        // 🔥 HEAD SALES CODE
         {
             fieldname: "custom_head_sales_code",
             label: "Head Sales Code",
             fieldtype: "MultiSelectList",
-
             get_data: function(txt) {
                 return frappe.db.sql_list(`
                     SELECT DISTINCT custom_head_sales_code
@@ -97,7 +110,6 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             fieldname: "custom_main_group",
             label: "Category",
             fieldtype: "MultiSelectList",
-
             get_data: function(txt) {
                 return frappe.db.sql_list(`
                     SELECT DISTINCT custom_main_group

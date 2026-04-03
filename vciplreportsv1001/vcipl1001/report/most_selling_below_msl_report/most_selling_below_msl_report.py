@@ -24,8 +24,7 @@ def get_columns():
         {
             "label": "Item Code",
             "fieldname": "item_code",
-            "fieldtype": "Link",
-            "options": "Item",
+            "fieldtype": "Data",   # ✅ ONLY CHANGE (was Link)
             "width": 180
         },
         {

@@ -1,15 +1,33 @@
 frappe.query_reports["Top Most Selling Items"] = {
+
     onload: function (report) {
         const today = frappe.datetime.get_today();
-        const year = frappe.datetime.str_to_obj(today).getMonth() > 2
-            ? frappe.datetime.str_to_obj(today).getFullYear()
-            : frappe.datetime.str_to_obj(today).getFullYear() - 1;
+        const today_obj = frappe.datetime.str_to_obj(today);
 
+        const year = today_obj.getMonth() > 2
+            ? today_obj.getFullYear()
+            : today_obj.getFullYear() - 1;
+
+        // ✅ Default values
         report.set_filter_value("custom_item_type", "Finished Goods");
         report.set_filter_value("record_limit", 50);
         report.set_filter_value("from_date", `${year}-04-01`);
         report.set_filter_value("to_date", `${year + 1}-03-31`);
         report.set_filter_value("show_all_items", 0);
+    },
+
+    // ✅ FINAL FIX → Show only Item Code (no name)
+    formatter: function (value, row, column, data, default_formatter) {
+
+        // Apply default formatter first
+        value = default_formatter(value, row, column, data);
+
+        // 🔥 Override Item Code display
+        if (column.fieldname === "item_code" && data) {
+            return data.item_code || "";
+        }
+
+        return value;
     },
 
     filters: [

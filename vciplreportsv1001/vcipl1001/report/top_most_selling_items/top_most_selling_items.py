@@ -13,7 +13,10 @@ def execute(filters=None):
         filters.from_date = date(fy_year, 4, 1)
         filters.to_date = date(fy_year + 1, 3, 31)
 
-    return get_columns(), get_data(filters)
+    columns = get_columns()
+    data = get_data(filters)
+
+    return columns, data
 
 
 # -------------------- COLUMNS --------------------
@@ -22,8 +25,7 @@ def get_columns():
         {
             "label": "Item Code",
             "fieldname": "item_code",
-            "fieldtype": "Data",
-            "options": "Item",
+            "fieldtype": "Data",   # ✅ IMPORTANT: keep Data
             "width": 150
         },
         {
@@ -62,12 +64,12 @@ def get_columns():
 
 # -------------------- DATA --------------------
 def get_data(filters):
-    # Check if "Show All Items" is checked
+
+    # ---------- LIMIT HANDLING ----------
     show_all = filters.get("show_all_items", 0)
-    
-    # Set limit based on checkbox
+
     if show_all:
-        limit_clause = ""  # No limit when show all is checked
+        limit_clause = ""
     else:
         limit = int(filters.get("record_limit") or 50)
         limit_clause = f"LIMIT {limit}"
@@ -82,9 +84,9 @@ def get_data(filters):
     # ---------------- SALES QUERY ----------------
     sales_query = f"""
         SELECT
-            sii.item_code,
-            i.item_name,
-            i.item_group,
+            sii.item_code AS item_code,
+            i.item_name AS item_name,
+            i.item_group AS item_group,
             SUM(sii.amount) AS total_amount,
             SUM(sii.qty) AS total_qty
         FROM `tabSales Invoice Item` sii
@@ -94,7 +96,8 @@ def get_data(filters):
             si.docstatus = %(docstatus)s
             AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
             AND (%(item_type)s IS NULL OR i.custom_item_type = %(item_type)s)
-        GROUP BY sii.item_code, i.item_name, i.item_group
+        GROUP BY
+            sii.item_code, i.item_name, i.item_group
         ORDER BY total_amount DESC
         {limit_clause}
     """
@@ -104,9 +107,9 @@ def get_data(filters):
     if not rows:
         return []
 
+    # ---------------- STOCK FETCH ----------------
     item_codes = [r["item_code"] for r in rows]
 
-    # ---------------- STOCK ----------------
     bins = frappe.get_all(
         "Bin",
         filters={"item_code": ["in", item_codes]},
@@ -115,8 +118,9 @@ def get_data(filters):
 
     stock_map = {}
     for b in bins:
-        stock_map[b.item_code] = stock_map.get(b.item_code, 0) + b.actual_qty
+        stock_map[b["item_code"]] = stock_map.get(b["item_code"], 0) + b["actual_qty"]
 
+    # ---------------- MERGE STOCK ----------------
     for r in rows:
         r["total_stock_qty"] = stock_map.get(r["item_code"], 0)
 

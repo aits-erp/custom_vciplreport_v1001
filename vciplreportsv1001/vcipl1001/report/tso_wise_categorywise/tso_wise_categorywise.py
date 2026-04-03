@@ -164,7 +164,6 @@
 #         {"parent": customer, "sales_person": sales_person},
 #         fieldname
 #     ) or 0
-
 import frappe
 from frappe.utils import flt
 
@@ -199,13 +198,13 @@ def execute(filters=None):
 
 # 🔹 Categories
 def get_categories(filters):
-    if filters.get("item_group"):
-        return filters.get("item_group")
+    if filters.get("custom_group"):
+        return filters.get("custom_group")
 
     return frappe.db.sql_list("""
-        SELECT DISTINCT item_group
+        SELECT DISTINCT custom_group
         FROM `tabItem`
-        WHERE item_group IS NOT NULL
+        WHERE custom_group IS NOT NULL
     """)
 
 
@@ -248,9 +247,10 @@ def get_data(filters, categories):
         conditions += " AND st.sales_person = %(sales_person)s"
         values["sales_person"] = filters.get("sales_person")
 
-    if filters.get("item_group"):
-        conditions += " AND sii.item_group IN %(item_group)s"
-        values["item_group"] = tuple(filters.get("item_group"))
+    # ✅ UPDATED FILTER
+    if filters.get("custom_group"):
+        conditions += " AND sii.custom_group IN %(custom_group)s"
+        values["custom_group"] = tuple(filters.get("custom_group"))
 
     data = frappe.db.sql(f"""
         SELECT
@@ -260,7 +260,7 @@ def get_data(filters, categories):
             si.customer_name as customer,
             c.customer_group,
             si.customer as customer_id,
-            sii.item_group as category,
+            sii.custom_group as category,
             SUM(sii.base_net_amount) as achieved
         FROM `tabSales Invoice` si
         LEFT JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
@@ -275,7 +275,7 @@ def get_data(filters, categories):
             sp.parent_sales_person,
             si.customer,
             c.customer_group,
-            sii.item_group
+            sii.custom_group
     """, values, as_dict=1)
 
     result = {}

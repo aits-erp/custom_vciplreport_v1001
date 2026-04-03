@@ -30,7 +30,6 @@ def execute(filters=None):
     return columns, data
 
 
-# 🔹 GET CATEGORIES
 def get_categories(filters):
 
     if filters.get("custom_main_group") and len(filters.get("custom_main_group")) > 0:
@@ -44,11 +43,12 @@ def get_categories(filters):
     """)
 
 
-# 🔹 COLUMNS
 def get_columns(categories):
 
     columns = [
         {"label": "Month", "fieldname": "month", "width": 100},
+        {"label": "Region", "fieldname": "custom_region", "width": 150},
+        {"label": "Head Sales Code", "fieldname": "custom_head_sales_code", "width": 150},
         {"label": "Head Sales Person", "fieldname": "parent_sales_person", "width": 200},
         {"label": "TSO", "fieldname": "tso", "width": 180},
         {"label": "Customer", "fieldname": "customer", "width": 220},
@@ -58,26 +58,13 @@ def get_columns(categories):
     for cat in categories:
         safe = cat.replace(" ", "_").replace(".", "").replace("-", "_")
 
-        columns.append({
-            "label": f"{cat} Target",
-            "fieldname": f"{safe}_target",
-            "fieldtype": "Currency"
-        })
-        columns.append({
-            "label": f"{cat} Achieved",
-            "fieldname": f"{safe}_achieved",
-            "fieldtype": "Currency"
-        })
-        columns.append({
-            "label": f"{cat} %",
-            "fieldname": f"{safe}_percent",
-            "fieldtype": "Percent"
-        })
+        columns.append({"label": f"{cat} Target", "fieldname": f"{safe}_target", "fieldtype": "Currency"})
+        columns.append({"label": f"{cat} Achieved", "fieldname": f"{safe}_achieved", "fieldtype": "Currency"})
+        columns.append({"label": f"{cat} %", "fieldname": f"{safe}_percent", "fieldtype": "Percent"})
 
     return columns
 
 
-# 🔹 DATA
 def get_data(filters, categories):
 
     conditions = ""
@@ -95,6 +82,16 @@ def get_data(filters, categories):
         conditions += " AND st.sales_person = %(sales_person)s"
         values["sales_person"] = filters.get("sales_person")
 
+    # 🔥 REGION FILTER
+    if filters.get("custom_region") and len(filters.get("custom_region")) > 0:
+        conditions += " AND sp.custom_region IN %(custom_region)s"
+        values["custom_region"] = tuple(filters.get("custom_region"))
+
+    # 🔥 HEAD SALES CODE FILTER
+    if filters.get("custom_head_sales_code") and len(filters.get("custom_head_sales_code")) > 0:
+        conditions += " AND sp.custom_head_sales_code IN %(custom_head_sales_code)s"
+        values["custom_head_sales_code"] = tuple(filters.get("custom_head_sales_code"))
+
     if filters.get("customer"):
         conditions += " AND si.customer = %(customer)s"
         values["customer"] = filters.get("customer")
@@ -103,12 +100,10 @@ def get_data(filters, categories):
         conditions += " AND c.customer_group = %(customer_group)s"
         values["customer_group"] = filters.get("customer_group")
 
-    # 🔥 CATEGORY FILTER
     if filters.get("custom_main_group") and len(filters.get("custom_main_group")) > 0:
         conditions += " AND i.custom_main_group IN %(custom_main_group)s"
         values["custom_main_group"] = tuple(filters.get("custom_main_group"))
 
-    # 🔥 ALWAYS FINISHED GOODS
     conditions += " AND i.custom_item_type = 'Finished Goods'"
 
     data = frappe.db.sql(f"""
@@ -116,23 +111,30 @@ def get_data(filters, categories):
             MONTH(si.posting_date) as month,
             st.sales_person as tso,
             sp.parent_sales_person,
+            sp.custom_region,
+            sp.custom_head_sales_code,
             si.customer_name as customer,
             c.customer_group,
             si.customer as customer_id,
             i.custom_main_group as category,
             SUM(sii.base_net_amount) as achieved
+
         FROM `tabSales Invoice` si
         LEFT JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         LEFT JOIN `tabItem` i ON i.name = sii.item_code
         LEFT JOIN `tabCustomer` c ON c.name = si.customer
         LEFT JOIN `tabSales Team` st ON st.parent = si.name AND st.idx = 1
         LEFT JOIN `tabSales Person` sp ON sp.name = st.sales_person
+
         WHERE si.docstatus = 1
         {conditions}
+
         GROUP BY 
             MONTH(si.posting_date),
             st.sales_person,
             sp.parent_sales_person,
+            sp.custom_region,
+            sp.custom_head_sales_code,
             si.customer,
             c.customer_group,
             i.custom_main_group
@@ -147,6 +149,8 @@ def get_data(filters, categories):
         if key not in result:
             result[key] = {
                 "month": MONTHS[int(row.month) - 1],
+                "custom_region": row.custom_region,
+                "custom_head_sales_code": row.custom_head_sales_code,
                 "parent_sales_person": row.parent_sales_person,
                 "tso": row.tso,
                 "customer": row.customer,
@@ -178,8 +182,11 @@ def get_data(filters, categories):
             totals[cat]["target"] += target
             totals[cat]["achieved"] += achieved
 
-    # 🔥 TOTAL ROW
-    total_row = {"month": "TOTAL"}
+    total_row = {
+        "month": "TOTAL",
+        "custom_region": "",
+        "custom_head_sales_code": ""
+    }
 
     for cat in categories:
         safe = cat.replace(" ", "_").replace(".", "").replace("-", "_")
@@ -195,7 +202,6 @@ def get_data(filters, categories):
     return list(result.values()) + [total_row]
 
 
-# 🔹 TARGET
 def get_target(customer, sales_person, month):
 
     fieldname = MONTH_FIELD_MAP.get(month)

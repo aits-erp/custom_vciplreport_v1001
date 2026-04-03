@@ -2,7 +2,6 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
 
     onload: function(report) {
 
-        // 🔥 DEFAULT CATEGORY VALUES
         report.set_filter_value("custom_main_group", [
             "Hard Anodised",
             "Nonstick",
@@ -46,6 +45,40 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             options: "Sales Person"
         },
 
+        // 🔥 NEW FILTER - REGION
+        {
+            fieldname: "custom_region",
+            label: "Region",
+            fieldtype: "MultiSelectList",
+
+            get_data: function(txt) {
+                return frappe.db.sql_list(`
+                    SELECT DISTINCT custom_region
+                    FROM \`tabSales Person\`
+                    WHERE custom_region IS NOT NULL
+                    AND custom_region != ''
+                    AND custom_region LIKE %s
+                `, ["%" + txt + "%"]);
+            }
+        },
+
+        // 🔥 NEW FILTER - HEAD SALES CODE
+        {
+            fieldname: "custom_head_sales_code",
+            label: "Head Sales Code",
+            fieldtype: "MultiSelectList",
+
+            get_data: function(txt) {
+                return frappe.db.sql_list(`
+                    SELECT DISTINCT custom_head_sales_code
+                    FROM \`tabSales Person\`
+                    WHERE custom_head_sales_code IS NOT NULL
+                    AND custom_head_sales_code != ''
+                    AND custom_head_sales_code LIKE %s
+                `, ["%" + txt + "%"]);
+            }
+        },
+
         {
             fieldname: "customer",
             label: "Customer",
@@ -60,7 +93,6 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             options: "Customer Group"
         },
 
-        // 🔥 CATEGORY FILTER
         {
             fieldname: "custom_main_group",
             label: "Category",

@@ -30,8 +30,9 @@ def execute(filters=None):
     return columns, data
 
 
-# 🔹 Categories
+# 🔹 GET CATEGORIES
 def get_categories(filters):
+
     if filters.get("custom_main_group") and len(filters.get("custom_main_group")) > 0:
         return filters.get("custom_main_group")
 
@@ -39,10 +40,11 @@ def get_categories(filters):
         SELECT DISTINCT custom_main_group
         FROM `tabItem`
         WHERE custom_main_group IS NOT NULL
+        AND custom_main_group != ''
     """)
 
 
-# 🔹 Columns
+# 🔹 COLUMNS
 def get_columns(categories):
 
     columns = [
@@ -54,16 +56,28 @@ def get_columns(categories):
     ]
 
     for cat in categories:
-        safe = cat.replace(" ", "_")
+        safe = cat.replace(" ", "_").replace(".", "").replace("-", "_")
 
-        columns.append({"label": f"{cat} Target", "fieldname": f"{safe}_target", "fieldtype": "Currency"})
-        columns.append({"label": f"{cat} Achieved", "fieldname": f"{safe}_achieved", "fieldtype": "Currency"})
-        columns.append({"label": f"{cat} %", "fieldname": f"{safe}_percent", "fieldtype": "Percent"})
+        columns.append({
+            "label": f"{cat} Target",
+            "fieldname": f"{safe}_target",
+            "fieldtype": "Currency"
+        })
+        columns.append({
+            "label": f"{cat} Achieved",
+            "fieldname": f"{safe}_achieved",
+            "fieldtype": "Currency"
+        })
+        columns.append({
+            "label": f"{cat} %",
+            "fieldname": f"{safe}_percent",
+            "fieldtype": "Percent"
+        })
 
     return columns
 
 
-# 🔹 Data
+# 🔹 DATA
 def get_data(filters, categories):
 
     conditions = ""
@@ -81,12 +95,20 @@ def get_data(filters, categories):
         conditions += " AND st.sales_person = %(sales_person)s"
         values["sales_person"] = filters.get("sales_person")
 
-    # 🔥 CATEGORY FILTER (FIXED)
+    if filters.get("customer"):
+        conditions += " AND si.customer = %(customer)s"
+        values["customer"] = filters.get("customer")
+
+    if filters.get("customer_group"):
+        conditions += " AND c.customer_group = %(customer_group)s"
+        values["customer_group"] = filters.get("customer_group")
+
+    # 🔥 CATEGORY FILTER
     if filters.get("custom_main_group") and len(filters.get("custom_main_group")) > 0:
         conditions += " AND i.custom_main_group IN %(custom_main_group)s"
         values["custom_main_group"] = tuple(filters.get("custom_main_group"))
 
-    # 🔥 ALWAYS APPLY → FINISHED GOODS
+    # 🔥 ALWAYS FINISHED GOODS
     conditions += " AND i.custom_item_type = 'Finished Goods'"
 
     data = frappe.db.sql(f"""
@@ -132,19 +154,20 @@ def get_data(filters, categories):
             }
 
             for cat in categories:
-                safe = cat.replace(" ", "_")
+                safe = cat.replace(" ", "_").replace(".", "").replace("-", "_")
+
                 result[key][f"{safe}_target"] = 0
                 result[key][f"{safe}_achieved"] = 0
                 result[key][f"{safe}_percent"] = 0
 
                 totals.setdefault(cat, {"target": 0, "achieved": 0})
 
-        month = int(row.month)
         cat = row.category
-        safe = cat.replace(" ", "_")
 
         if cat in categories:
-            target = flt(get_target(row.customer_id, row.tso, month))
+            safe = cat.replace(" ", "_").replace(".", "").replace("-", "_")
+
+            target = flt(get_target(row.customer_id, row.tso, int(row.month)))
             achieved = flt(row.achieved)
             percent = (achieved / target * 100) if target else 0
 
@@ -159,7 +182,7 @@ def get_data(filters, categories):
     total_row = {"month": "TOTAL"}
 
     for cat in categories:
-        safe = cat.replace(" ", "_")
+        safe = cat.replace(" ", "_").replace(".", "").replace("-", "_")
 
         t = totals[cat]["target"]
         a = totals[cat]["achieved"]
@@ -172,7 +195,7 @@ def get_data(filters, categories):
     return list(result.values()) + [total_row]
 
 
-# 🔹 Target
+# 🔹 TARGET
 def get_target(customer, sales_person, month):
 
     fieldname = MONTH_FIELD_MAP.get(month)

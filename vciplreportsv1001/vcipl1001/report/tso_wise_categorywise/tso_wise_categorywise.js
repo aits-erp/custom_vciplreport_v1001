@@ -1,5 +1,26 @@
 frappe.query_reports["TSO WISE CATEGORYWISE"] = {
 
+    onload: function(report) {
+
+        // 🔥 DEFAULT CATEGORY VALUES
+        report.set_filter_value("custom_main_group", [
+            "Hard Anodised",
+            "Nonstick",
+            "Horeca",
+            "Pressure Cookers",
+            "SS Cookware",
+            "Healux",
+            "Kraft",
+            "Platinum",
+            "Platinum Triply P.cooker",
+            "Cast Iron",
+            "Kraft Pressure Cooker",
+            "Csd",
+            "Cookers Spare Parts",
+            "Other Spare"
+        ]);
+    },
+
     filters: [
 
         {
@@ -39,11 +60,12 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             options: "Customer Group"
         },
 
-        // 🔥 CATEGORY (MULTI + SINGLE SUPPORT)
+        // 🔥 CATEGORY FILTER
         {
             fieldname: "custom_main_group",
             label: "Category",
             fieldtype: "MultiSelectList",
+
             get_data: function(txt) {
                 return frappe.db.sql_list(`
                     SELECT DISTINCT custom_main_group

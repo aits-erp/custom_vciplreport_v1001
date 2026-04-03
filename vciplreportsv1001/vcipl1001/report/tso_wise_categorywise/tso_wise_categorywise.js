@@ -39,18 +39,18 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             options: "Customer Group"
         },
 
-        // 🔥 CATEGORY (UPDATED TO CUSTOM GROUP)
+        // 🔥 CATEGORY (FINAL FIX)
         {
-            fieldname: "custom_group",
+            fieldname: "custom_main_group",
             label: "Category",
             fieldtype: "MultiSelectList",
             get_data: function(txt) {
                 return frappe.db.sql_list(`
-                    SELECT DISTINCT custom_group
+                    SELECT DISTINCT custom_main_group
                     FROM \`tabItem\`
-                    WHERE custom_group IS NOT NULL
-                    AND custom_group != ''
-                    AND custom_group LIKE %s
+                    WHERE custom_main_group IS NOT NULL
+                    AND custom_main_group != ''
+                    AND custom_main_group LIKE %s
                 `, ["%" + txt + "%"]);
             }
         }

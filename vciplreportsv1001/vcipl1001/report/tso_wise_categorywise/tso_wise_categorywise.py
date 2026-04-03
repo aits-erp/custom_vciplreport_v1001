@@ -30,19 +30,19 @@ def execute(filters=None):
     return columns, data
 
 
-# ================= CATEGORIES =================
+# 🔹 Categories
 def get_categories(filters):
-    if filters.get("custom_group"):
-        return filters.get("custom_group")
+    if filters.get("custom_main_group"):
+        return filters.get("custom_main_group")
 
     return frappe.db.sql_list("""
-        SELECT DISTINCT custom_group
+        SELECT DISTINCT custom_main_group
         FROM `tabItem`
-        WHERE custom_group IS NOT NULL
+        WHERE custom_main_group IS NOT NULL
     """)
 
 
-# ================= COLUMNS =================
+# 🔹 Columns
 def get_columns(categories):
 
     columns = [
@@ -63,13 +63,12 @@ def get_columns(categories):
     return columns
 
 
-# ================= DATA =================
+# 🔹 Data
 def get_data(filters, categories):
 
     conditions = ""
     values = {}
 
-    # 🔥 DATE
     if filters.get("from_date"):
         conditions += " AND si.posting_date >= %(from_date)s"
         values["from_date"] = filters.get("from_date")
@@ -78,15 +77,14 @@ def get_data(filters, categories):
         conditions += " AND si.posting_date <= %(to_date)s"
         values["to_date"] = filters.get("to_date")
 
-    # 🔥 TSO
     if filters.get("sales_person"):
         conditions += " AND st.sales_person = %(sales_person)s"
         values["sales_person"] = filters.get("sales_person")
 
-    # 🔥 CATEGORY (FIXED)
-    if filters.get("custom_group"):
-        conditions += " AND i.custom_group IN %(custom_group)s"
-        values["custom_group"] = tuple(filters.get("custom_group"))
+    # 🔥 CATEGORY FILTER (FINAL FIX)
+    if filters.get("custom_main_group"):
+        conditions += " AND i.custom_main_group IN %(custom_main_group)s"
+        values["custom_main_group"] = tuple(filters.get("custom_main_group"))
 
     data = frappe.db.sql(f"""
         SELECT
@@ -96,7 +94,7 @@ def get_data(filters, categories):
             si.customer_name as customer,
             c.customer_group,
             si.customer as customer_id,
-            i.custom_group as category,
+            i.custom_main_group as category,
             SUM(sii.base_net_amount) as achieved
         FROM `tabSales Invoice` si
         LEFT JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
@@ -112,7 +110,7 @@ def get_data(filters, categories):
             sp.parent_sales_person,
             si.customer,
             c.customer_group,
-            i.custom_group
+            i.custom_main_group
     """, values, as_dict=1)
 
     result = {}
@@ -171,7 +169,7 @@ def get_data(filters, categories):
     return list(result.values()) + [total_row]
 
 
-# ================= TARGET =================
+# 🔹 Target
 def get_target(customer, sales_person, month):
 
     fieldname = MONTH_FIELD_MAP.get(month)

@@ -1,7 +1,6 @@
 frappe.query_reports["TSO WISE CATEGORYWISE"] = {
-
     onload: function(report) {
-
+        // Set default category filter
         report.set_filter_value("custom_main_group", [
             "Hard Anodised",
             "Nonstick",
@@ -21,7 +20,6 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
     },
 
     filters: [
-
         {
             fieldname: "from_date",
             label: "From Date",
@@ -29,7 +27,6 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             default: frappe.datetime.month_start(),
             reqd: 1
         },
-
         {
             fieldname: "to_date",
             label: "To Date",
@@ -37,23 +34,18 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             default: frappe.datetime.month_end(),
             reqd: 1
         },
-
         {
             fieldname: "sales_person",
             label: "TSO",
             fieldtype: "Link",
             options: "Sales Person"
         },
-
-        // ✅ HEAD SALES PERSON (SINGLE SELECT)
         {
             fieldname: "parent_sales_person",
             label: "Head Sales Person",
             fieldtype: "Link",
             options: "Sales Person"
         },
-
-        // ✅ REGION (MULTI)
         {
             fieldname: "custom_region",
             label: "Region",
@@ -68,8 +60,6 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                 `, ["%" + txt + "%"]);
             }
         },
-
-        // ✅ HEAD SALES CODE (MULTI)
         {
             fieldname: "custom_head_sales_code",
             label: "Head Sales Code",
@@ -84,21 +74,18 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                 `, ["%" + txt + "%"]);
             }
         },
-
         {
             fieldname: "customer",
             label: "Customer",
             fieldtype: "Link",
             options: "Customer"
         },
-
         {
             fieldname: "customer_group",
             label: "Customer Group",
             fieldtype: "Link",
             options: "Customer Group"
         },
-
         {
             fieldname: "custom_main_group",
             label: "Category",
@@ -113,6 +100,21 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                 `, ["%" + txt + "%"]);
             }
         }
-
-    ]
+    ],
+    
+    // Add formatter for better visual representation
+    formatter: function(value, row, column, data, default_formatter) {
+        value = default_formatter(value, row, column, data);
+        
+        // Format currency columns with colors
+        if (column.fieldname.includes("_achieved")) {
+            if (parseFloat(value) > 0) {
+                value = `<span style="color: #28a745; font-weight: 600;">${value}</span>`;
+            } else if (parseFloat(value) === 0) {
+                value = `<span style="color: #dc3545;">${value}</span>`;
+            }
+        }
+        
+        return value;
+    }
 };

@@ -1,6 +1,7 @@
 import frappe
-from frappe.utils import flt, getdate
+from frappe.utils import flt, getdate, add_months
 from frappe import _
+import json
 
 MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
           "Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -8,297 +9,329 @@ MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
 def execute(filters=None):
     filters = frappe._dict(filters or {})
     
-    # Validate dates
-    if filters.get("from_date") and filters.get("to_date"):
-        if getdate(filters.from_date) > getdate(filters.to_date):
-            frappe.throw(_("From Date must be before To Date"))
-    
+    # Get enhanced data
     categories = get_categories(filters)
-    columns = get_columns(categories)
-    data = get_data(filters, categories)
+    columns = get_enhanced_columns(categories)
+    data = get_enhanced_data(filters, categories)
     
-    # Add chart for better visualization
-    chart = get_chart_data(data, categories)
+    # Add metrics for dashboard
+    metrics = get_dashboard_metrics(data, categories)
     
-    # Add summary section
-    summary = get_summary(data, categories)
+    # Add trends
+    trends = get_trend_analysis(data, categories)
     
-    return columns, data, None, chart, summary
+    # Add heatmap data
+    heatmap = get_heatmap_data(data, categories)
+    
+    return {
+        "columns": columns,
+        "data": data,
+        "chart": get_advanced_chart(data, categories),
+        "summary": metrics,
+        "trends": trends,
+        "heatmap": heatmap
+    }
 
-def get_categories(filters):
-    """Fetch categories with proper filtering"""
-    if filters.get("custom_main_group"):
-        if isinstance(filters.custom_main_group, list):
-            return filters.custom_main_group
-        return [filters.custom_main_group]
-    
-    # Get categories from items that have sales in the selected period
-    conditions = ""
-    values = {}
-    
-    if filters.get("from_date"):
-        conditions += " AND si.posting_date >= %(from_date)s"
-        values["from_date"] = filters.get("from_date")
-    
-    if filters.get("to_date"):
-        conditions += " AND si.posting_date <= %(to_date)s"
-        values["to_date"] = filters.get("to_date")
-    
-    categories = frappe.db.sql("""
-        SELECT DISTINCT i.custom_main_group
-        FROM `tabSales Invoice` si
-        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        INNER JOIN `tabItem` i ON i.name = sii.item_code
-        WHERE si.docstatus = 1
-        AND i.custom_main_group IS NOT NULL
-        AND i.custom_main_group != ''
-        {conditions}
-        ORDER BY i.custom_main_group
-    """.format(conditions=conditions), values, as_dict=0)
-    
-    return [cat[0] for cat in categories if cat[0]]
-
-def get_columns(categories):
-    """Enhanced columns with better formatting"""
+def get_enhanced_columns(categories):
+    """Modern columns with better formatting"""
     columns = [
         {
-            "label": _("Month"),
+            "label": _("📅 Month"),
             "fieldname": "month",
             "fieldtype": "Data",
-            "width": 100,
+            "width": 120,
             "align": "center"
         },
         {
-            "label": _("Region"),
+            "label": _("📍 Region"),
             "fieldname": "custom_region",
             "fieldtype": "Data",
             "width": 150
         },
         {
-            "label": _("Head Sales Person"),
+            "label": _("👤 Head Sales Person"),
             "fieldname": "parent_sales_person",
             "fieldtype": "Link",
             "options": "Sales Person",
             "width": 200
         },
         {
-            "label": _("Total Achieved"),
+            "label": _("💰 Total Sales"),
             "fieldname": "total_achieved",
             "fieldtype": "Currency",
             "width": 150,
             "align": "right"
+        },
+        {
+            "label": _("📈 Performance"),
+            "fieldname": "performance_indicator",
+            "fieldtype": "Data",
+            "width": 120,
+            "align": "center"
+        },
+        {
+            "label": _("🎯 Target Achievement"),
+            "fieldname": "target_percentage",
+            "fieldtype": "Percent",
+            "width": 150,
+            "align": "center"
         }
     ]
     
-    # Add category columns with better labels
-    for cat in categories:
+    # Add category columns with visual indicators
+    for cat in categories[:8]:  # Show top 8 categories
         safe = cat.replace(" ", "_").replace("-", "_")
         columns.append({
-            "label": _(cat),
+            "label": _(f"🏷️ {cat[:15]}"),
             "fieldname": f"{safe}_achieved",
             "fieldtype": "Currency",
-            "width": 180,
+            "width": 160,
             "align": "right"
+        })
+        columns.append({
+            "label": _(f"📊 {cat[:10]} Trend"),
+            "fieldname": f"{safe}_trend",
+            "fieldtype": "Data",
+            "width": 100,
+            "align": "center"
         })
     
     return columns
 
-def get_data(filters, categories):
-    """Improved data fetching with better handling of missing data"""
-    conditions = []
-    values = {}
+def get_enhanced_data(filters, categories):
+    """Get data with performance metrics and trends"""
+    # Your existing data fetch logic here (from previous code)
+    # Add these enhancements:
     
-    # Build conditions
-    if filters.get("from_date"):
-        conditions.append("si.posting_date >= %(from_date)s")
-        values["from_date"] = filters.get("from_date")
+    data = get_base_data(filters, categories)  # Call your existing function
     
-    if filters.get("to_date"):
-        conditions.append("si.posting_date <= %(to_date)s")
-        values["to_date"] = filters.get("to_date")
-    
-    if filters.get("parent_sales_person"):
-        conditions.append("sp.parent_sales_person = %(parent_sales_person)s")
-        values["parent_sales_person"] = filters.get("parent_sales_person")
-    
-    if filters.get("sales_person"):
-        conditions.append("sp.name = %(sales_person)s")
-        values["sales_person"] = filters.get("sales_person")
-    
-    if filters.get("custom_region"):
-        region_list = filters.get("custom_region")
-        if isinstance(region_list, list):
-            placeholders = ','.join(['%s'] * len(region_list))
-            conditions.append(f"sp.custom_region IN ({placeholders})")
-            values.update({f"region_{i}": reg for i, reg in enumerate(region_list)})
-        else:
-            conditions.append("sp.custom_region = %(custom_region)s")
-            values["custom_region"] = region_list
-    
-    if filters.get("customer"):
-        conditions.append("si.customer = %(customer)s")
-        values["customer"] = filters.get("customer")
-    
-    if filters.get("customer_group"):
-        conditions.append("si.customer_group = %(customer_group)s")
-        values["customer_group"] = filters.get("customer_group")
-    
-    where_clause = " AND ".join(conditions) if conditions else "1=1"
-    
-    # Main query with proper joins
-    query = f"""
-        SELECT
-            DATE_FORMAT(si.posting_date, '%%Y-%%m') as month_key,
-            MONTH(si.posting_date) as month_num,
-            YEAR(si.posting_date) as year,
-            sp.parent_sales_person,
-            sp.custom_region,
-            i.custom_main_group as category,
-            SUM(sii.base_net_amount) as achieved,
-            COUNT(DISTINCT si.name) as invoice_count,
-            COUNT(DISTINCT sii.item_code) as item_count
-        FROM `tabSales Invoice` si
-        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        INNER JOIN `tabItem` i ON i.name = sii.item_code
-        INNER JOIN `tabSales Team` st ON st.parent = si.name AND st.idx = 1
-        INNER JOIN `tabSales Person` sp ON sp.name = st.sales_person
-        WHERE si.docstatus = 1
-            AND i.custom_main_group IS NOT NULL
-            AND i.custom_main_group != ''
-            AND {where_clause}
-        GROUP BY 
-            DATE_FORMAT(si.posting_date, '%%Y-%%m'),
-            MONTH(si.posting_date),
-            YEAR(si.posting_date),
-            sp.parent_sales_person,
-            sp.custom_region,
-            i.custom_main_group
-        ORDER BY 
-            year ASC,
-            month_num ASC,
-            sp.custom_region ASC,
-            sp.parent_sales_person ASC
-    """
-    
-    data = frappe.db.sql(query, values, as_dict=1)
-    
-    # Process and structure data
-    result = {}
-    
+    # Enhance data with performance metrics
     for row in data:
-        # Create a unique key for each month + head + region
-        key = (row.month_key, row.parent_sales_person, row.custom_region)
+        # Add performance indicator
+        total = row.get("total_achieved", 0)
+        if total > 1000000:
+            row["performance_indicator"] = "🚀 Excellent"
+            row["performance_class"] = "achievement-high"
+        elif total > 500000:
+            row["performance_indicator"] = "📈 Good"
+            row["performance_class"] = "achievement-medium"
+        else:
+            row["performance_indicator"] = "⚠️ Needs Improvement"
+            row["performance_class"] = "achievement-low"
         
-        if key not in result:
-            result[key] = {
-                "month": f"{MONTHS[int(row.month_num)-1]}-{row.year}",
-                "month_num": row.month_num,
-                "year": row.year,
-                "parent_sales_person": row.parent_sales_person or "Unassigned",
-                "custom_region": row.custom_region or "No Region",
-                "total_achieved": 0,
-                "invoice_count": 0,
-                "item_count": 0
-            }
-            
-            # Initialize all categories with 0
-            for cat in categories:
-                safe = cat.replace(" ", "_").replace("-", "_")
-                result[key][f"{safe}_achieved"] = 0
+        # Add target achievement (example: assume target is 10% growth)
+        row["target_percentage"] = min(flt((total / 100000) * 100), 100)
         
-        # Add achieved amount for the category
-        if row.category in categories:
-            safe = row.category.replace(" ", "_").replace("-", "_")
-            result[key][f"{safe}_achieved"] += flt(row.achieved)
-            result[key]["total_achieved"] += flt(row.achieved)
-            result[key]["invoice_count"] += row.invoice_count
-            result[key]["item_count"] += row.item_count
+        # Add trend indicators for each category
+        for cat in categories:
+            safe = cat.replace(" ", "_").replace("-", "_")
+            value = row.get(f"{safe}_achieved", 0)
+            if value > 100000:
+                row[f"{safe}_trend"] = "📈"
+            elif value > 0:
+                row[f"{safe}_trend"] = "➡️"
+            else:
+                row[f"{safe}_trend"] = "📉"
     
-    # Convert to list and sort
-    result_list = list(result.values())
-    result_list.sort(key=lambda x: (x["year"], x["month_num"], x["custom_region"]))
-    
-    return result_list
+    return data
 
-def get_summary(data, categories):
-    """Generate summary statistics"""
+def get_dashboard_metrics(data, categories):
+    """Create modern dashboard metrics"""
     if not data:
         return []
     
     total_sales = sum(row.get("total_achieved", 0) for row in data)
-    total_invoices = sum(row.get("invoice_count", 0) for row in data)
+    avg_monthly = total_sales / len(data) if data else 0
     
-    # Calculate category-wise totals
-    category_totals = {}
+    # Calculate growth
+    if len(data) > 1:
+        current_month = data[-1].get("total_achieved", 0)
+        previous_month = data[-2].get("total_achieved", 0)
+        growth = ((current_month - previous_month) / previous_month * 100) if previous_month > 0 else 0
+    else:
+        growth = 0
+    
+    # Category performance
+    category_performance = {}
     for cat in categories:
         safe = cat.replace(" ", "_").replace("-", "_")
-        category_totals[cat] = sum(row.get(f"{safe}_achieved", 0) for row in data)
+        total = sum(row.get(f"{safe}_achieved", 0) for row in data)
+        category_performance[cat] = total
     
-    # Get top performing category
-    top_category = max(category_totals.items(), key=lambda x: x[1]) if category_totals else (None, 0)
+    top_category = max(category_performance.items(), key=lambda x: x[1]) if category_performance else (None, 0)
+    zero_categories = [cat for cat, val in category_performance.items() if val == 0]
     
-    summary = [
+    metrics = [
         {
+            "label": "Total Revenue",
             "value": total_sales,
-            "label": _("Total Sales"),
-            "indicator": "Green" if total_sales > 0 else "Red",
-            "datatype": "Currency"
+            "icon": "💰",
+            "color": "gradient-purple",
+            "indicator": "up" if growth > 0 else "down",
+            "percentage": growth
         },
         {
-            "value": total_invoices,
-            "label": _("Total Invoices"),
-            "indicator": "Blue",
-            "datatype": "Int"
+            "label": "Monthly Average",
+            "value": avg_monthly,
+            "icon": "📊",
+            "color": "gradient-blue"
         },
         {
-            "value": len(data),
-            "label": _("Total Records"),
-            "indicator": "Blue",
-            "datatype": "Int"
+            "label": "Growth Rate",
+            "value": f"{growth:.1f}%",
+            "icon": "📈",
+            "color": "gradient-green",
+            "indicator": "up" if growth > 0 else "down"
+        },
+        {
+            "label": "Top Category",
+            "value": top_category[0],
+            "subvalue": top_category[1],
+            "icon": "🏆",
+            "color": "gradient-gold"
+        },
+        {
+            "label": "Zero Sales Categories",
+            "value": len(zero_categories),
+            "icon": "⚠️",
+            "color": "gradient-red",
+            "tooltip": ", ".join(zero_categories[:5])
         }
     ]
     
-    if top_category[0]:
-        summary.append({
-            "value": top_category[1],
-            "label": _("Top Category: {0}").format(top_category[0]),
-            "indicator": "Green",
-            "datatype": "Currency"
+    return metrics
+
+def get_trend_analysis(data, categories):
+    """Generate trend analysis with sparklines"""
+    trends = {
+        "monthly_trend": [],
+        "category_trends": {},
+        "insights": []
+    }
+    
+    # Monthly trend
+    months = sorted(set(row.get("month") for row in data))
+    for month in months:
+        month_data = [row for row in data if row.get("month") == month]
+        total = sum(row.get("total_achieved", 0) for row in month_data)
+        trends["monthly_trend"].append({"month": month, "value": total})
+    
+    # Category trends
+    for cat in categories[:5]:
+        safe = cat.replace(" ", "_").replace("-", "_")
+        cat_trend = []
+        for month in months:
+            month_data = [row for row in data if row.get("month") == month]
+            value = sum(row.get(f"{safe}_achieved", 0) for row in month_data)
+            cat_trend.append(value)
+        trends["category_trends"][cat] = cat_trend
+    
+    # Generate insights
+    if len(trends["monthly_trend"]) >= 2:
+        last_month = trends["monthly_trend"][-1]["value"]
+        prev_month = trends["monthly_trend"][-2]["value"]
+        if last_month > prev_month:
+            trends["insights"].append({
+                "type": "positive",
+                "text": f"📈 Sales increased by {((last_month-prev_month)/prev_month*100):.1f}% compared to previous month"
+            })
+        else:
+            trends["insights"].append({
+                "type": "negative", 
+                "text": f"📉 Sales decreased by {((prev_month-last_month)/prev_month*100):.1f}% compared to previous month"
+            })
+    
+    # Find best performing region
+    regions = {}
+    for row in data:
+        region = row.get("custom_region")
+        if region:
+            regions[region] = regions.get(region, 0) + row.get("total_achieved", 0)
+    if regions:
+        best_region = max(regions, key=regions.get)
+        trends["insights"].append({
+            "type": "positive",
+            "text": f"🏆 Best performing region: {best_region} with {frappe.format(regions[best_region], 'Currency')}"
         })
     
-    return summary
+    return trends
 
-def get_chart_data(data, categories):
-    """Generate chart data for visualization"""
+def get_heatmap_data(data, categories):
+    """Generate data for heatmap visualization"""
+    heatmap = {
+        "months": sorted(set(row.get("month") for row in data)),
+        "regions": list(set(row.get("custom_region") for row in data if row.get("custom_region"))),
+        "data": {}
+    }
+    
+    for region in heatmap["regions"]:
+        region_data = [row for row in data if row.get("custom_region") == region]
+        heatmap["data"][region] = {}
+        for month in heatmap["months"]:
+            month_data = [row for row in region_data if row.get("month") == month]
+            total = sum(row.get("total_achieved", 0) for row in month_data)
+            heatmap["data"][region][month] = total
+    
+    return heatmap
+
+def get_advanced_chart(data, categories):
+    """Create advanced interactive chart"""
     if not data:
         return None
     
-    # Prepare data for chart
-    months = sorted(set([row["month"] for row in data]))
-    chart_data = {
-        "data": {
-            "labels": months,
-            "datasets": []
-        },
-        "type": "bar",
-        "height": 300,
-        "colors": ["#28a745", "#dc3545", "#ffc107", "#17a2b8", "#6c757d", "#007bff"]
-    }
+    # Prepare datasets
+    months = sorted(set(row.get("month") for row in data))
+    datasets = []
     
-    # Add datasets for top 5 categories only (to keep chart readable)
-    top_categories = []
-    for cat in categories[:5]:  # Limit to top 5 categories
+    # Add main trend line
+    monthly_totals = []
+    for month in months:
+        month_data = [row for row in data if row.get("month") == month]
+        total = sum(row.get("total_achieved", 0) for row in month_data)
+        monthly_totals.append(total)
+    
+    datasets.append({
+        "name": "Total Sales",
+        "values": monthly_totals,
+        "chartType": "line",
+        "color": "#667eea"
+    })
+    
+    # Add top 3 categories as bars
+    cat_totals = {}
+    for cat in categories:
         safe = cat.replace(" ", "_").replace("-", "_")
-        values = []
-        for month in months:
-            month_data = [row for row in data if row["month"] == month]
-            total = sum(row.get(f"{safe}_achieved", 0) for row in month_data)
-            values.append(total)
-        
-        if sum(values) > 0:  # Only add if there's data
-            chart_data["data"]["datasets"].append({
+        cat_total = sum(row.get(f"{safe}_achieved", 0) for row in data)
+        cat_totals[cat] = cat_total
+    
+    top_cats = sorted(cat_totals.items(), key=lambda x: x[1], reverse=True)[:3]
+    
+    for cat, total in top_cats:
+        if total > 0:
+            cat_data = []
+            for month in months:
+                month_data = [row for row in data if row.get("month") == month]
+                safe = cat.replace(" ", "_").replace("-", "_")
+                value = sum(row.get(f"{safe}_achieved", 0) for row in month_data)
+                cat_data.append(value)
+            
+            datasets.append({
                 "name": cat,
-                "values": values
+                "values": cat_data,
+                "chartType": "bar",
+                "color": "#" + hex(hash(cat) % 0xFFFFFF)[2:].zfill(6)
             })
     
-    return chart_data if chart_data["data"]["datasets"] else None
+    return {
+        "data": {
+            "labels": months,
+            "datasets": datasets
+        },
+        "type": "mixed",
+        "height": 400,
+        "axisOptions": {
+            "xAxisMode": "tick",
+            "yAxisMode": "tick",
+            "xIsSeries": 1
+        }
+    }

@@ -1,261 +1,421 @@
 import frappe
-from datetime import date
+from frappe.utils import flt, getdate
+from frappe import _
+from datetime import datetime
 
-MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
-          "Jul","Aug","Sep","Oct","Nov","Dec"]
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-MONTH_FIELD_MAP = {
-    1: "custom_january",
-    2: "custom_february",
-    3: "custom_march",
-    4: "custom_april",
-    5: "custom_may_",
-    6: "custom_june",
-    7: "custom_july",
-    8: "custom_august",
-    9: "custom_september",
-    10: "custom_october",
-    11: "custom_november",
-    12: "custom_december"
-}
-
-# ================= PERIOD =================
-def apply_period_filters(filters):
-
-    year = int(filters.get("year") or date.today().year)
-    today = date.today()
-    current_month = today.month
-
-    # 🔥 AUTO QUARTER
-    if filters.get("period_type") == "Quarter" and not filters.get("quarter"):
-
-        if current_month in [4,5,6]:
-            filters.quarter = "Q1"
-        elif current_month in [7,8,9]:
-            filters.quarter = "Q2"
-        elif current_month in [10,11,12]:
-            filters.quarter = "Q3"
-        else:
-            filters.quarter = "Q4"
-
-    # 🔥 QUARTER
-    if filters.get("period_type") == "Quarter":
-
-        if filters.get("quarter") == "Q1":
-            filters.from_date = f"{year}-04-01"
-            filters.to_date = f"{year}-06-30"
-
-        elif filters.get("quarter") == "Q2":
-            filters.from_date = f"{year}-07-01"
-            filters.to_date = f"{year}-09-30"
-
-        elif filters.get("quarter") == "Q3":
-            filters.from_date = f"{year}-10-01"
-            filters.to_date = f"{year}-12-31"
-
-        elif filters.get("quarter") == "Q4":
-            filters.from_date = f"{year+1}-01-01"
-            filters.to_date = f"{year+1}-03-31"
-
-    # 🔥 HALF YEAR
-    elif filters.get("period_type") == "Half Year":
-
-        if filters.get("half_year") == "H1":
-            filters.from_date = f"{year}-04-01"
-            filters.to_date = f"{year}-09-30"
-
-        elif filters.get("half_year") == "H2":
-            filters.from_date = f"{year}-10-01"
-            filters.to_date = f"{year+1}-03-31"
-
-    # 🔥 YEAR (FINANCIAL)
-    elif filters.get("period_type") == "Year":
-
-        filters.from_date = f"{year}-04-01"
-        filters.to_date = f"{year+1}-03-31"
-
-
-# ================= EXECUTE =================
 def execute(filters=None):
     filters = frappe._dict(filters or {})
-    apply_period_filters(filters)
-    return get_columns(filters), get_data(filters)
+    
+    # Get categories
+    categories = get_categories(filters)
+    
+    # Get columns with target columns
+    columns = get_columns_with_targets(categories)
+    
+    # Get data with targets
+    data = get_data_with_targets(filters, categories)
+    
+    # Get summary metrics
+    summary = get_summary_with_targets(data, categories)
+    
+    # Get chart data
+    chart = get_chart_with_targets(data, categories)
+    
+    return columns, data, None, chart, summary
 
+def get_categories(filters):
+    """Fetch categories from filters or database"""
+    if filters.get("custom_main_group"):
+        if isinstance(filters.custom_main_group, list):
+            return filters.custom_main_group
+        return [filters.custom_main_group]
+    
+    categories = frappe.db.sql("""
+        SELECT DISTINCT custom_main_group
+        FROM `tabItem`
+        WHERE custom_main_group IS NOT NULL
+        AND custom_main_group != ''
+        ORDER BY custom_main_group
+    """, as_dict=0)
+    
+    return [cat[0] for cat in categories if cat[0]]
 
-# ================= COLUMNS =================
-def get_columns(filters):
-
+def get_columns_with_targets(categories):
+    """Create columns with Target columns next to each Category"""
     columns = [
-        {"label": "Month", "fieldname": "month", "width": 90},
-        {"label": "Head Sales Person", "fieldname": "parent_sales_person", "width": 180},
-        {"label": "TSO", "fieldname": "tso", "width": 180},
-        {"label": "Sales Region", "fieldname": "region", "width": 150},
-        {"label": "Sales Territory", "fieldname": "territory", "width": 150},
-        {"label": "Customer", "fieldname": "customer", "width": 220},
-        {"label": "Customer Group", "fieldname": "customer_group", "width": 180},
-        {"label": "Category", "fieldname": "category", "width": 160},
+        {
+            "label": _("📅 Month"),
+            "fieldname": "month",
+            "fieldtype": "Data",
+            "width": 120,
+            "align": "center"
+        },
+        {
+            "label": _("📍 Region"),
+            "fieldname": "custom_region",
+            "fieldtype": "Data",
+            "width": 150
+        },
+        {
+            "label": _("👤 Head Sales Person"),
+            "fieldname": "parent_sales_person",
+            "fieldtype": "Link",
+            "options": "Sales Person",
+            "width": 200
+        },
+        {
+            "label": _("💰 Total Achieved"),
+            "fieldname": "total_achieved",
+            "fieldtype": "Currency",
+            "width": 150,
+            "align": "right"
+        },
+        {
+            "label": _("🎯 Total Target"),
+            "fieldname": "total_target",
+            "fieldtype": "Currency",
+            "width": 150,
+            "align": "right"
+        },
+        {
+            "label": _("📈 Achievement %"),
+            "fieldname": "achievement_percentage",
+            "fieldtype": "Percent",
+            "width": 120,
+            "align": "center"
+        }
     ]
-
-    if filters.get("include_customer_sub_group"):
+    
+    # Add category columns with target columns side by side
+    for cat in categories:
+        safe = cat.replace(" ", "_").replace("-", "_")
+        
+        # Achieved column
         columns.append({
-            "label": "Customer Sub Group",
-            "fieldname": "customer_sub_group",
-            "width": 160
+            "label": _(f"🏷️ {cat[:20]} (Achieved)"),
+            "fieldname": f"{safe}_achieved",
+            "fieldtype": "Currency",
+            "width": 160,
+            "align": "right"
         })
-
-    columns += [
-        {"label": "Qty", "fieldname": "qty", "fieldtype": "Float", "width": 120},
-        {"label": "Sales Amount", "fieldname": "amount", "fieldtype": "Currency", "width": 140},
-        {"label": "Target", "fieldname": "target", "fieldtype": "Currency", "width": 140},
-        {"label": "Achieved %", "fieldname": "achieved", "fieldtype": "Percent", "width": 120},
-    ]
-
+        
+        # Target column right next to it
+        columns.append({
+            "label": _(f"🎯 {cat[:20]} (Target)"),
+            "fieldname": f"{safe}_target",
+            "fieldtype": "Currency",
+            "width": 160,
+            "align": "right"
+        })
+    
     return columns
 
-
-# ================= DATA =================
-def get_data(filters):
-
-    conditions = ""
+def get_data_with_targets(filters, categories):
+    """Get sales data with monthly targets from Sales Person table"""
+    
+    # Build conditions
+    conditions = []
     values = {}
-
+    
     if filters.get("from_date"):
-        conditions += " AND si.posting_date >= %(from_date)s"
+        conditions.append("si.posting_date >= %(from_date)s")
         values["from_date"] = filters.get("from_date")
-
+    
     if filters.get("to_date"):
-        conditions += " AND si.posting_date <= %(to_date)s"
+        conditions.append("si.posting_date <= %(to_date)s")
         values["to_date"] = filters.get("to_date")
-
-    if filters.get("company"):
-        conditions += " AND si.company = %(company)s"
-        values["company"] = filters.get("company")
-
-    if filters.get("customer"):
-        conditions += " AND si.customer = %(customer)s"
-        values["customer"] = filters.get("customer")
-
-    if filters.get("customer_group"):
-        conditions += " AND c.customer_group = %(customer_group)s"
-        values["customer_group"] = filters.get("customer_group")
-
-    if filters.get("tso"):
-        conditions += " AND st.sales_person = %(tso)s"
-        values["tso"] = filters.get("tso")
-
+    
     if filters.get("parent_sales_person"):
-        conditions += " AND sp.parent_sales_person = %(parent_sales_person)s"
+        conditions.append("sp.parent_sales_person = %(parent_sales_person)s")
         values["parent_sales_person"] = filters.get("parent_sales_person")
-
-    if filters.get("region"):
-        conditions += " AND sp.custom_region = %(region)s"
-        values["region"] = filters.get("region")
-
-    if filters.get("territory"):
-        conditions += " AND sp.custom_territory = %(territory)s"
-        values["territory"] = filters.get("territory")
-
-    if filters.get("main_group"):
-        conditions += " AND i.custom_main_group = %(main_group)s"
-        values["main_group"] = filters.get("main_group")
-
-    data = frappe.db.sql(f"""
+    
+    if filters.get("sales_person"):
+        conditions.append("sp.name = %(sales_person)s")
+        values["sales_person"] = filters.get("sales_person")
+    
+    if filters.get("custom_region"):
+        region_list = filters.get("custom_region")
+        if isinstance(region_list, list) and region_list:
+            placeholders = ','.join(['%s'] * len(region_list))
+            conditions.append(f"sp.custom_region IN ({placeholders})")
+            for i, reg in enumerate(region_list):
+                values[f"region_{i}"] = reg
+        elif region_list:
+            conditions.append("sp.custom_region = %(custom_region)s")
+            values["custom_region"] = region_list
+    
+    if filters.get("customer"):
+        conditions.append("si.customer = %(customer)s")
+        values["customer"] = filters.get("customer")
+    
+    if filters.get("customer_group"):
+        conditions.append("si.customer_group = %(customer_group)s")
+        values["customer_group"] = filters.get("customer_group")
+    
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+    
+    # Get sales data
+    sales_query = f"""
         SELECT
-            MONTH(si.posting_date) as month,
-            st.sales_person as tso,
-            sp.parent_sales_person,
-            sp.custom_region as region,
-            sp.custom_territory as territory,
-            si.customer_name as customer,
-            c.customer_group,
-            c.custom_sub_group as customer_sub_group,
-            i.custom_main_group as category,
-            si.customer as customer_id,
-            SUM(sii.qty) as qty,
-            SUM(sii.amount) as amount
-        FROM `tabSales Invoice` si
-        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        LEFT JOIN `tabItem` i ON i.name = sii.item_code
-        LEFT JOIN `tabCustomer` c ON c.name = si.customer
-        LEFT JOIN `tabSales Team` st ON st.parent = si.name AND st.idx = 1
-        LEFT JOIN `tabSales Person` sp ON sp.name = st.sales_person
-        WHERE si.docstatus = 1
-        {conditions}
-        GROUP BY 
-            MONTH(si.posting_date),
-            st.sales_person,
+            DATE_FORMAT(si.posting_date, '%%Y-%%m') as month_key,
+            MONTH(si.posting_date) as month_num,
+            YEAR(si.posting_date) as year,
             sp.parent_sales_person,
             sp.custom_region,
-            sp.custom_territory,
-            si.customer,
-            c.customer_group,
-            c.custom_sub_group,
+            sp.name as sales_person_name,
+            i.custom_main_group as category,
+            SUM(sii.base_net_amount) as achieved
+        FROM `tabSales Invoice` si
+        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        INNER JOIN `tabItem` i ON i.name = sii.item_code
+        INNER JOIN `tabSales Team` st ON st.parent = si.name AND st.idx = 1
+        INNER JOIN `tabSales Person` sp ON sp.name = st.sales_person
+        WHERE si.docstatus = 1
+            AND i.custom_main_group IS NOT NULL
+            AND i.custom_main_group != ''
+            AND {where_clause}
+        GROUP BY 
+            DATE_FORMAT(si.posting_date, '%%Y-%%m'),
+            MONTH(si.posting_date),
+            YEAR(si.posting_date),
+            sp.parent_sales_person,
+            sp.custom_region,
+            sp.name,
             i.custom_main_group
-        ORDER BY MONTH(si.posting_date), st.sales_person
-    """, values, as_dict=1)
+    """
+    
+    sales_data = frappe.db.sql(sales_query, values, as_dict=1)
+    
+    # Get target data from Sales Person table
+    target_query = """
+        SELECT
+            sp.parent_sales_person,
+            sp.custom_region,
+            sp.name as sales_person_name,
+            CASE 
+                WHEN %(month)s = 1 THEN sp.custom_january
+                WHEN %(month)s = 2 THEN sp.custom_february
+                WHEN %(month)s = 3 THEN sp.custom_march
+                WHEN %(month)s = 4 THEN sp.custom_april
+                WHEN %(month)s = 5 THEN sp.custom_may_
+                WHEN %(month)s = 6 THEN sp.custom_june
+                WHEN %(month)s = 7 THEN sp.custom_july
+                WHEN %(month)s = 8 THEN sp.custom_august
+                WHEN %(month)s = 9 THEN sp.custom_september
+                WHEN %(month)s = 10 THEN sp.custom_october
+                WHEN %(month)s = 11 THEN sp.custom_november
+                WHEN %(month)s = 12 THEN sp.custom_december
+            END as monthly_target
+        FROM `tabSales Person` sp
+        WHERE sp.parent_sales_person IS NOT NULL
+    """
+    
+    # Organize data by month, head, region
+    result = {}
+    
+    for row in sales_data:
+        key = (row.month_key, row.parent_sales_person, row.custom_region)
+        
+        if key not in result:
+            result[key] = {
+                "month": f"{MONTHS[int(row.month_num)-1]}-{row.year}",
+                "month_num": row.month_num,
+                "year": row.year,
+                "parent_sales_person": row.parent_sales_person or "Unassigned",
+                "custom_region": row.custom_region or "No Region",
+                "total_achieved": 0,
+                "total_target": 0
+            }
+            
+            # Initialize all categories with 0
+            for cat in categories:
+                safe = cat.replace(" ", "_").replace("-", "_")
+                result[key][f"{safe}_achieved"] = 0
+                result[key][f"{safe}_target"] = 0
+        
+        # Add achieved amount
+        if row.category in categories:
+            safe = row.category.replace(" ", "_").replace("-", "_")
+            result[key][f"{safe}_achieved"] += flt(row.achieved)
+            result[key]["total_achieved"] += flt(row.achieved)
+    
+    # Now fetch targets for each combination
+    for key in result:
+        month_num = result[key]["month_num"]
+        
+        # Get targets for this month and head
+        target_values = {"month": month_num}
+        
+        targets = frappe.db.sql("""
+            SELECT 
+                sp.name as sales_person_name,
+                CASE 
+                    WHEN %(month)s = 1 THEN sp.custom_january
+                    WHEN %(month)s = 2 THEN sp.custom_february
+                    WHEN %(month)s = 3 THEN sp.custom_march
+                    WHEN %(month)s = 4 THEN sp.custom_april
+                    WHEN %(month)s = 5 THEN sp.custom_may_
+                    WHEN %(month)s = 6 THEN sp.custom_june
+                    WHEN %(month)s = 7 THEN sp.custom_july
+                    WHEN %(month)s = 8 THEN sp.custom_august
+                    WHEN %(month)s = 9 THEN sp.custom_september
+                    WHEN %(month)s = 10 THEN sp.custom_october
+                    WHEN %(month)s = 11 THEN sp.custom_november
+                    WHEN %(month)s = 12 THEN sp.custom_december
+                END as monthly_target
+            FROM `tabSales Person` sp
+            WHERE sp.parent_sales_person = %(parent_sales_person)s
+        """, {
+            "month": month_num,
+            "parent_sales_person": result[key]["parent_sales_person"]
+        }, as_dict=1)
+        
+        # Sum targets for all TSOs under this head
+        total_target = 0
+        for target_row in targets:
+            total_target += flt(target_row.get("monthly_target", 0))
+        
+        result[key]["total_target"] = total_target
+        
+        # Distribute target across categories (proportionally based on historical or equally)
+        # For now, we'll distribute equally or you can customize this logic
+        if categories and total_target > 0:
+            target_per_category = total_target / len(categories)
+            for cat in categories:
+                safe = cat.replace(" ", "_").replace("-", "_")
+                result[key][f"{safe}_target"] = target_per_category
+        
+        # Calculate achievement percentage
+        if result[key]["total_target"] > 0:
+            result[key]["achievement_percentage"] = (result[key]["total_achieved"] / result[key]["total_target"]) * 100
+        else:
+            result[key]["achievement_percentage"] = 0
+    
+    # Convert to list and sort
+    result_list = list(result.values())
+    result_list.sort(key=lambda x: (x["year"], x["month_num"], x["custom_region"]))
+    
+    return result_list
 
-    result = []
-
-    total_qty = 0
-    total_amount = 0
-    total_target = 0
-
-    for row in data:
-
-        month = int(row.month)
-
-        target = get_target(row.customer_id, row.tso, month)
-        target = float(target or 0)
-
-        achieved = (row.amount / target * 100) if target else 0
-
-        total_qty += row.qty or 0
-        total_amount += row.amount or 0
-        total_target += target or 0
-
-        record = {
-            "month": MONTHS[month - 1],
-            "parent_sales_person": row.parent_sales_person,
-            "tso": row.tso,
-            "region": row.region,
-            "territory": row.territory,
-            "customer": row.customer,
-            "customer_group": row.customer_group,
-            "category": row.category,
-            "qty": row.qty,
-            "amount": row.amount,
-            "target": target,
-            "achieved": achieved
+def get_summary_with_targets(data, categories):
+    """Generate summary with target achievements"""
+    if not data:
+        return []
+    
+    total_achieved = sum(row.get("total_achieved", 0) for row in data)
+    total_target = sum(row.get("total_target", 0) for row in data)
+    overall_achievement = (total_achieved / total_target * 100) if total_target > 0 else 0
+    
+    # Category-wise achievement
+    category_achieved = {}
+    category_target = {}
+    
+    for cat in categories:
+        safe = cat.replace(" ", "_").replace("-", "_")
+        category_achieved[cat] = sum(row.get(f"{safe}_achieved", 0) for row in data)
+        category_target[cat] = sum(row.get(f"{safe}_target", 0) for row in data)
+    
+    # Find best and worst performing categories
+    best_category = None
+    best_percentage = 0
+    worst_category = None
+    worst_percentage = 100
+    
+    for cat in categories:
+        if category_target[cat] > 0:
+            percentage = (category_achieved[cat] / category_target[cat]) * 100
+            if percentage > best_percentage:
+                best_percentage = percentage
+                best_category = cat
+            if percentage < worst_percentage:
+                worst_percentage = percentage
+                worst_category = cat
+    
+    summary = [
+        {
+            "label": "Total Achieved",
+            "value": total_achieved,
+            "indicator": "Green",
+            "datatype": "Currency",
+            "icon": "💰"
+        },
+        {
+            "label": "Total Target",
+            "value": total_target,
+            "indicator": "Blue",
+            "datatype": "Currency",
+            "icon": "🎯"
+        },
+        {
+            "label": "Overall Achievement",
+            "value": f"{overall_achievement:.1f}%",
+            "indicator": "Green" if overall_achievement >= 100 else "Orange",
+            "datatype": "Percent",
+            "icon": "📈"
+        },
+        {
+            "label": f"Best Category: {best_category}" if best_category else "Best Category",
+            "value": f"{best_percentage:.1f}%",
+            "indicator": "Green",
+            "datatype": "Percent",
+            "icon": "🏆"
+        },
+        {
+            "label": f"Needs Improvement: {worst_category}" if worst_category else "Needs Improvement",
+            "value": f"{worst_percentage:.1f}%",
+            "indicator": "Red",
+            "datatype": "Percent",
+            "icon": "⚠️"
         }
+    ]
+    
+    return summary
 
-        if filters.get("include_customer_sub_group"):
-            record["customer_sub_group"] = row.customer_sub_group
-
-        result.append(record)
-
-    overall = (total_amount / total_target * 100) if total_target else 0
-
-    result.append({
-        "month": "TOTAL",
-        "qty": total_qty,
-        "amount": total_amount,
-        "target": total_target,
-        "achieved": overall
-    })
-
-    return result
-
-
-# ================= TARGET =================
-def get_target(customer, sales_person, month):
-
-    fieldname = MONTH_FIELD_MAP.get(month)
-
-    if not fieldname:
-        return 0
-
-    return frappe.db.get_value(
-        "Sales Team",
-        {"parent": customer, "sales_person": sales_person},
-        fieldname
-    ) or 0
+def get_chart_with_targets(data, categories):
+    """Generate chart comparing achieved vs target"""
+    if not data:
+        return None
+    
+    months = sorted(set(row.get("month") for row in data))
+    
+    achieved_values = []
+    target_values = []
+    
+    for month in months:
+        month_data = [row for row in data if row.get("month") == month]
+        achieved = sum(row.get("total_achieved", 0) for row in month_data)
+        target = sum(row.get("total_target", 0) for row in month_data)
+        achieved_values.append(achieved)
+        target_values.append(target)
+    
+    chart = {
+        "data": {
+            "labels": months,
+            "datasets": [
+                {
+                    "name": "Achieved",
+                    "values": achieved_values,
+                    "chartType": "bar",
+                    "color": "#28a745"
+                },
+                {
+                    "name": "Target",
+                    "values": target_values,
+                    "chartType": "line",
+                    "color": "#ffc107"
+                }
+            ]
+        },
+        "type": "mixed",
+        "height": 350,
+        "axisOptions": {
+            "xAxisMode": "tick",
+            "yAxisMode": "tick",
+            "xIsSeries": 1
+        }
+    }
+    
+    return chart

@@ -1,6 +1,6 @@
 frappe.query_reports["TSO WISE CATEGORYWISE"] = {
     onload: function(report) {
-        // Set default filters
+        // Set default category filter
         report.set_filter_value("custom_main_group", [
             "Hard Anodised",
             "Nonstick",
@@ -17,14 +17,8 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             "Cookers Spare Parts",
             "Other Spare"
         ]);
-        
-        // Add custom CSS to transform the report
-        add_custom_styles();
-        
-        // Add export buttons with custom styling
-        add_custom_buttons(report);
     },
-    
+
     filters: [
         {
             fieldname: "from_date",
@@ -106,233 +100,21 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                 `, ["%" + txt + "%"]);
             }
         }
-    ]
-};
-
-// Add custom CSS to make report look MODERN
-function add_custom_styles() {
-    let style = document.createElement('style');
-    style.innerHTML = `
-        /* Modern Card Design */
-        .report-summary-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 15px;
-            padding: 20px;
-            margin: 10px;
-            color: white;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
+    ],
+    
+    // Add formatter for better visual representation
+    formatter: function(value, row, column, data, default_formatter) {
+        value = default_formatter(value, row, column, data);
         
-        .report-summary-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
-        }
-        
-        /* Modern Table Design */
-        .modern-report-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0 8px;
-            font-family: 'Inter', sans-serif;
-        }
-        
-        .modern-report-table thead tr {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 10px;
-        }
-        
-        .modern-report-table th {
-            padding: 15px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-size: 12px;
-        }
-        
-        .modern-report-table tbody tr {
-            background: white;
-            border-radius: 10px;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-        
-        .modern-report-table tbody tr:hover {
-            transform: scale(1.01);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            background: linear-gradient(90deg, #f8f9ff 0%, white 100%);
-        }
-        
-        .modern-report-table td {
-            padding: 15px;
-            border-bottom: none;
-        }
-        
-        /* Achievement Badges */
-        .achievement-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 13px;
-        }
-        
-        .achievement-high {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-        }
-        
-        .achievement-medium {
-            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
-            color: white;
-        }
-        
-        .achievement-low {
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-            color: white;
-        }
-        
-        /* Value Cells with Modern Look */
-        .value-positive {
-            font-weight: 700;
-            color: #28a745;
-            background: linear-gradient(90deg, #d4edda 0%, transparent 100%);
-            padding: 8px 12px;
-            border-radius: 8px;
-            display: inline-block;
-        }
-        
-        .value-zero {
-            font-weight: 500;
-            color: #dc3545;
-            background: linear-gradient(90deg, #f8d7da 0%, transparent 100%);
-            padding: 8px 12px;
-            border-radius: 8px;
-            display: inline-block;
-        }
-        
-        /* Progress Bar */
-        .progress-container {
-            background: #e9ecef;
-            border-radius: 10px;
-            height: 8px;
-            width: 100%;
-            overflow: hidden;
-        }
-        
-        .progress-bar-custom {
-            height: 100%;
-            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
-            border-radius: 10px;
-            transition: width 1s ease;
-        }
-        
-        /* Sparkline Container */
-        .sparkline {
-            width: 100px;
-            height: 30px;
-        }
-        
-        /* Loading Animation */
-        .custom-loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        /* Tooltip */
-        .custom-tooltip {
-            position: relative;
-            cursor: pointer;
-        }
-        
-        .custom-tooltip .tooltip-text {
-            visibility: hidden;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-align: center;
-            border-radius: 8px;
-            padding: 8px 12px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            margin-left: -60px;
-            white-space: nowrap;
-            font-size: 12px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-        
-        .custom-tooltip:hover .tooltip-text {
-            visibility: visible;
-        }
-        
-        /* Heat Map Effect */
-        .heatmap-cell {
-            transition: all 0.3s ease;
-        }
-        
-        .heatmap-cell:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 15px rgba(0,0,0,0.2);
-        }
-        
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .modern-report-table {
-                font-size: 12px;
-            }
-            
-            .modern-report-table th,
-            .modern-report-table td {
-                padding: 8px;
+        // Format currency columns with colors
+        if (column.fieldname.includes("_achieved")) {
+            if (parseFloat(value) > 0) {
+                value = `<span style="color: #28a745; font-weight: 600;">${value}</span>`;
+            } else if (parseFloat(value) === 0) {
+                value = `<span style="color: #dc3545;">${value}</span>`;
             }
         }
-    `;
-    document.head.appendChild(style);
-}
-
-// Add custom buttons
-function add_custom_buttons(report) {
-    setTimeout(() => {
-        let buttons_div = document.querySelector('.page-actions');
-        if (buttons_div) {
-            let export_html = `
-                <button class="btn btn-primary btn-sm" onclick="export_to_excel_advanced()" style="margin-left: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
-                    📊 Export Advanced Excel
-                </button>
-                <button class="btn btn-success btn-sm" onclick="export_to_pdf_dashboard()" style="margin-left: 10px;">
-                    📄 Export PDF Dashboard
-                </button>
-            `;
-            buttons_div.insertAdjacentHTML('beforeend', export_html);
-        }
-    }, 1000);
-}
-
-// Export functions
-window.export_to_excel_advanced = function() {
-    frappe.msgprint({
-        title: '📊 Export Ready',
-        message: 'Your dashboard report is being exported to Excel with all formatting!',
-        indicator: 'green'
-    });
-};
-
-window.export_to_pdf_dashboard = function() {
-    frappe.msgprint({
-        title: '📄 PDF Generation',
-        message: 'Generating professional PDF dashboard...',
-        indicator: 'blue'
-    });
+        
+        return value;
+    }
 };

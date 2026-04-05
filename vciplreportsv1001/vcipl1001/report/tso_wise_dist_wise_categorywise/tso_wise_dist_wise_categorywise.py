@@ -1,7 +1,6 @@
 import frappe
 from frappe.utils import flt, getdate
 from frappe import _
-from datetime import datetime
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -47,41 +46,41 @@ def get_columns_with_targets(categories):
     """Create columns with Target columns next to each Category"""
     columns = [
         {
-            "label": _("📅 Month"),
+            "label": _("Month"),
             "fieldname": "month",
             "fieldtype": "Data",
-            "width": 120,
+            "width": 100,
             "align": "center"
         },
         {
-            "label": _("📍 Region"),
+            "label": _("Region"),
             "fieldname": "custom_region",
             "fieldtype": "Data",
             "width": 150
         },
         {
-            "label": _("👤 Head Sales Person"),
+            "label": _("Head Sales Person"),
             "fieldname": "parent_sales_person",
             "fieldtype": "Link",
             "options": "Sales Person",
             "width": 200
         },
         {
-            "label": _("💰 Total Achieved"),
+            "label": _("Total Achieved"),
             "fieldname": "total_achieved",
             "fieldtype": "Currency",
             "width": 150,
             "align": "right"
         },
         {
-            "label": _("🎯 Total Target"),
+            "label": _("Total Target"),
             "fieldname": "total_target",
             "fieldtype": "Currency",
             "width": 150,
             "align": "right"
         },
         {
-            "label": _("📈 Achievement %"),
+            "label": _("Achievement %"),
             "fieldname": "achievement_percentage",
             "fieldtype": "Percent",
             "width": 120,
@@ -91,11 +90,11 @@ def get_columns_with_targets(categories):
     
     # Add category columns with target columns side by side
     for cat in categories:
-        safe = cat.replace(" ", "_").replace("-", "_")
+        safe = cat.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
         
         # Achieved column
         columns.append({
-            "label": _(f"🏷️ {cat[:20]} (Achieved)"),
+            "label": _(f"{cat} (Achieved)"),
             "fieldname": f"{safe}_achieved",
             "fieldtype": "Currency",
             "width": 160,
@@ -104,7 +103,7 @@ def get_columns_with_targets(categories):
         
         # Target column right next to it
         columns.append({
-            "label": _(f"🎯 {cat[:20]} (Target)"),
+            "label": _(f"{cat} (Target)"),
             "fieldname": f"{safe}_target",
             "fieldtype": "Currency",
             "width": 160,
@@ -114,7 +113,7 @@ def get_columns_with_targets(categories):
     return columns
 
 def get_data_with_targets(filters, categories):
-    """Get sales data with monthly targets from Sales Person table"""
+    """Get sales data with monthly targets from Sales Team table"""
     
     # Build conditions
     conditions = []
@@ -185,33 +184,10 @@ def get_data_with_targets(filters, categories):
             sp.custom_region,
             sp.name,
             i.custom_main_group
+        ORDER BY year ASC, month_num ASC, sp.custom_region ASC
     """
     
     sales_data = frappe.db.sql(sales_query, values, as_dict=1)
-    
-    # Get target data from Sales Person table
-    target_query = """
-        SELECT
-            sp.parent_sales_person,
-            sp.custom_region,
-            sp.name as sales_person_name,
-            CASE 
-                WHEN %(month)s = 1 THEN sp.custom_january
-                WHEN %(month)s = 2 THEN sp.custom_february
-                WHEN %(month)s = 3 THEN sp.custom_march
-                WHEN %(month)s = 4 THEN sp.custom_april
-                WHEN %(month)s = 5 THEN sp.custom_may_
-                WHEN %(month)s = 6 THEN sp.custom_june
-                WHEN %(month)s = 7 THEN sp.custom_july
-                WHEN %(month)s = 8 THEN sp.custom_august
-                WHEN %(month)s = 9 THEN sp.custom_september
-                WHEN %(month)s = 10 THEN sp.custom_october
-                WHEN %(month)s = 11 THEN sp.custom_november
-                WHEN %(month)s = 12 THEN sp.custom_december
-            END as monthly_target
-        FROM `tabSales Person` sp
-        WHERE sp.parent_sales_person IS NOT NULL
-    """
     
     # Organize data by month, head, region
     result = {}
@@ -227,72 +203,95 @@ def get_data_with_targets(filters, categories):
                 "parent_sales_person": row.parent_sales_person or "Unassigned",
                 "custom_region": row.custom_region or "No Region",
                 "total_achieved": 0,
-                "total_target": 0
+                "total_target": 0,
+                "achievement_percentage": 0
             }
             
             # Initialize all categories with 0
             for cat in categories:
-                safe = cat.replace(" ", "_").replace("-", "_")
+                safe = cat.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
                 result[key][f"{safe}_achieved"] = 0
                 result[key][f"{safe}_target"] = 0
         
         # Add achieved amount
         if row.category in categories:
-            safe = row.category.replace(" ", "_").replace("-", "_")
+            safe = row.category.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
             result[key][f"{safe}_achieved"] += flt(row.achieved)
             result[key]["total_achieved"] += flt(row.achieved)
     
-    # Now fetch targets for each combination
+    # Fetch targets from Sales Team table for each Head Sales Person
     for key in result:
         month_num = result[key]["month_num"]
+        parent_sales_person = result[key]["parent_sales_person"]
         
-        # Get targets for this month and head
-        target_values = {"month": month_num}
-        
-        targets = frappe.db.sql("""
-            SELECT 
-                sp.name as sales_person_name,
-                CASE 
-                    WHEN %(month)s = 1 THEN sp.custom_january
-                    WHEN %(month)s = 2 THEN sp.custom_february
-                    WHEN %(month)s = 3 THEN sp.custom_march
-                    WHEN %(month)s = 4 THEN sp.custom_april
-                    WHEN %(month)s = 5 THEN sp.custom_may_
-                    WHEN %(month)s = 6 THEN sp.custom_june
-                    WHEN %(month)s = 7 THEN sp.custom_july
-                    WHEN %(month)s = 8 THEN sp.custom_august
-                    WHEN %(month)s = 9 THEN sp.custom_september
-                    WHEN %(month)s = 10 THEN sp.custom_october
-                    WHEN %(month)s = 11 THEN sp.custom_november
-                    WHEN %(month)s = 12 THEN sp.custom_december
-                END as monthly_target
-            FROM `tabSales Person` sp
-            WHERE sp.parent_sales_person = %(parent_sales_person)s
-        """, {
-            "month": month_num,
-            "parent_sales_person": result[key]["parent_sales_person"]
-        }, as_dict=1)
-        
-        # Sum targets for all TSOs under this head
-        total_target = 0
-        for target_row in targets:
-            total_target += flt(target_row.get("monthly_target", 0))
-        
-        result[key]["total_target"] = total_target
-        
-        # Distribute target across categories (proportionally based on historical or equally)
-        # For now, we'll distribute equally or you can customize this logic
-        if categories and total_target > 0:
-            target_per_category = total_target / len(categories)
-            for cat in categories:
-                safe = cat.replace(" ", "_").replace("-", "_")
-                result[key][f"{safe}_target"] = target_per_category
-        
-        # Calculate achievement percentage
-        if result[key]["total_target"] > 0:
-            result[key]["achievement_percentage"] = (result[key]["total_achieved"] / result[key]["total_target"]) * 100
-        else:
-            result[key]["achievement_percentage"] = 0
+        if parent_sales_person and parent_sales_person != "Unassigned":
+            # Query to get targets from Sales Team table
+            # Using CASE statement as per your original requirement
+            target_query = """
+                SELECT 
+                    st.parent as sales_person,
+                    CASE 
+                        WHEN %(month)s = 1 THEN st.custom_january
+                        WHEN %(month)s = 2 THEN st.custom_february
+                        WHEN %(month)s = 3 THEN st.custom_march
+                        WHEN %(month)s = 4 THEN st.custom_april
+                        WHEN %(month)s = 5 THEN st.custom_may_
+                        WHEN %(month)s = 6 THEN st.custom_june
+                        WHEN %(month)s = 7 THEN st.custom_july
+                        WHEN %(month)s = 8 THEN st.custom_august
+                        WHEN %(month)s = 9 THEN st.custom_september
+                        WHEN %(month)s = 10 THEN st.custom_october
+                        WHEN %(month)s = 11 THEN st.custom_november
+                        WHEN %(month)s = 12 THEN st.custom_december
+                    END as monthly_target
+                FROM `tabSales Team` st
+                WHERE st.parent = %(parent_sales_person)s
+            """
+            
+            try:
+                targets = frappe.db.sql(target_query, {
+                    "month": month_num,
+                    "parent_sales_person": parent_sales_person
+                }, as_dict=1)
+                
+                # Sum targets for all entries under this head
+                total_target = 0
+                for target_row in targets:
+                    total_target += flt(target_row.get("monthly_target", 0))
+                
+                result[key]["total_target"] = total_target
+                
+                # Distribute target across categories based on historical achievement ratio
+                if categories and total_target > 0:
+                    total_achieved = result[key]["total_achieved"]
+                    
+                    if total_achieved > 0:
+                        # Distribute based on actual achievement ratio
+                        for cat in categories:
+                            safe = cat.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
+                            cat_achieved = result[key].get(f"{safe}_achieved", 0)
+                            if cat_achieved > 0:
+                                target_per_category = (cat_achieved / total_achieved) * total_target
+                            else:
+                                target_per_category = total_target / len(categories)
+                            result[key][f"{safe}_target"] = target_per_category
+                    else:
+                        # Equal distribution if no achievements
+                        target_per_category = total_target / len(categories)
+                        for cat in categories:
+                            safe = cat.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
+                            result[key][f"{safe}_target"] = target_per_category
+                
+                # Calculate achievement percentage
+                if result[key]["total_target"] > 0:
+                    result[key]["achievement_percentage"] = (result[key]["total_achieved"] / result[key]["total_target"]) * 100
+                else:
+                    result[key]["achievement_percentage"] = 0
+                    
+            except Exception as e:
+                frappe.log_error(f"Error fetching targets for {parent_sales_person}: {str(e)}", "Target Fetch Error")
+                result[key]["total_target"] = 0
+                result[key]["achievement_percentage"] = 0
     
     # Convert to list and sort
     result_list = list(result.values())
@@ -314,7 +313,7 @@ def get_summary_with_targets(data, categories):
     category_target = {}
     
     for cat in categories:
-        safe = cat.replace(" ", "_").replace("-", "_")
+        safe = cat.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
         category_achieved[cat] = sum(row.get(f"{safe}_achieved", 0) for row in data)
         category_target[cat] = sum(row.get(f"{safe}_target", 0) for row in data)
     
@@ -336,41 +335,40 @@ def get_summary_with_targets(data, categories):
     
     summary = [
         {
-            "label": "Total Achieved",
             "value": total_achieved,
-            "indicator": "Green",
-            "datatype": "Currency",
-            "icon": "💰"
+            "label": _("Total Achieved"),
+            "indicator": "Green" if total_achieved > 0 else "Red",
+            "datatype": "Currency"
         },
         {
-            "label": "Total Target",
             "value": total_target,
+            "label": _("Total Target"),
             "indicator": "Blue",
-            "datatype": "Currency",
-            "icon": "🎯"
+            "datatype": "Currency"
         },
         {
-            "label": "Overall Achievement",
             "value": f"{overall_achievement:.1f}%",
+            "label": _("Overall Achievement"),
             "indicator": "Green" if overall_achievement >= 100 else "Orange",
-            "datatype": "Percent",
-            "icon": "📈"
-        },
-        {
-            "label": f"Best Category: {best_category}" if best_category else "Best Category",
-            "value": f"{best_percentage:.1f}%",
-            "indicator": "Green",
-            "datatype": "Percent",
-            "icon": "🏆"
-        },
-        {
-            "label": f"Needs Improvement: {worst_category}" if worst_category else "Needs Improvement",
-            "value": f"{worst_percentage:.1f}%",
-            "indicator": "Red",
-            "datatype": "Percent",
-            "icon": "⚠️"
+            "datatype": "Percent"
         }
     ]
+    
+    if best_category:
+        summary.append({
+            "value": f"{best_percentage:.1f}%",
+            "label": _(f"Best: {best_category[:20]}"),
+            "indicator": "Green",
+            "datatype": "Percent"
+        })
+    
+    if worst_category and worst_percentage < 100:
+        summary.append({
+            "value": f"{worst_percentage:.1f}%",
+            "label": _(f"Needs Improvement: {worst_category[:20]}"),
+            "indicator": "Red",
+            "datatype": "Percent"
+        })
     
     return summary
 
@@ -410,7 +408,7 @@ def get_chart_with_targets(data, categories):
             ]
         },
         "type": "mixed",
-        "height": 350,
+        "height": 300,
         "axisOptions": {
             "xAxisMode": "tick",
             "yAxisMode": "tick",

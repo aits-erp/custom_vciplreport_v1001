@@ -78,8 +78,7 @@ def get_columns(categories):
         {
             "label": _("Customer Name"),
             "fieldname": "customer_name",
-            "fieldtype": "Link",
-            "options": "Customer",
+            "fieldtype": "Data",
             "width": 200
         },
         {
@@ -159,7 +158,7 @@ def get_data(filters, categories):
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     
-    # Main query with proper joins including Customer and TSO
+    # Main query with proper joins including Customer Name (customer_name field)
     query = f"""
         SELECT
             DATE_FORMAT(si.posting_date, '%%Y-%%m') as month_key,
@@ -168,7 +167,7 @@ def get_data(filters, categories):
             sp.name as tso_name,
             sp.parent_sales_person,
             sp.custom_region,
-            si.customer as customer_name,
+            c.customer_name as customer_name,
             i.custom_main_group as category,
             SUM(sii.base_net_amount) as achieved,
             COUNT(DISTINCT si.name) as invoice_count,
@@ -178,6 +177,7 @@ def get_data(filters, categories):
         INNER JOIN `tabItem` i ON i.name = sii.item_code
         INNER JOIN `tabSales Team` st ON st.parent = si.name AND st.idx = 1
         INNER JOIN `tabSales Person` sp ON sp.name = st.sales_person
+        INNER JOIN `tabCustomer` c ON c.name = si.customer
         WHERE si.docstatus = 1
             AND i.custom_main_group IS NOT NULL
             AND i.custom_main_group != ''
@@ -189,13 +189,13 @@ def get_data(filters, categories):
             sp.name,
             sp.parent_sales_person,
             sp.custom_region,
-            si.customer,
+            c.customer_name,
             i.custom_main_group
         ORDER BY 
             year ASC,
             month_num ASC,
             sp.name ASC,
-            si.customer ASC
+            c.customer_name ASC
     """
     
     data = frappe.db.sql(query, values, as_dict=1)
@@ -306,7 +306,6 @@ def get_chart_data(data, categories):
     }
     
     # Add datasets for top 5 categories only (to keep chart readable)
-    top_categories = []
     for cat in categories[:5]:  # Limit to top 5 categories
         safe = cat.replace(" ", "_").replace("-", "_")
         values = []

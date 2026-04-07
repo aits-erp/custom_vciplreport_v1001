@@ -2,48 +2,80 @@ import frappe
 from frappe.utils import flt, getdate
 from frappe import _
 
-MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
+          "Jul","Aug","Sep","Oct","Nov","Dec"]
+
+# Month field mapping for target amounts
+month_fields = {
+    1: "custom_january", 
+    2: "custom_february", 
+    3: "custom_march",
+    4: "custom_april", 
+    5: "custom_may_", 
+    6: "custom_june",
+    7: "custom_july", 
+    8: "custom_august", 
+    9: "custom_september",
+    10: "custom_october", 
+    11: "custom_november", 
+    12: "custom_december"
+}
 
 def execute(filters=None):
     filters = frappe._dict(filters or {})
     
-    # Get categories
+    # Validate dates
+    if filters.get("from_date") and filters.get("to_date"):
+        if getdate(filters.from_date) > getdate(filters.to_date):
+            frappe.throw(_("From Date must be before To Date"))
+    
     categories = get_categories(filters)
+    columns = get_columns(categories)
+    data = get_data(filters, categories)
     
-    # Get columns with target columns
-    columns = get_columns_with_targets(categories)
+    # Add chart for better visualization
+    chart = get_chart_data(data, categories)
     
-    # Get data with targets
-    data = get_data_with_targets(filters, categories)
-    
-    # Get summary metrics
-    summary = get_summary_with_targets(data, categories)
-    
-    # Get chart data
-    chart = get_chart_with_targets(data, categories)
+    # Add summary section
+    summary = get_summary(data, categories)
     
     return columns, data, None, chart, summary
 
 def get_categories(filters):
-    """Fetch categories from filters or database"""
+    """Fetch categories with proper filtering"""
     if filters.get("custom_main_group"):
         if isinstance(filters.custom_main_group, list):
             return filters.custom_main_group
         return [filters.custom_main_group]
     
+    # Get categories from items that have sales in the selected period
+    conditions = ""
+    values = {}
+    
+    if filters.get("from_date"):
+        conditions += " AND si.posting_date >= %(from_date)s"
+        values["from_date"] = filters.get("from_date")
+    
+    if filters.get("to_date"):
+        conditions += " AND si.posting_date <= %(to_date)s"
+        values["to_date"] = filters.get("to_date")
+    
     categories = frappe.db.sql("""
-        SELECT DISTINCT custom_main_group
-        FROM `tabItem`
-        WHERE custom_main_group IS NOT NULL
-        AND custom_main_group != ''
-        ORDER BY custom_main_group
-    """, as_dict=0)
+        SELECT DISTINCT i.custom_main_group
+        FROM `tabSales Invoice` si
+        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        INNER JOIN `tabItem` i ON i.name = sii.item_code
+        WHERE si.docstatus = 1
+        AND i.custom_main_group IS NOT NULL
+        AND i.custom_main_group != ''
+        {conditions}
+        ORDER BY i.custom_main_group
+    """.format(conditions=conditions), values, as_dict=0)
     
     return [cat[0] for cat in categories if cat[0]]
 
-def get_columns_with_targets(categories):
-    """Create columns with Target columns next to each Category"""
+def get_columns(categories):
+    """Enhanced columns with better formatting including Customer and Target columns"""
     columns = [
         {
             "label": _("Month"),
@@ -66,11 +98,11 @@ def get_columns_with_targets(categories):
             "width": 200
         },
         {
-            "label": _("Total Achieved"),
-            "fieldname": "total_achieved",
-            "fieldtype": "Currency",
-            "width": 150,
-            "align": "right"
+            "label": _("Customer"),
+            "fieldname": "customer",
+            "fieldtype": "Link",
+            "options": "Customer",
+            "width": 200
         },
         {
             "label": _("Total Target"),
@@ -80,45 +112,40 @@ def get_columns_with_targets(categories):
             "align": "right"
         },
         {
-            "label": _("Achievement %"),
-            "fieldname": "achievement_percentage",
-            "fieldtype": "Percent",
-            "width": 120,
-            "align": "center"
+            "label": _("Total Achieved"),
+            "fieldname": "total_achieved",
+            "fieldtype": "Currency",
+            "width": 150,
+            "align": "right"
         }
     ]
     
-    # Add category columns with target columns side by side
+    # Add category columns with Target and Achieved
     for cat in categories:
-        safe = cat.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
-        
-        # Achieved column
-        columns.append({
-            "label": _(f"{cat} (Achieved)"),
-            "fieldname": f"{safe}_achieved",
-            "fieldtype": "Currency",
-            "width": 160,
-            "align": "right"
-        })
-        
-        # Target column right next to it
+        safe = cat.replace(" ", "_").replace("-", "_")
         columns.append({
             "label": _(f"{cat} (Target)"),
             "fieldname": f"{safe}_target",
             "fieldtype": "Currency",
-            "width": 160,
+            "width": 180,
+            "align": "right"
+        })
+        columns.append({
+            "label": _(f"{cat} (Achieved)"),
+            "fieldname": f"{safe}_achieved",
+            "fieldtype": "Currency",
+            "width": 180,
             "align": "right"
         })
     
     return columns
 
-def get_data_with_targets(filters, categories):
-    """Get sales data with monthly targets from Sales Team table"""
-    
-    # Build conditions
+def get_data(filters, categories):
+    """Improved data fetching with customer and target columns"""
     conditions = []
     values = {}
     
+    # Build conditions
     if filters.get("from_date"):
         conditions.append("si.posting_date >= %(from_date)s")
         values["from_date"] = filters.get("from_date")
@@ -137,12 +164,11 @@ def get_data_with_targets(filters, categories):
     
     if filters.get("custom_region"):
         region_list = filters.get("custom_region")
-        if isinstance(region_list, list) and region_list:
+        if isinstance(region_list, list):
             placeholders = ','.join(['%s'] * len(region_list))
             conditions.append(f"sp.custom_region IN ({placeholders})")
-            for i, reg in enumerate(region_list):
-                values[f"region_{i}"] = reg
-        elif region_list:
+            values.update({f"region_{i}": reg for i, reg in enumerate(region_list)})
+        else:
             conditions.append("sp.custom_region = %(custom_region)s")
             values["custom_region"] = region_list
     
@@ -156,17 +182,19 @@ def get_data_with_targets(filters, categories):
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     
-    # Get sales data
-    sales_query = f"""
+    # Main query with proper joins including customer
+    query = f"""
         SELECT
             DATE_FORMAT(si.posting_date, '%%Y-%%m') as month_key,
             MONTH(si.posting_date) as month_num,
             YEAR(si.posting_date) as year,
             sp.parent_sales_person,
             sp.custom_region,
-            sp.name as sales_person_name,
+            si.customer,
             i.custom_main_group as category,
-            SUM(sii.base_net_amount) as achieved
+            SUM(sii.base_net_amount) as achieved,
+            COUNT(DISTINCT si.name) as invoice_count,
+            COUNT(DISTINCT sii.item_code) as item_count
         FROM `tabSales Invoice` si
         INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         INNER JOIN `tabItem` i ON i.name = sii.item_code
@@ -182,162 +210,170 @@ def get_data_with_targets(filters, categories):
             YEAR(si.posting_date),
             sp.parent_sales_person,
             sp.custom_region,
-            sp.name,
+            si.customer,
             i.custom_main_group
-        ORDER BY year ASC, month_num ASC, sp.custom_region ASC
+        ORDER BY 
+            year ASC,
+            month_num ASC,
+            sp.custom_region ASC,
+            sp.parent_sales_person ASC,
+            si.customer ASC
     """
     
-    sales_data = frappe.db.sql(sales_query, values, as_dict=1)
+    data = frappe.db.sql(query, values, as_dict=1)
     
-    # Organize data by month, head, region
+    # Get target data for each Sales Person and month
+    targets = get_targets(filters, categories)
+    
+    # Process and structure data
     result = {}
     
-    for row in sales_data:
-        key = (row.month_key, row.parent_sales_person, row.custom_region)
+    for row in data:
+        # Create a unique key for each month + head + region + customer
+        key = (row.month_key, row.parent_sales_person, row.custom_region, row.customer)
         
         if key not in result:
+            month_num = int(row.month_num)
+            year = row.year
+            
+            # Get targets for this sales person and month
+            target_key = (row.parent_sales_person, row.month_key)
+            sales_targets = targets.get(target_key, {})
+            
             result[key] = {
-                "month": f"{MONTHS[int(row.month_num)-1]}-{row.year}",
-                "month_num": row.month_num,
-                "year": row.year,
+                "month": f"{MONTHS[month_num-1]}-{year}",
+                "month_num": month_num,
+                "year": year,
                 "parent_sales_person": row.parent_sales_person or "Unassigned",
                 "custom_region": row.custom_region or "No Region",
-                "total_achieved": 0,
+                "customer": row.customer or "No Customer",
                 "total_target": 0,
-                "achievement_percentage": 0
+                "total_achieved": 0,
+                "invoice_count": 0,
+                "item_count": 0
             }
             
-            # Initialize all categories with 0
+            # Initialize all categories with 0 for target and achieved
             for cat in categories:
-                safe = cat.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
+                safe = cat.replace(" ", "_").replace("-", "_")
+                result[key][f"{safe}_target"] = sales_targets.get(cat, 0)
                 result[key][f"{safe}_achieved"] = 0
-                result[key][f"{safe}_target"] = 0
+                result[key]["total_target"] += sales_targets.get(cat, 0)
         
-        # Add achieved amount
+        # Add achieved amount for the category
         if row.category in categories:
-            safe = row.category.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
+            safe = row.category.replace(" ", "_").replace("-", "_")
             result[key][f"{safe}_achieved"] += flt(row.achieved)
             result[key]["total_achieved"] += flt(row.achieved)
-    
-    # Fetch targets from Sales Team table for each Head Sales Person
-    for key in result:
-        month_num = result[key]["month_num"]
-        parent_sales_person = result[key]["parent_sales_person"]
-        
-        if parent_sales_person and parent_sales_person != "Unassigned":
-            # Query to get targets from Sales Team table
-            # Using CASE statement as per your original requirement
-            target_query = """
-                SELECT 
-                    st.parent as sales_person,
-                    CASE 
-                        WHEN %(month)s = 1 THEN st.custom_january
-                        WHEN %(month)s = 2 THEN st.custom_february
-                        WHEN %(month)s = 3 THEN st.custom_march
-                        WHEN %(month)s = 4 THEN st.custom_april
-                        WHEN %(month)s = 5 THEN st.custom_may_
-                        WHEN %(month)s = 6 THEN st.custom_june
-                        WHEN %(month)s = 7 THEN st.custom_july
-                        WHEN %(month)s = 8 THEN st.custom_august
-                        WHEN %(month)s = 9 THEN st.custom_september
-                        WHEN %(month)s = 10 THEN st.custom_october
-                        WHEN %(month)s = 11 THEN st.custom_november
-                        WHEN %(month)s = 12 THEN st.custom_december
-                    END as monthly_target
-                FROM `tabSales Team` st
-                WHERE st.parent = %(parent_sales_person)s
-            """
-            
-            try:
-                targets = frappe.db.sql(target_query, {
-                    "month": month_num,
-                    "parent_sales_person": parent_sales_person
-                }, as_dict=1)
-                
-                # Sum targets for all entries under this head
-                total_target = 0
-                for target_row in targets:
-                    total_target += flt(target_row.get("monthly_target", 0))
-                
-                result[key]["total_target"] = total_target
-                
-                # Distribute target across categories based on historical achievement ratio
-                if categories and total_target > 0:
-                    total_achieved = result[key]["total_achieved"]
-                    
-                    if total_achieved > 0:
-                        # Distribute based on actual achievement ratio
-                        for cat in categories:
-                            safe = cat.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
-                            cat_achieved = result[key].get(f"{safe}_achieved", 0)
-                            if cat_achieved > 0:
-                                target_per_category = (cat_achieved / total_achieved) * total_target
-                            else:
-                                target_per_category = total_target / len(categories)
-                            result[key][f"{safe}_target"] = target_per_category
-                    else:
-                        # Equal distribution if no achievements
-                        target_per_category = total_target / len(categories)
-                        for cat in categories:
-                            safe = cat.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
-                            result[key][f"{safe}_target"] = target_per_category
-                
-                # Calculate achievement percentage
-                if result[key]["total_target"] > 0:
-                    result[key]["achievement_percentage"] = (result[key]["total_achieved"] / result[key]["total_target"]) * 100
-                else:
-                    result[key]["achievement_percentage"] = 0
-                    
-            except Exception as e:
-                frappe.log_error(f"Error fetching targets for {parent_sales_person}: {str(e)}", "Target Fetch Error")
-                result[key]["total_target"] = 0
-                result[key]["achievement_percentage"] = 0
+            result[key]["invoice_count"] += row.invoice_count
+            result[key]["item_count"] += row.item_count
     
     # Convert to list and sort
     result_list = list(result.values())
-    result_list.sort(key=lambda x: (x["year"], x["month_num"], x["custom_region"]))
+    result_list.sort(key=lambda x: (x["year"], x["month_num"], x["custom_region"], x["customer"]))
     
     return result_list
 
-def get_summary_with_targets(data, categories):
-    """Generate summary with target achievements"""
+def get_targets(filters, categories):
+    """Fetch targets from Sales Person table based on month fields"""
+    targets = {}
+    
+    # Get date range for filtering
+    from_date = filters.get("from_date")
+    to_date = filters.get("to_date")
+    
+    if not from_date or not to_date:
+        return targets
+    
+    # Build conditions for sales persons
+    conditions = []
+    values = {}
+    
+    if filters.get("parent_sales_person"):
+        conditions.append("name = %(parent_sales_person)s")
+        values["parent_sales_person"] = filters.get("parent_sales_person")
+    
+    if filters.get("sales_person"):
+        conditions.append("name = %(sales_person)s")
+        values["sales_person"] = filters.get("sales_person")
+    
+    if filters.get("custom_region"):
+        region_list = filters.get("custom_region")
+        if isinstance(region_list, list):
+            placeholders = ','.join(['%s'] * len(region_list))
+            conditions.append(f"custom_region IN ({placeholders})")
+            values.update({f"region_{i}": reg for i, reg in enumerate(region_list)})
+        else:
+            conditions.append("custom_region = %(custom_region)s")
+            values["custom_region"] = region_list
+    
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+    
+    # Fetch all sales persons with their monthly target fields
+    sales_persons = frappe.db.sql(f"""
+        SELECT name, {', '.join([f'COALESCE({field}, 0) as {field}' for field in month_fields.values()])}
+        FROM `tabSales Person`
+        WHERE {where_clause}
+    """, values, as_dict=1)
+    
+    # For each month in range, get targets
+    current_date = getdate(from_date)
+    while current_date <= getdate(to_date):
+        month_num = current_date.month
+        month_key = f"{current_date.year}-{str(month_num).zfill(2)}"
+        month_field = month_fields.get(month_num)
+        
+        if month_field:
+            for sp in sales_persons:
+                target_value = flt(sp.get(month_field, 0))
+                
+                # If categories exist, distribute target across categories
+                # Note: Modify this logic based on how category-wise targets are stored
+                if categories and target_value > 0:
+                    per_category_target = target_value / len(categories)
+                    key = (sp.name, month_key)
+                    if key not in targets:
+                        targets[key] = {}
+                    for cat in categories:
+                        targets[key][cat] = per_category_target
+                else:
+                    key = (sp.name, month_key)
+                    if key not in targets:
+                        targets[key] = {}
+                    for cat in categories:
+                        targets[key][cat] = 0
+        
+        # Move to next month
+        if current_date.month == 12:
+            current_date = current_date.replace(year=current_date.year + 1, month=1)
+        else:
+            current_date = current_date.replace(month=current_date.month + 1)
+    
+    return targets
+
+def get_summary(data, categories):
+    """Generate summary statistics"""
     if not data:
         return []
     
-    total_achieved = sum(row.get("total_achieved", 0) for row in data)
+    total_sales = sum(row.get("total_achieved", 0) for row in data)
     total_target = sum(row.get("total_target", 0) for row in data)
-    overall_achievement = (total_achieved / total_target * 100) if total_target > 0 else 0
+    total_invoices = sum(row.get("invoice_count", 0) for row in data)
     
-    # Category-wise achievement
-    category_achieved = {}
-    category_target = {}
-    
+    # Calculate category-wise totals
+    category_totals = {}
     for cat in categories:
-        safe = cat.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "").replace(".", "")
-        category_achieved[cat] = sum(row.get(f"{safe}_achieved", 0) for row in data)
-        category_target[cat] = sum(row.get(f"{safe}_target", 0) for row in data)
+        safe = cat.replace(" ", "_").replace("-", "_")
+        category_totals[cat] = sum(row.get(f"{safe}_achieved", 0) for row in data)
     
-    # Find best and worst performing categories
-    best_category = None
-    best_percentage = 0
-    worst_category = None
-    worst_percentage = 100
-    
-    for cat in categories:
-        if category_target[cat] > 0:
-            percentage = (category_achieved[cat] / category_target[cat]) * 100
-            if percentage > best_percentage:
-                best_percentage = percentage
-                best_category = cat
-            if percentage < worst_percentage:
-                worst_percentage = percentage
-                worst_category = cat
+    # Get top performing category
+    top_category = max(category_totals.items(), key=lambda x: x[1]) if category_totals else (None, 0)
     
     summary = [
         {
-            "value": total_achieved,
-            "label": _("Total Achieved"),
-            "indicator": "Green" if total_achieved > 0 else "Red",
+            "value": total_sales,
+            "label": _("Total Sales"),
+            "indicator": "Green" if total_sales > 0 else "Red",
             "datatype": "Currency"
         },
         {
@@ -347,73 +383,65 @@ def get_summary_with_targets(data, categories):
             "datatype": "Currency"
         },
         {
-            "value": f"{overall_achievement:.1f}%",
-            "label": _("Overall Achievement"),
-            "indicator": "Green" if overall_achievement >= 100 else "Orange",
-            "datatype": "Percent"
+            "value": total_invoices,
+            "label": _("Total Invoices"),
+            "indicator": "Blue",
+            "datatype": "Int"
+        },
+        {
+            "value": len(data),
+            "label": _("Total Records"),
+            "indicator": "Blue",
+            "datatype": "Int"
+        },
+        {
+            "value": len(set([row.get("customer") for row in data if row.get("customer") != "No Customer"])),
+            "label": _("Unique Customers"),
+            "indicator": "Blue",
+            "datatype": "Int"
         }
     ]
     
-    if best_category:
+    if top_category[0]:
         summary.append({
-            "value": f"{best_percentage:.1f}%",
-            "label": _(f"Best: {best_category[:20]}"),
+            "value": top_category[1],
+            "label": _("Top Category: {0}").format(top_category[0]),
             "indicator": "Green",
-            "datatype": "Percent"
-        })
-    
-    if worst_category and worst_percentage < 100:
-        summary.append({
-            "value": f"{worst_percentage:.1f}%",
-            "label": _(f"Needs Improvement: {worst_category[:20]}"),
-            "indicator": "Red",
-            "datatype": "Percent"
+            "datatype": "Currency"
         })
     
     return summary
 
-def get_chart_with_targets(data, categories):
-    """Generate chart comparing achieved vs target"""
+def get_chart_data(data, categories):
+    """Generate chart data for visualization"""
     if not data:
         return None
     
-    months = sorted(set(row.get("month") for row in data))
-    
-    achieved_values = []
-    target_values = []
-    
-    for month in months:
-        month_data = [row for row in data if row.get("month") == month]
-        achieved = sum(row.get("total_achieved", 0) for row in month_data)
-        target = sum(row.get("total_target", 0) for row in month_data)
-        achieved_values.append(achieved)
-        target_values.append(target)
-    
-    chart = {
+    # Prepare data for chart
+    months = sorted(set([row["month"] for row in data]))
+    chart_data = {
         "data": {
             "labels": months,
-            "datasets": [
-                {
-                    "name": "Achieved",
-                    "values": achieved_values,
-                    "chartType": "bar",
-                    "color": "#28a745"
-                },
-                {
-                    "name": "Target",
-                    "values": target_values,
-                    "chartType": "line",
-                    "color": "#ffc107"
-                }
-            ]
+            "datasets": []
         },
-        "type": "mixed",
+        "type": "bar",
         "height": 300,
-        "axisOptions": {
-            "xAxisMode": "tick",
-            "yAxisMode": "tick",
-            "xIsSeries": 1
-        }
+        "colors": ["#28a745", "#dc3545", "#ffc107", "#17a2b8", "#6c757d", "#007bff"]
     }
     
-    return chart
+    # Add datasets for top 5 categories only (to keep chart readable)
+    for cat in categories[:5]:  # Limit to top 5 categories
+        safe = cat.replace(" ", "_").replace("-", "_")
+        values = []
+        for month in months:
+            month_data = [row for row in data if row["month"] == month]
+            total = sum(row.get(f"{safe}_achieved", 0) for row in month_data)
+            values.append(total)
+        
+        if sum(values) > 0:  # Only add if there's data
+            chart_data["data"]["datasets"].append({
+                "name": cat,
+                "values": values
+            })
+    
+    return chart_data if chart_data["data"]["datasets"] else None

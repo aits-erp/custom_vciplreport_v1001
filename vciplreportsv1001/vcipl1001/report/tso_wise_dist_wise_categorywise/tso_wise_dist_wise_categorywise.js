@@ -17,9 +17,6 @@ frappe.query_reports["TSO WISE DIST WISE CATEGORYWISE"] = {
             "Cookers Spare Parts",
             "Other Spare"
         ]);
-        
-        // Add custom styles
-        this.add_custom_styles();
     },
 
     filters: [
@@ -105,88 +102,24 @@ frappe.query_reports["TSO WISE DIST WISE CATEGORYWISE"] = {
         }
     ],
     
-    // Custom formatter for better visuals
+    // Add formatter for better visual representation
     formatter: function(value, row, column, data, default_formatter) {
+        value = default_formatter(value, row, column, data);
+        
+        // Format currency columns with colors
         if (column.fieldname.includes("_achieved")) {
-            let target_field = column.fieldname.replace("_achieved", "_target");
-            let target = row[target_field] || 0;
-            let percentage = target > 0 ? (value / target * 100) : 0;
-            
-            if (value > 0 && value >= target) {
-                return `<span style="color: #28a745; font-weight: bold; background: #d4edda; padding: 4px 8px; border-radius: 4px;">
-                            ${default_formatter(value, row, column, data)}
-                            <small style="color: #155724;"> (${Math.round(percentage)}%)</small>
-                        </span>`;
-            } else if (value > 0 && value < target) {
-                return `<span style="color: #ffc107; font-weight: bold; background: #fff3cd; padding: 4px 8px; border-radius: 4px;">
-                            ${default_formatter(value, row, column, data)}
-                            <small style="color: #856404;"> (${Math.round(percentage)}%)</small>
-                        </span>`;
-            } else if (value === 0 && target > 0) {
-                return `<span style="color: #dc3545; background: #f8d7da; padding: 4px 8px; border-radius: 4px;">
-                            ${default_formatter(value, row, column, data)}
-                            <small style="color: #721c24;"> (0%)</small>
-                        </span>`;
+            if (parseFloat(value) > 0) {
+                value = `<span style="color: #28a745; font-weight: 600;">${value}</span>`;
+            } else if (parseFloat(value) === 0) {
+                value = `<span style="color: #dc3545;">${value}</span>`;
             }
-            return default_formatter(value, row, column, data);
         }
         
-        if (column.fieldname.includes("_target")) {
-            return `<span style="color: #6c757d; font-style: italic;">🎯 ${default_formatter(value, row, column, data)}</span>`;
+        // Format target columns
+        if (column.fieldname.includes("_target") && parseFloat(value) > 0) {
+            value = `<span style="color: #007bff; font-weight: 600;">${value}</span>`;
         }
         
-        if (column.fieldname === "total_achieved") {
-            return `<strong style="color: #28a745;">${default_formatter(value, row, column, data)}</strong>`;
-        }
-        
-        if (column.fieldname === "total_target") {
-            return `<strong style="color: #ffc107;">🎯 ${default_formatter(value, row, column, data)}</strong>`;
-        }
-        
-        if (column.fieldname === "achievement_percentage") {
-            let color = value >= 100 ? "#28a745" : (value >= 60 ? "#ffc107" : "#dc3545");
-            return `<div style="text-align: center;">
-                        <div class="progress" style="background-color: #e9ecef; border-radius: 10px; height: 8px; margin-bottom: 5px;">
-                            <div style="width: ${Math.min(value, 100)}%; background-color: ${color}; height: 8px; border-radius: 10px;"></div>
-                        </div>
-                        <strong style="color: ${color};">${Math.round(value)}%</strong>
-                    </div>`;
-        }
-        
-        return default_formatter(value, row, column, data);
-    },
-    
-    add_custom_styles: function() {
-        let style = document.createElement('style');
-        style.innerHTML = `
-            .report-table {
-                border-collapse: separate;
-                border-spacing: 0 8px;
-            }
-            .report-table tbody tr {
-                background: white;
-                transition: all 0.3s ease;
-            }
-            .report-table tbody tr:hover {
-                transform: scale(1.01);
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            }
-            .report-table th {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 12px;
-                font-weight: 600;
-            }
-            .report-table td {
-                padding: 10px;
-                vertical-align: middle;
-            }
-            .progress {
-                background-color: #e9ecef;
-                border-radius: 10px;
-                overflow: hidden;
-            }
-        `;
-        document.head.appendChild(style);
+        return value;
     }
 };

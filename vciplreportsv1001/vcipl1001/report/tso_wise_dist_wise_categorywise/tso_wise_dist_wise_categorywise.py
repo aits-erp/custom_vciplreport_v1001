@@ -75,7 +75,7 @@ def get_categories(filters):
     return [cat[0] for cat in categories if cat[0]]
 
 def get_columns(categories):
-    """Enhanced columns with better formatting including Customer and Target columns"""
+    """Enhanced columns with better formatting - Added Customer and Target columns"""
     columns = [
         {
             "label": _("Month"),
@@ -105,13 +105,6 @@ def get_columns(categories):
             "width": 200
         },
         {
-            "label": _("Total Target"),
-            "fieldname": "total_target",
-            "fieldtype": "Currency",
-            "width": 150,
-            "align": "right"
-        },
-        {
             "label": _("Total Achieved"),
             "fieldname": "total_achieved",
             "fieldtype": "Currency",
@@ -131,7 +124,7 @@ def get_columns(categories):
             "align": "right"
         })
         columns.append({
-            "label": _(f"{cat} (Achieved)"),
+            "label": _(cat),
             "fieldname": f"{safe}_achieved",
             "fieldtype": "Currency",
             "width": 180,
@@ -141,7 +134,7 @@ def get_columns(categories):
     return columns
 
 def get_data(filters, categories):
-    """Improved data fetching with customer and target columns"""
+    """Improved data fetching with better handling of missing data - Added Customer and Target"""
     conditions = []
     values = {}
     
@@ -182,7 +175,7 @@ def get_data(filters, categories):
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     
-    # Main query with proper joins including customer
+    # Main query with proper joins - Added customer
     query = f"""
         SELECT
             DATE_FORMAT(si.posting_date, '%%Y-%%m') as month_key,
@@ -216,8 +209,7 @@ def get_data(filters, categories):
             year ASC,
             month_num ASC,
             sp.custom_region ASC,
-            sp.parent_sales_person ASC,
-            si.customer ASC
+            sp.parent_sales_person ASC
     """
     
     data = frappe.db.sql(query, values, as_dict=1)
@@ -247,7 +239,6 @@ def get_data(filters, categories):
                 "parent_sales_person": row.parent_sales_person or "Unassigned",
                 "custom_region": row.custom_region or "No Region",
                 "customer": row.customer or "No Customer",
-                "total_target": 0,
                 "total_achieved": 0,
                 "invoice_count": 0,
                 "item_count": 0
@@ -258,7 +249,6 @@ def get_data(filters, categories):
                 safe = cat.replace(" ", "_").replace("-", "_")
                 result[key][f"{safe}_target"] = sales_targets.get(cat, 0)
                 result[key][f"{safe}_achieved"] = 0
-                result[key]["total_target"] += sales_targets.get(cat, 0)
         
         # Add achieved amount for the category
         if row.category in categories:
@@ -270,7 +260,7 @@ def get_data(filters, categories):
     
     # Convert to list and sort
     result_list = list(result.values())
-    result_list.sort(key=lambda x: (x["year"], x["month_num"], x["custom_region"], x["customer"]))
+    result_list.sort(key=lambda x: (x["year"], x["month_num"], x["custom_region"]))
     
     return result_list
 
@@ -327,8 +317,7 @@ def get_targets(filters, categories):
             for sp in sales_persons:
                 target_value = flt(sp.get(month_field, 0))
                 
-                # If categories exist, distribute target across categories
-                # Note: Modify this logic based on how category-wise targets are stored
+                # Distribute target across categories
                 if categories and target_value > 0:
                     per_category_target = target_value / len(categories)
                     key = (sp.name, month_key)
@@ -357,7 +346,6 @@ def get_summary(data, categories):
         return []
     
     total_sales = sum(row.get("total_achieved", 0) for row in data)
-    total_target = sum(row.get("total_target", 0) for row in data)
     total_invoices = sum(row.get("invoice_count", 0) for row in data)
     
     # Calculate category-wise totals
@@ -377,12 +365,6 @@ def get_summary(data, categories):
             "datatype": "Currency"
         },
         {
-            "value": total_target,
-            "label": _("Total Target"),
-            "indicator": "Blue",
-            "datatype": "Currency"
-        },
-        {
             "value": total_invoices,
             "label": _("Total Invoices"),
             "indicator": "Blue",
@@ -391,12 +373,6 @@ def get_summary(data, categories):
         {
             "value": len(data),
             "label": _("Total Records"),
-            "indicator": "Blue",
-            "datatype": "Int"
-        },
-        {
-            "value": len(set([row.get("customer") for row in data if row.get("customer") != "No Customer"])),
-            "label": _("Unique Customers"),
             "indicator": "Blue",
             "datatype": "Int"
         }

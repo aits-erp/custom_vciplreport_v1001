@@ -115,11 +115,6 @@ frappe.query_reports["TSO WISE DIST WISE CATEGORYWISE"] = {
             }
         }
         
-        // Format target columns
-        if (column.fieldname.includes("_target") && parseFloat(value) > 0) {
-            value = `<span style="color: #007bff; font-weight: 600;">${value}</span>`;
-        }
-        
         return value;
     }
 };

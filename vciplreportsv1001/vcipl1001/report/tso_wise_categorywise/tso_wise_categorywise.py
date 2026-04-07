@@ -59,7 +59,7 @@ def get_categories(filters):
     return [cat[0] for cat in categories if cat[0]]
 
 def get_columns(categories):
-    """Enhanced columns with better formatting"""
+    """Enhanced columns with better formatting including Customer Name and TSO"""
     columns = [
         {
             "label": _("Month"),
@@ -67,6 +67,20 @@ def get_columns(categories):
             "fieldtype": "Data",
             "width": 100,
             "align": "center"
+        },
+        {
+            "label": _("TSO"),
+            "fieldname": "tso_name",
+            "fieldtype": "Link",
+            "options": "Sales Person",
+            "width": 200
+        },
+        {
+            "label": _("Customer Name"),
+            "fieldname": "customer_name",
+            "fieldtype": "Link",
+            "options": "Customer",
+            "width": 200
         },
         {
             "label": _("Region"),
@@ -104,7 +118,7 @@ def get_columns(categories):
     return columns
 
 def get_data(filters, categories):
-    """Improved data fetching with better handling of missing data"""
+    """Improved data fetching with Customer Name and TSO columns"""
     conditions = []
     values = {}
     
@@ -145,14 +159,16 @@ def get_data(filters, categories):
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     
-    # Main query with proper joins
+    # Main query with proper joins including Customer and TSO
     query = f"""
         SELECT
             DATE_FORMAT(si.posting_date, '%%Y-%%m') as month_key,
             MONTH(si.posting_date) as month_num,
             YEAR(si.posting_date) as year,
+            sp.name as tso_name,
             sp.parent_sales_person,
             sp.custom_region,
+            si.customer as customer_name,
             i.custom_main_group as category,
             SUM(sii.base_net_amount) as achieved,
             COUNT(DISTINCT si.name) as invoice_count,
@@ -170,14 +186,16 @@ def get_data(filters, categories):
             DATE_FORMAT(si.posting_date, '%%Y-%%m'),
             MONTH(si.posting_date),
             YEAR(si.posting_date),
+            sp.name,
             sp.parent_sales_person,
             sp.custom_region,
+            si.customer,
             i.custom_main_group
         ORDER BY 
             year ASC,
             month_num ASC,
-            sp.custom_region ASC,
-            sp.parent_sales_person ASC
+            sp.name ASC,
+            si.customer ASC
     """
     
     data = frappe.db.sql(query, values, as_dict=1)
@@ -186,14 +204,16 @@ def get_data(filters, categories):
     result = {}
     
     for row in data:
-        # Create a unique key for each month + head + region
-        key = (row.month_key, row.parent_sales_person, row.custom_region)
+        # Create a unique key for each month + TSO + Customer + Head + Region
+        key = (row.month_key, row.tso_name, row.customer_name, row.parent_sales_person, row.custom_region)
         
         if key not in result:
             result[key] = {
                 "month": f"{MONTHS[int(row.month_num)-1]}-{row.year}",
                 "month_num": row.month_num,
                 "year": row.year,
+                "tso_name": row.tso_name or "Unassigned",
+                "customer_name": row.customer_name or "No Customer",
                 "parent_sales_person": row.parent_sales_person or "Unassigned",
                 "custom_region": row.custom_region or "No Region",
                 "total_achieved": 0,
@@ -216,7 +236,7 @@ def get_data(filters, categories):
     
     # Convert to list and sort
     result_list = list(result.values())
-    result_list.sort(key=lambda x: (x["year"], x["month_num"], x["custom_region"]))
+    result_list.sort(key=lambda x: (x["year"], x["month_num"], x["tso_name"], x["customer_name"]))
     
     return result_list
 

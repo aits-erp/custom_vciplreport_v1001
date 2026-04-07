@@ -130,12 +130,14 @@ def get_columns(categories):
     
     return columns
 
-def get_month_target(sales_person, month_num, year, category):
-    """Fetch target for a specific sales person, month and category"""
+def get_month_target_from_sales_team(sales_person, month_num, year, category):
+    """
+    Fetch target for a specific sales person, month and category from Sales Team child table
+    """
     if not sales_person or sales_person == "Unassigned":
         return 0
     
-    # Map month number to custom field name
+    # Map month number to custom field name in Sales Team table
     month_fields = {
         1: "custom_january",
         2: "custom_february",
@@ -155,29 +157,77 @@ def get_month_target(sales_person, month_num, year, category):
     if not month_field:
         return 0
     
-    # Query target from Sales Person child table for specific category
-    target = frappe.db.sql("""
-        SELECT {month_field}
-        FROM `tabSales Person`
-        WHERE name = %s
-    """.format(month_field=month_field), (sales_person,))
-    
-    if target and target[0][0]:
-        # If target is stored as JSON or has category-wise targets
-        # Adjust this based on your actual data structure
-        target_value = target[0][0]
+    # Query target from Sales Team child table
+    # The Sales Team table is linked to Sales Invoice, Sales Order, etc.
+    # We need to find the target set for this sales person
+    try:
+        # First, try to get target from Sales Person target table if exists
+        # Many ERPNext setups have a separate Target table
+        target = frappe.db.sql("""
+            SELECT st.`{month_field}`
+            FROM `tabSales Team` st
+            WHERE st.sales_person = %s
+            LIMIT 1
+        """.format(month_field=month_field), (sales_person,))
         
-        # If target is stored as a string like "Nonstick:1000,Hard Anodised:2000"
-        if isinstance(target_value, str) and ':' in target_value:
-            target_dict = {}
-            for item in target_value.split(','):
-                if ':' in item:
-                    cat, val = item.split(':')
-                    target_dict[cat.strip()] = flt(val)
-            return target_dict.get(category, 0)
+        if target and target[0][0] is not None:
+            target_value = target[0][0]
+            
+            # If target is stored as JSON or has category-wise targets
+            if isinstance(target_value, str):
+                # Check if it's a JSON string
+                if target_value.startswith('{'):
+                    import json
+                    try:
+                        target_dict = json.loads(target_value)
+                        return flt(target_dict.get(category, 0))
+                    except:
+                        pass
+                
+                # Check if it's a comma-separated string like "Nonstick:1000,Hard Anodised:2000"
+                if ':' in target_value:
+                    target_dict = {}
+                    for item in target_value.split(','):
+                        if ':' in item:
+                            cat, val = item.split(':')
+                            target_dict[cat.strip()] = flt(val)
+                    return target_dict.get(category, 0)
+            
+            # If it's a number, return as is
+            return flt(target_value)
         
-        # If target is a single number for all categories
-        return flt(target_value)
+        # If no target found in Sales Team, try to get from Sales Person targets
+        target = frappe.db.sql("""
+            SELECT sp.`{month_field}`
+            FROM `tabSales Person` sp
+            WHERE sp.name = %s
+        """.format(month_field=month_field), (sales_person,))
+        
+        if target and target[0][0] is not None:
+            target_value = target[0][0]
+            
+            # If target is stored as JSON or has category-wise targets
+            if isinstance(target_value, str):
+                if target_value.startswith('{'):
+                    import json
+                    try:
+                        target_dict = json.loads(target_value)
+                        return flt(target_dict.get(category, 0))
+                    except:
+                        pass
+                
+                if ':' in target_value:
+                    target_dict = {}
+                    for item in target_value.split(','):
+                        if ':' in item:
+                            cat, val = item.split(':')
+                            target_dict[cat.strip()] = flt(val)
+                    return target_dict.get(category, 0)
+            
+            return flt(target_value)
+        
+    except Exception as e:
+        frappe.log_error(f"Error fetching target for {sales_person}: {str(e)}", "Target Fetch Error")
     
     return 0
 
@@ -185,11 +235,6 @@ def get_data(filters, categories):
     """Improved data fetching with Customer Name, TSO and Target columns"""
     conditions = []
     values = {}
-    
-    # Get month number from filters
-    month_num = None
-    if filters.get("from_date"):
-        month_num = getdate(filters.from_date).month
     
     # Build conditions
     if filters.get("from_date"):
@@ -210,11 +255,12 @@ def get_data(filters, categories):
     
     if filters.get("custom_region"):
         region_list = filters.get("custom_region")
-        if isinstance(region_list, list):
+        if isinstance(region_list, list) and region_list:
             placeholders = ','.join(['%s'] * len(region_list))
             conditions.append(f"sp.custom_region IN ({placeholders})")
-            values.update({f"region_{i}": reg for i, reg in enumerate(region_list)})
-        else:
+            for i, reg in enumerate(region_list):
+                values[f"region_{i}"] = reg
+        elif region_list:
             conditions.append("sp.custom_region = %(custom_region)s")
             values["custom_region"] = region_list
     
@@ -301,9 +347,14 @@ def get_data(filters, categories):
             # Fetch and set targets for each category for this TSO and month
             for cat in categories:
                 safe = cat.replace(" ", "_").replace("-", "_")
-                target_value = get_month_target(row.tso_name, row.month_num, row.year, cat)
-                result[key][f"{safe}_target"] = target_value
-                result[key]["total_target"] += target_value
+                try:
+                    target_value = get_month_target_from_sales_team(row.tso_name, row.month_num, row.year, cat)
+                    result[key][f"{safe}_target"] = target_value
+                    result[key]["total_target"] += target_value
+                except Exception as e:
+                    # If target fetch fails, set to 0
+                    frappe.log_error(f"Error setting target for {row.tso_name}, category {cat}: {str(e)}", "Target Error")
+                    result[key][f"{safe}_target"] = 0
         
         # Add achieved amount for the category
         if row.category in categories:
@@ -377,13 +428,13 @@ def get_summary(data, categories):
     
     # Add category-wise summary
     for cat in categories[:5]:  # Show top 5 categories in summary
-        safe = cat.replace(" ", "_").replace("-", "_")
         achieved_total = category_achieved_totals.get(cat, 0)
         target_total = category_target_totals.get(cat, 0)
         if achieved_total > 0 or target_total > 0:
+            achievement_percentage = (achieved_total / target_total * 100) if target_total > 0 else 0
             summary.append({
                 "value": achieved_total,
-                "label": _("{0} Achieved").format(cat),
+                "label": _("{0} Achieved ({1:.1f}% of Target)").format(cat, achievement_percentage),
                 "indicator": "Green" if achieved_total >= target_total else "Orange",
                 "datatype": "Currency"
             })
@@ -428,10 +479,11 @@ def get_chart_data(data, categories):
                 "values": achieved_values,
                 "chart_type": "bar"
             })
-            chart_data["data"]["datasets"].append({
-                "name": f"{cat} (Target)",
-                "values": target_values,
-                "chart_type": "line"
-            })
+            if sum(target_values) > 0:
+                chart_data["data"]["datasets"].append({
+                    "name": f"{cat} (Target)",
+                    "values": target_values,
+                    "chart_type": "line"
+                })
     
     return chart_data if chart_data["data"]["datasets"] else None

@@ -115,6 +115,13 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             }
         }
         
+        // Format target columns with different color
+        if (column.fieldname.includes("_target")) {
+            if (parseFloat(value) > 0) {
+                value = `<span style="color: #007bff; font-weight: 600;">${value}</span>`;
+            }
+        }
+        
         return value;
     }
 };

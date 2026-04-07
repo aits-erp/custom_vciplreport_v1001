@@ -59,7 +59,7 @@ def get_categories(filters):
     return [cat[0] for cat in categories if cat[0]]
 
 def get_columns(categories):
-    """Enhanced columns with better formatting including Customer Name and TSO"""
+    """Enhanced columns with Target columns for each category"""
     columns = [
         {
             "label": _("Month"),
@@ -100,26 +100,96 @@ def get_columns(categories):
             "fieldtype": "Currency",
             "width": 150,
             "align": "right"
+        },
+        {
+            "label": _("Total Target"),
+            "fieldname": "total_target",
+            "fieldtype": "Currency",
+            "width": 150,
+            "align": "right"
         }
     ]
     
-    # Add category columns with better labels
+    # Add category columns with Target and Achieved side by side
     for cat in categories:
         safe = cat.replace(" ", "_").replace("-", "_")
         columns.append({
-            "label": _(cat),
+            "label": _(f"{cat} (Target)"),
+            "fieldname": f"{safe}_target",
+            "fieldtype": "Currency",
+            "width": 150,
+            "align": "right"
+        })
+        columns.append({
+            "label": _(f"{cat} (Achieved)"),
             "fieldname": f"{safe}_achieved",
             "fieldtype": "Currency",
-            "width": 180,
+            "width": 150,
             "align": "right"
         })
     
     return columns
 
+def get_month_target(sales_person, month_num, year, category):
+    """Fetch target for a specific sales person, month and category"""
+    if not sales_person or sales_person == "Unassigned":
+        return 0
+    
+    # Map month number to custom field name
+    month_fields = {
+        1: "custom_january",
+        2: "custom_february",
+        3: "custom_march",
+        4: "custom_april",
+        5: "custom_may_",
+        6: "custom_june",
+        7: "custom_july",
+        8: "custom_august",
+        9: "custom_september",
+        10: "custom_october",
+        11: "custom_november",
+        12: "custom_december"
+    }
+    
+    month_field = month_fields.get(month_num)
+    if not month_field:
+        return 0
+    
+    # Query target from Sales Person child table for specific category
+    target = frappe.db.sql("""
+        SELECT {month_field}
+        FROM `tabSales Person`
+        WHERE name = %s
+    """.format(month_field=month_field), (sales_person,))
+    
+    if target and target[0][0]:
+        # If target is stored as JSON or has category-wise targets
+        # Adjust this based on your actual data structure
+        target_value = target[0][0]
+        
+        # If target is stored as a string like "Nonstick:1000,Hard Anodised:2000"
+        if isinstance(target_value, str) and ':' in target_value:
+            target_dict = {}
+            for item in target_value.split(','):
+                if ':' in item:
+                    cat, val = item.split(':')
+                    target_dict[cat.strip()] = flt(val)
+            return target_dict.get(category, 0)
+        
+        # If target is a single number for all categories
+        return flt(target_value)
+    
+    return 0
+
 def get_data(filters, categories):
-    """Improved data fetching with Customer Name and TSO columns"""
+    """Improved data fetching with Customer Name, TSO and Target columns"""
     conditions = []
     values = {}
+    
+    # Get month number from filters
+    month_num = None
+    if filters.get("from_date"):
+        month_num = getdate(filters.from_date).month
     
     # Build conditions
     if filters.get("from_date"):
@@ -158,7 +228,7 @@ def get_data(filters, categories):
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     
-    # Main query with proper joins including Customer Name (customer_name field)
+    # Main query with proper joins including Customer Name
     query = f"""
         SELECT
             DATE_FORMAT(si.posting_date, '%%Y-%%m') as month_key,
@@ -217,14 +287,23 @@ def get_data(filters, categories):
                 "parent_sales_person": row.parent_sales_person or "Unassigned",
                 "custom_region": row.custom_region or "No Region",
                 "total_achieved": 0,
+                "total_target": 0,
                 "invoice_count": 0,
                 "item_count": 0
             }
             
-            # Initialize all categories with 0
+            # Initialize all categories with 0 for target and achieved
             for cat in categories:
                 safe = cat.replace(" ", "_").replace("-", "_")
+                result[key][f"{safe}_target"] = 0
                 result[key][f"{safe}_achieved"] = 0
+            
+            # Fetch and set targets for each category for this TSO and month
+            for cat in categories:
+                safe = cat.replace(" ", "_").replace("-", "_")
+                target_value = get_month_target(row.tso_name, row.month_num, row.year, cat)
+                result[key][f"{safe}_target"] = target_value
+                result[key]["total_target"] += target_value
         
         # Add achieved amount for the category
         if row.category in categories:
@@ -241,27 +320,37 @@ def get_data(filters, categories):
     return result_list
 
 def get_summary(data, categories):
-    """Generate summary statistics"""
+    """Generate summary statistics with category-wise totals"""
     if not data:
         return []
     
     total_sales = sum(row.get("total_achieved", 0) for row in data)
+    total_targets = sum(row.get("total_target", 0) for row in data)
     total_invoices = sum(row.get("invoice_count", 0) for row in data)
     
-    # Calculate category-wise totals
-    category_totals = {}
+    # Calculate category-wise totals for achieved and target
+    category_achieved_totals = {}
+    category_target_totals = {}
+    
     for cat in categories:
         safe = cat.replace(" ", "_").replace("-", "_")
-        category_totals[cat] = sum(row.get(f"{safe}_achieved", 0) for row in data)
+        category_achieved_totals[cat] = sum(row.get(f"{safe}_achieved", 0) for row in data)
+        category_target_totals[cat] = sum(row.get(f"{safe}_target", 0) for row in data)
     
-    # Get top performing category
-    top_category = max(category_totals.items(), key=lambda x: x[1]) if category_totals else (None, 0)
+    # Get top performing category by achieved
+    top_category = max(category_achieved_totals.items(), key=lambda x: x[1]) if category_achieved_totals else (None, 0)
     
     summary = [
         {
             "value": total_sales,
-            "label": _("Total Sales"),
+            "label": _("Total Sales Achieved"),
             "indicator": "Green" if total_sales > 0 else "Red",
+            "datatype": "Currency"
+        },
+        {
+            "value": total_targets,
+            "label": _("Total Targets"),
+            "indicator": "Blue",
             "datatype": "Currency"
         },
         {
@@ -281,10 +370,23 @@ def get_summary(data, categories):
     if top_category[0]:
         summary.append({
             "value": top_category[1],
-            "label": _("Top Category: {0}").format(top_category[0]),
+            "label": _("Top Category: {0} (Achieved)").format(top_category[0]),
             "indicator": "Green",
             "datatype": "Currency"
         })
+    
+    # Add category-wise summary
+    for cat in categories[:5]:  # Show top 5 categories in summary
+        safe = cat.replace(" ", "_").replace("-", "_")
+        achieved_total = category_achieved_totals.get(cat, 0)
+        target_total = category_target_totals.get(cat, 0)
+        if achieved_total > 0 or target_total > 0:
+            summary.append({
+                "value": achieved_total,
+                "label": _("{0} Achieved").format(cat),
+                "indicator": "Green" if achieved_total >= target_total else "Orange",
+                "datatype": "Currency"
+            })
     
     return summary
 
@@ -293,7 +395,7 @@ def get_chart_data(data, categories):
     if not data:
         return None
     
-    # Prepare data for chart
+    # Prepare data for chart - show achieved vs target for top categories
     months = sorted(set([row["month"] for row in data]))
     chart_data = {
         "data": {
@@ -302,22 +404,34 @@ def get_chart_data(data, categories):
         },
         "type": "bar",
         "height": 300,
-        "colors": ["#28a745", "#dc3545", "#ffc107", "#17a2b8", "#6c757d", "#007bff"]
+        "colors": ["#28a745", "#007bff", "#dc3545", "#ffc107", "#17a2b8", "#6c757d"]
     }
     
-    # Add datasets for top 5 categories only (to keep chart readable)
-    for cat in categories[:5]:  # Limit to top 5 categories
+    # Add datasets for top 3 categories only (achieved vs target)
+    for cat in categories[:3]:  # Limit to top 3 categories
         safe = cat.replace(" ", "_").replace("-", "_")
-        values = []
+        
+        # Achieved values
+        achieved_values = []
+        target_values = []
+        
         for month in months:
             month_data = [row for row in data if row["month"] == month]
-            total = sum(row.get(f"{safe}_achieved", 0) for row in month_data)
-            values.append(total)
+            achieved_total = sum(row.get(f"{safe}_achieved", 0) for row in month_data)
+            target_total = sum(row.get(f"{safe}_target", 0) for row in month_data)
+            achieved_values.append(achieved_total)
+            target_values.append(target_total)
         
-        if sum(values) > 0:  # Only add if there's data
+        if sum(achieved_values) > 0 or sum(target_values) > 0:
             chart_data["data"]["datasets"].append({
-                "name": cat,
-                "values": values
+                "name": f"{cat} (Achieved)",
+                "values": achieved_values,
+                "chart_type": "bar"
+            })
+            chart_data["data"]["datasets"].append({
+                "name": f"{cat} (Target)",
+                "values": target_values,
+                "chart_type": "line"
             })
     
     return chart_data if chart_data["data"]["datasets"] else None

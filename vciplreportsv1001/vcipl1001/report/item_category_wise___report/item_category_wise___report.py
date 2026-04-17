@@ -18,6 +18,9 @@ def execute(filters=None):
 def get_columns(customers):
 
     columns = [
+        {"label": "Item Code", "fieldname": "item_code", "width": 150},   # ✅ ADDED
+        {"label": "Item Name", "fieldname": "item_name", "width": 180},   # ✅ ADDED
+
         {"label": "Item Group", "fieldname": "item_group", "width": 180},
         {"label": "Main Group", "fieldname": "custom_main_group", "width": 180},
         {"label": "Sub Group", "fieldname": "custom_sub_group", "width": 180},
@@ -84,11 +87,12 @@ def get_pivot_data(filters):
     raw_data = frappe.db.sql(
         f"""
         SELECT
+            sii.item_code,                -- ✅ ADDED
+            sii.item_name,                -- ✅ ADDED
             i.item_group,
             i.custom_main_group,
             i.custom_sub_group,
             c.customer_name,
-            sii.item_name,
             sii.qty,
             sii.base_net_amount AS amount
         FROM `tabSales Invoice` si
@@ -118,16 +122,20 @@ def get_pivot_data(filters):
     # ---------------------------------------------
     for row in raw_data:
 
+        item_code = row.item_code or "Undefined"   # ✅ ADDED
+        item_name = row.item_name or "Undefined"   # ✅ ADDED
         item_group = row.item_group or "Undefined"
         main_group = row.custom_main_group or "Undefined"
         sub_group = row.custom_sub_group or "Undefined"
         customer = row.customer_name
 
-        key = f"{item_group}::{main_group}::{sub_group}"
+        key = f"{item_code}::{item_name}::{item_group}::{main_group}::{sub_group}"   # ✅ UPDATED KEY
         cust_field = frappe.scrub(customer)
 
         if key not in result:
             result[key] = {
+                "item_code": item_code,         # ✅ ADDED
+                "item_name": item_name,         # ✅ ADDED
                 "item_group": item_group,
                 "custom_main_group": main_group,
                 "custom_sub_group": sub_group,

@@ -498,12 +498,13 @@ MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
 def execute(filters=None):
     filters = frappe._dict(filters or {})
     
+    # Validate dates
     if filters.get("from_date") and filters.get("to_date"):
         if getdate(filters.from_date) > getdate(filters.to_date):
             frappe.throw(_("From Date must be before To Date"))
     
     categories = get_categories(filters)
-    columns = get_columns(categories, filters)  # ✅ UPDATED
+    columns = get_columns(categories, filters)   # ✅ UPDATED
     data = get_data(filters, categories)
     
     chart = get_chart_data(data, categories)
@@ -529,7 +530,7 @@ def get_categories(filters):
         conditions += " AND si.posting_date <= %(to_date)s"
         values["to_date"] = filters.get("to_date")
     
-    categories = frappe.db.sql(f"""
+    categories = frappe.db.sql("""
         SELECT DISTINCT i.custom_main_group
         FROM `tabSales Invoice` si
         INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
@@ -539,34 +540,22 @@ def get_categories(filters):
         AND i.custom_main_group != ''
         {conditions}
         ORDER BY i.custom_main_group
-    """, values)
+    """.format(conditions=conditions), values)
     
-    return [cat[0] for cat in categories if cat[0]]
+    return [c[0] for c in categories if c[0]]
 
 
 # ✅ UPDATED COLUMNS
 def get_columns(categories, filters=None):
     columns = []
 
-    # ✅ ADD ITEM COLUMNS FIRST
+    # ✅ ADD ITEM FIELDS FIRST
     if filters and filters.get("show_item_details"):
         columns.extend([
-            {
-                "label": _("Item Code"),
-                "fieldname": "item_code",
-                "fieldtype": "Link",
-                "options": "Item",
-                "width": 150
-            },
-            {
-                "label": _("Item Name"),
-                "fieldname": "item_name",
-                "fieldtype": "Data",
-                "width": 200
-            }
+            {"label": _("Item Code"), "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 150},
+            {"label": _("Item Name"), "fieldname": "item_name", "fieldtype": "Data", "width": 200}
         ])
 
-    # ORIGINAL COLUMNS (UNCHANGED)
     columns.extend([
         {"label": _("Month"), "fieldname": "month", "fieldtype": "Data", "width": 100, "align": "center"},
         {"label": _("TSO"), "fieldname": "tso_name", "fieldtype": "Link", "options": "Sales Person", "width": 200},
@@ -615,9 +604,9 @@ def get_data(filters, categories):
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
 
-    # ✅ DYNAMIC GROUP BY
+    # ✅ FIXED GROUP BY
     group_by = """
-        DATE_FORMAT(si.posting_date, '%Y-%m'),
+        DATE_FORMAT(si.posting_date, '%%Y-%%m'),
         MONTH(si.posting_date),
         YEAR(si.posting_date),
         sp.name,
@@ -632,7 +621,7 @@ def get_data(filters, categories):
 
     query = f"""
         SELECT
-            DATE_FORMAT(si.posting_date, '%Y-%m') as month_key,
+            DATE_FORMAT(si.posting_date, '%%Y-%%m') as month_key,
             MONTH(si.posting_date) as month_num,
             YEAR(si.posting_date) as year,
             sp.name as tso_name,
@@ -656,7 +645,6 @@ def get_data(filters, categories):
         AND i.custom_main_group != ''
         AND {where_clause}
         GROUP BY {group_by}
-        ORDER BY year ASC, month_num ASC
     """
 
     data = frappe.db.sql(query, values, as_dict=1)
@@ -697,9 +685,7 @@ def get_data(filters, categories):
 
             for cat in categories:
                 safe = cat.replace(" ", "_").replace("-", "_")
-                target_value = get_month_target_from_sales_team(
-                    row.tso_name, row.month_num, row.year, cat
-                )
+                target_value = get_month_target_from_sales_team(row.tso_name, row.month_num, row.year, cat)
                 result[key][f"{safe}_target"] = target_value
                 result[key]["total_target"] += target_value
 
@@ -712,7 +698,7 @@ def get_data(filters, categories):
     return list(result.values())
 
 
-# 🔽 YOUR ORIGINAL FUNCTIONS BELOW (UNCHANGED)
+# KEEP YOUR ORIGINAL FUNCTIONS BELOW (UNCHANGED)
 
 def get_month_target_from_sales_team(sales_person, month_num, year, category):
     return 0

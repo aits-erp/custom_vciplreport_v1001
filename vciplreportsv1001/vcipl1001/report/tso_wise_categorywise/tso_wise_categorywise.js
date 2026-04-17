@@ -125,7 +125,6 @@
 //         return value;
 //     }
 // };
-
 frappe.query_reports["TSO WISE CATEGORYWISE"] = {
     onload: function(report) {
         report.set_filter_value("custom_main_group", [
@@ -219,7 +218,7 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             }
         },
 
-        // ✅ CHECKBOX ADDED
+        // ✅ CHECKBOX
         {
             fieldname: "show_item_details",
             label: "Include Item Code & Item Name",
@@ -233,15 +232,15 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
 
         if (column.fieldname.includes("_achieved")) {
             if (parseFloat(value) > 0) {
-                value = `<span style="color: #28a745; font-weight: 600;">${value}</span>`;
+                value = `<span style="color:#28a745;font-weight:600;">${value}</span>`;
             } else if (parseFloat(value) === 0) {
-                value = `<span style="color: #dc3545;">${value}</span>`;
+                value = `<span style="color:#dc3545;">${value}</span>`;
             }
         }
 
         if (column.fieldname.includes("_target")) {
             if (parseFloat(value) > 0) {
-                value = `<span style="color: #007bff; font-weight: 600;">${value}</span>`;
+                value = `<span style="color:#007bff;font-weight:600;">${value}</span>`;
             }
         }
 

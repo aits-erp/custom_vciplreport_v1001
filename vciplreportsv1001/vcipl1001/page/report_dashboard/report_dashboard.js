@@ -30,6 +30,9 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "Sales Person Report":
             "/app/query-report/Sales%20Person%20Report?month=1&year=2026",
 
+        "TSO WISE CATEGORYWISE":
+            "/app/query-report/TSO%20WISE%20CATEGORYWISE",
+
         "Monthwise Sales Report":
             "/app/query-report/Monthwise%20Sales%20Report",
 

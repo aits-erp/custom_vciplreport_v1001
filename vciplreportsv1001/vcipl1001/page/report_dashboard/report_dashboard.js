@@ -31,7 +31,7 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
             "/app/query-report/Sales%20Person%20Report?month=1&year=2026",
 
         "TSO WISE CATEGORYWISE":
-            "/app/report/TSO%20WISE%20CATEGORYWISE1",
+            "/app/query-report/TSO%20WISE%20CATEGORYWISE1?from_date=2026-05-01&to_date=2026-05-31&customer_group=Debtors+Distributors&custom_main_group=%5B"Assorted+Utensils"%2C"Bag"%2C"Bottle"%2C"Carton"%2C"Cast+Iron"%2C"Circle"%2C"Coil"%2C"Csd"%2C"Electrical+Appliances"%2C"Futuretec"%2C"Healux"%2C"Horeca"%2C"Kraft"%2C"Machinery"%2C"Nonstick"%2C"Other"%2C"Other+Spare"%2C"Platinum"%2C"Platinum+Triply+P.cooker"%2C"Polishing"%2C"Powder"%2C"Pressure+Cookers"%2C"SFG"%2C"SS+Cookware"%2C"Scrap"%2C"Sticker+%26+Warranty+Card"%2C"Tool"%2C"Trading+SFG"%5D",
 
         "Monthwise Sales Report":
             "/app/query-report/Monthwise%20Sales%20Report",

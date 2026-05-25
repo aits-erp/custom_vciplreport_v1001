@@ -1,0 +1,64 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-05-22 16:10:41.055382",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "excel_customisation_section",
+  "header_bg_color",
+  "header_text_color",
+  "enable_zebra"
+ ],
+ "fields": [
+  {
+   "fieldname": "excel_customisation_section",
+   "fieldtype": "Section Break",
+   "label": "Excel Customisation"
+  },
+  {
+   "default": "#1F4E78",
+   "fieldname": "header_bg_color",
+   "fieldtype": "Color",
+   "label": "Header Background Color"
+  },
+  {
+   "default": "#FFFFFF",
+   "fieldname": "header_text_color",
+   "fieldtype": "Color",
+   "label": "Header Text Color"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_zebra",
+   "fieldtype": "Check",
+   "label": "Enable Zebra Stripping"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-05-22 16:15:25.857872",
+ "modified_by": "Administrator",
+ "module": "vcipl1001",
+ "name": "Excel Export Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

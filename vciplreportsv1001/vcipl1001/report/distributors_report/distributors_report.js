@@ -51,6 +51,9 @@ frappe.query_reports["Distributors Report"] = {
     },
 
     show_popup(rows, title) {
+        if (title === "Invoices – Average Overdue Days") {
+            rows = rows.filter(r => flt(r.amount) > 0);
+        }
 
         if (!rows || rows.length === 0) {
             frappe.msgprint(__("No data available"));

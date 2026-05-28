@@ -18,19 +18,20 @@ def execute(filters=None):
 def get_columns(customers):
 
     columns = [
-        {"label": "Item Code", "fieldname": "item_code", "width": 150},   # ✅ ADDED
-        {"label": "Item Name", "fieldname": "item_name", "width": 180},   # ✅ ADDED
+        {"label": "Item Code", "fieldname": "item_code", "width": 150},
+        {"label": "Item Name", "fieldname": "item_name", "width": 180},
 
         {"label": "Item Group", "fieldname": "item_group", "width": 180},
         {"label": "Main Group", "fieldname": "custom_main_group", "width": 180},
         {"label": "Sub Group", "fieldname": "custom_sub_group", "width": 180},
     ]
 
+    # CUSTOMER COLUMNS
     for customer in customers:
         columns.append({
             "label": customer,
             "fieldname": frappe.scrub(customer),
-            "fieldtype": "Currency",
+            "fieldtype": "Float",     # CHANGED FROM Currency
             "width": 150
         })
 
@@ -87,8 +88,8 @@ def get_pivot_data(filters):
     raw_data = frappe.db.sql(
         f"""
         SELECT
-            sii.item_code,                -- ✅ ADDED
-            sii.item_name,                -- ✅ ADDED
+            sii.item_code,
+            sii.item_name,
             i.item_group,
             i.custom_main_group,
             i.custom_sub_group,
@@ -100,8 +101,10 @@ def get_pivot_data(filters):
         JOIN `tabItem` i ON i.name = sii.item_code
         JOIN `tabCustomer` c ON c.name = si.customer
         LEFT JOIN `tabSales Team` st
-            ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
-        LEFT JOIN `tabSales Person` sp ON sp.name = st.sales_person
+            ON st.parent = si.name
+            AND st.parenttype = 'Sales Invoice'
+        LEFT JOIN `tabSales Person` sp
+            ON sp.name = st.sales_person
         WHERE si.docstatus = 1
           AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
           {conditions}
@@ -111,54 +114,59 @@ def get_pivot_data(filters):
     )
 
     # ---------------------------------------------
-    # Identify unique customers
+    # UNIQUE CUSTOMERS
     # ---------------------------------------------
     customers = sorted({row.customer_name for row in raw_data})
 
     result = {}
 
     # ---------------------------------------------
-    # Build pivot structure
+    # BUILD PIVOT
     # ---------------------------------------------
     for row in raw_data:
 
-        item_code = row.item_code or "Undefined"   # ✅ ADDED
-        item_name = row.item_name or "Undefined"   # ✅ ADDED
+        item_code = row.item_code or "Undefined"
+        item_name = row.item_name or "Undefined"
         item_group = row.item_group or "Undefined"
         main_group = row.custom_main_group or "Undefined"
         sub_group = row.custom_sub_group or "Undefined"
         customer = row.customer_name
 
-        key = f"{item_code}::{item_name}::{item_group}::{main_group}::{sub_group}"   # ✅ UPDATED KEY
+        key = f"{item_code}::{item_name}::{item_group}::{main_group}::{sub_group}"
+
         cust_field = frappe.scrub(customer)
 
         if key not in result:
+
             result[key] = {
-                "item_code": item_code,         # ✅ ADDED
-                "item_name": item_name,         # ✅ ADDED
+                "item_code": item_code,
+                "item_name": item_name,
                 "item_group": item_group,
                 "custom_main_group": main_group,
                 "custom_sub_group": sub_group,
                 "popup_data": {}
             }
 
-            # initialize pivot columns
+            # initialize customer columns
             for c in customers:
+
                 sc = frappe.scrub(c)
+
                 result[key][sc] = 0
                 result[key]["popup_data"][sc] = {}
 
-        # -------------------------
-        # Add pivot amount
-        # -------------------------
-        result[key][cust_field] += flt(row.amount)
+        # -------------------------------------------------
+        # MAIN REPORT VALUE -> NOW SHOWING QTY
+        # -------------------------------------------------
+        result[key][cust_field] += flt(row.qty)
 
-        # -------------------------
-        # Add popup item breakdown
-        # -------------------------
+        # -------------------------------------------------
+        # POPUP DATA
+        # -------------------------------------------------
         items = result[key]["popup_data"][cust_field]
 
         if row.item_name not in items:
+
             items[row.item_name] = {
                 "item_name": row.item_name,
                 "qty": 0,
@@ -169,13 +177,14 @@ def get_pivot_data(filters):
         items[row.item_name]["amount"] += flt(row.amount)
 
     # ---------------------------------------------
-    # Convert popup dict → list + add totals
+    # CONVERT POPUP DICT TO LIST
     # ---------------------------------------------
     data = []
 
     for record in result.values():
 
         for cust in record["popup_data"]:
+
             item_list = list(record["popup_data"][cust].values())
 
             total_qty = sum(i["qty"] for i in item_list)
@@ -189,13 +198,13 @@ def get_pivot_data(filters):
 
             record["popup_data"][cust] = item_list
 
-        # Convert to JSON string for JS
+        # JSON for JS
         record["popup_data"] = json.dumps(record["popup_data"])
 
         data.append(record)
 
     # ---------------------------------------------
-    # Add Row Index (for JS safe popup reference)
+    # ROW INDEX
     # ---------------------------------------------
     for idx, row in enumerate(data, start=1):
         row["idx"] = idx

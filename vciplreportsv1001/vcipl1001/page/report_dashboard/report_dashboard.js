@@ -64,7 +64,8 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
             "/app/query-report/Pricing%20Rule",
 
         "Item Category Wise - Report": "/app/query-report/Item%20Category%20Wise%20-%20Report?from_date=2026-01-01&to_date=2026-01-31",   
-            
+        
+        "Item Category wise Qty -Report": "/app/query-report/Item%20Category%20wise%20Qty%20-Report?from_date=2026-01-01&to_date=2026-01-31",
         "Ageing Report - Customers":"/app/query-report/Ageing%20Report%20-%20Customers"
         
        

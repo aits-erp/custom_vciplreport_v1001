@@ -16,39 +16,28 @@ def execute(filters=None):
     return columns, data
 
 
-# ──────────────────────────────
-# COLUMNS  (no KBC columns here — they open in popup instead)
-# ──────────────────────────────
 def get_columns():
     return [
-        {"label": "Item Code",        "fieldname": "item_code",         "fieldtype": "Link", "options": "Item",       "width": 150},
-        {"label": "Main Group",       "fieldname": "custom_main_group",                                                "width": 150},
-        {"label": "Item Name",        "fieldname": "item_name",                                                        "width": 220},
-        {"label": "Item Group",       "fieldname": "item_group",         "fieldtype": "Link", "options": "Item Group", "width": 160},
-
-        {"label": "Current Stock",    "fieldname": "current_stock",      "fieldtype": "Float",                         "width": 130},
-        {"label": "Min Stock Level",  "fieldname": "safety_stock",       "fieldtype": "Float",                         "width": 130},
-        {"label": "Rate",             "fieldname": "rate",               "fieldtype": "Currency",                      "width": 120},
-        {"label": "Amount",           "fieldname": "amount",             "fieldtype": "Currency",                      "width": 150},
-
-        {"label": "Finished Goods",   "fieldname": "fg",                 "fieldtype": "Float",                         "width": 130},
-        {"label": "Goods In Transit", "fieldname": "git",                "fieldtype": "Float",                         "width": 130},
-        {"label": "Bby Gala No. 014", "fieldname": "g014",              "fieldtype": "Float",                         "width": 130},
-        {"label": "Bby Gala No. 203", "fieldname": "g203",              "fieldtype": "Float",                         "width": 130},
-        {"label": "Unit-1 Shelvali",  "fieldname": "u1",                "fieldtype": "Float",                         "width": 130},
-        {"label": "Unit-2 BIDCO",     "fieldname": "u2",                "fieldtype": "Float",                         "width": 130},
-        {"label": "Unit-3 Gundale",   "fieldname": "u3",                "fieldtype": "Float",                         "width": 130},
-        {"label": "Work In Progress", "fieldname": "wip",               "fieldtype": "Float",                         "width": 130},
-        {"label": "Stores",           "fieldname": "stores",            "fieldtype": "Float",                         "width": 130},
-
-        # Single KBC column — clicking item_code opens popup with all 3
-        {"label": "KBC Stock",        "fieldname": "kbc_stock",         "fieldtype": "Data",                          "width": 110},
+        {"label": "Item Code",        "fieldname": "item_code",        "fieldtype": "Link", "options": "Item",       "width": 150},
+        {"label": "Main Group",       "fieldname": "custom_main_group",                                               "width": 150},
+        {"label": "Item Name",        "fieldname": "item_name",                                                       "width": 220},
+        {"label": "Item Group",       "fieldname": "item_group",        "fieldtype": "Link", "options": "Item Group", "width": 160},
+        {"label": "Current Stock",    "fieldname": "current_stock",     "fieldtype": "Float",                         "width": 130},
+        {"label": "Min Stock Level",  "fieldname": "safety_stock",      "fieldtype": "Float",                         "width": 130},
+        {"label": "Rate",             "fieldname": "rate",              "fieldtype": "Currency",                      "width": 120},
+        {"label": "Amount",           "fieldname": "amount",            "fieldtype": "Currency",                      "width": 150},
+        {"label": "Finished Goods",   "fieldname": "fg",                "fieldtype": "Float",                         "width": 130},
+        {"label": "Goods In Transit", "fieldname": "git",               "fieldtype": "Float",                         "width": 130},
+        {"label": "Bby Gala No. 014", "fieldname": "g014",             "fieldtype": "Float",                         "width": 130},
+        {"label": "Bby Gala No. 203", "fieldname": "g203",             "fieldtype": "Float",                         "width": 130},
+        {"label": "Unit-1 Shelvali",  "fieldname": "u1",               "fieldtype": "Float",                         "width": 130},
+        {"label": "Unit-2 BIDCO",     "fieldname": "u2",               "fieldtype": "Float",                         "width": 130},
+        {"label": "Unit-3 Gundale",   "fieldname": "u3",               "fieldtype": "Float",                         "width": 130},
+        {"label": "Work In Progress", "fieldname": "wip",              "fieldtype": "Float",                         "width": 130},
+        {"label": "Stores",           "fieldname": "stores",           "fieldtype": "Float",                         "width": 130},
     ]
 
 
-# ──────────────────────────────
-# DATA
-# ──────────────────────────────
 def get_data(item_type, item_group, main_group):
 
     conditions = ""
@@ -62,20 +51,18 @@ def get_data(item_type, item_group, main_group):
         conditions += " AND i.custom_main_group = %s"
         values.append(main_group)
 
-    rows = frappe.db.sql(
+    return frappe.db.sql(
         f"""
         SELECT
             i.name          AS item_code,
             i.custom_main_group,
             i.item_name,
             i.item_group,
-
             COALESCE(i.safety_stock, 0)                     AS safety_stock,
             COALESCE(SUM(b.actual_qty), 0)                  AS current_stock,
             COALESCE(rate.rate, 0)                          AS rate,
             COALESCE(SUM(b.actual_qty), 0)
                 * COALESCE(rate.rate, 0)                    AS amount,
-
             COALESCE(SUM(CASE WHEN b.warehouse = 'Finished Goods - VCIPL'    THEN b.actual_qty END), 0) AS fg,
             COALESCE(SUM(CASE WHEN b.warehouse = 'Goods In Transit - VCIPL'  THEN b.actual_qty END), 0) AS git,
             COALESCE(SUM(CASE WHEN b.warehouse = 'Bby Gala No. 014 - VCIPL'  THEN b.actual_qty END), 0) AS g014,
@@ -85,10 +72,8 @@ def get_data(item_type, item_group, main_group):
             COALESCE(SUM(CASE WHEN b.warehouse = 'Unit-3 Gundale - VCIPL'    THEN b.actual_qty END), 0) AS u3,
             COALESCE(SUM(CASE WHEN b.warehouse = 'Work In Progress - VCIPL'  THEN b.actual_qty END), 0) AS wip,
             COALESCE(SUM(CASE WHEN b.warehouse = 'Stores - VCIPL'            THEN b.actual_qty END), 0) AS stores
-
         FROM `tabItem` i
         LEFT JOIN `tabBin` b ON b.item_code = i.name
-
         LEFT JOIN (
             SELECT item_code, MAX(price_list_rate) AS rate
             FROM `tabItem Price`
@@ -96,53 +81,16 @@ def get_data(item_type, item_group, main_group):
               AND selling = 1
             GROUP BY item_code
         ) rate ON rate.item_code = i.name
-
         WHERE
             i.disabled      = 0
             AND i.is_stock_item = 1
             AND i.custom_item_type = %s
             {conditions}
-
         GROUP BY
             i.name, i.custom_main_group, i.item_name,
             i.item_group, i.safety_stock, rate.rate
-
         ORDER BY current_stock DESC
         """,
         values,
         as_dict=True,
     )
-
-    if not rows:
-        return []
-
-    # ── Fetch KBC totals in one bulk query ───────────────────────────────
-    kbc_items = []
-    for r in rows:
-        kbc_items += [r.item_code + "K", r.item_code + "B", r.item_code + "C"]
-
-    placeholders = ", ".join(["%s"] * len(kbc_items))
-    kbc_stock = frappe.db.sql(
-        f"""
-        SELECT item_code, COALESCE(SUM(actual_qty), 0) AS total_qty
-        FROM `tabBin`
-        WHERE item_code IN ({placeholders})
-        GROUP BY item_code
-        """,
-        kbc_items,
-        as_dict=True,
-    )
-
-    stock_map = {s.item_code: s.total_qty for s in kbc_stock}
-
-    for r in rows:
-        k = stock_map.get(r.item_code + "K", 0)
-        b = stock_map.get(r.item_code + "B", 0)
-        c = stock_map.get(r.item_code + "C", 0)
-        # Store totals as data attributes — JS reads them to show popup
-        r["kbc_stock"]   = "View KBC"
-        r["kalvert_qty"] = k
-        r["buffing_qty"] = b
-        r["charak_qty"]  = c
-
-    return rows

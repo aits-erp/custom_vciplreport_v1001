@@ -261,7 +261,7 @@ def get_data(filters, categories):
         WHERE mtd.sales_person =
         COALESCE(sp_inv.name, sp_cust.name)
           AND spt.period_type = 'Monthly'
-          AND spt.docstatus = 0
+          AND spt.docstatus = 1
 )
 
 AND {where_clause}

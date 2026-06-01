@@ -33,7 +33,7 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         // "TSO WISE CATEGORYWISE":
         //     "/app/query-report/TSO%20WISE%20CATEGORYWISE1?from_date=2026-05-01&to_date=2026-05-31&customer_group=Debtors+Distributors&custom_main_group=%5B"Assorted+Utensils"%2C"Bag"%2C"Bottle"%2C"Carton"%2C"Cast+Iron"%2C"Circle"%2C"Coil"%2C"Csd"%2C"Electrical+Appliances"%2C"Futuretec"%2C"Healux"%2C"Horeca"%2C"Kraft"%2C"Machinery"%2C"Nonstick"%2C"Other"%2C"Other+Spare"%2C"Platinum"%2C"Platinum+Triply+P.cooker"%2C"Polishing"%2C"Powder"%2C"Pressure+Cookers"%2C"SFG"%2C"SS+Cookware"%2C"Scrap"%2C"Sticker+%26+Warranty+Card"%2C"Tool"%2C"Trading+SFG"%5D",
         "TSO WISE CATEGORYWISE":
-    "/app/query-report/TSO%20WISE%20CATEGORYWISE1?from_date=2026-05-01&to_date=2026-05-31&customer_group=Debtors+Distributors&custom_main_group=%5B%22Assorted+Utensils%22%2C%22Bag%22%2C%22Bottle%22%2C%22Carton%22%2C%22Cast+Iron%22%2C%22Circle%22%2C%22Coil%22%2C%22Csd%22%2C%22Electrical+Appliances%22%2C%22Futuretec%22%2C%22Healux%22%2C%22Horeca%22%2C%22Kraft%22%2C%22Machinery%22%2C%22Nonstick%22%2C%22Other%22%2C%22Other+Spare%22%2C%22Platinum%22%2C%22Platinum+Triply+P.cooker%22%2C%22Polishing%22%2C%22Powder%22%2C%22Pressure+Cookers%22%2C%22SFG%22%2C%22SS+Cookware%22%2C%22Scrap%22%2C%22Sticker+%26+Warranty+Card%22%2C%22Tool%22%2C%22Trading+SFG%22%5D",
+    "/app/query-report/TSO%20WISE%20CATEGORYWISE",
 
         "Monthwise Sales Report":
             "/app/query-report/Monthwise%20Sales%20Report",

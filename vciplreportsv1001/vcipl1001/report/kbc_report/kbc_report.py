@@ -3,11 +3,10 @@
 
 import frappe
 
-
 def execute(filters=None):
     filters = filters or {}
 
-    item_type  = filters.get("custom_item_type") or ""
+    item_type  = filters.get("custom_item_type") or "Finished Goods"
     item_group = filters.get("item_group")
     main_group = filters.get("custom_main_group")
 
@@ -18,34 +17,32 @@ def execute(filters=None):
 
 
 # ──────────────────────────────
-# COLUMNS
+# COLUMNS  (no KBC columns here — they open in popup instead)
 # ──────────────────────────────
 def get_columns():
     return [
-        {"label": "Item Code",       "fieldname": "item_code",          "fieldtype": "Link",     "options": "Item",       "width": 150},
-        {"label": "Main Group",      "fieldname": "custom_main_group",                                                     "width": 150},
-        {"label": "Item Name",       "fieldname": "item_name",                                                             "width": 220},
-        {"label": "Item Group",      "fieldname": "item_group",          "fieldtype": "Link",     "options": "Item Group", "width": 160},
+        {"label": "Item Code",        "fieldname": "item_code",         "fieldtype": "Link", "options": "Item",       "width": 150},
+        {"label": "Main Group",       "fieldname": "custom_main_group",                                                "width": 150},
+        {"label": "Item Name",        "fieldname": "item_name",                                                        "width": 220},
+        {"label": "Item Group",       "fieldname": "item_group",         "fieldtype": "Link", "options": "Item Group", "width": 160},
 
-        {"label": "Current Stock",   "fieldname": "current_stock",       "fieldtype": "Float",                             "width": 130},
-        {"label": "Min Stock Level", "fieldname": "safety_stock",        "fieldtype": "Float",                             "width": 130},
-        {"label": "Rate",            "fieldname": "rate",                "fieldtype": "Currency",                          "width": 120},
-        {"label": "Amount",          "fieldname": "amount",              "fieldtype": "Currency",                          "width": 150},
+        {"label": "Current Stock",    "fieldname": "current_stock",      "fieldtype": "Float",                         "width": 130},
+        {"label": "Min Stock Level",  "fieldname": "safety_stock",       "fieldtype": "Float",                         "width": 130},
+        {"label": "Rate",             "fieldname": "rate",               "fieldtype": "Currency",                      "width": 120},
+        {"label": "Amount",           "fieldname": "amount",             "fieldtype": "Currency",                      "width": 150},
 
-        {"label": "Finished Goods",  "fieldname": "fg",                  "fieldtype": "Float",                             "width": 130},
-        {"label": "Goods In Transit","fieldname": "git",                 "fieldtype": "Float",                             "width": 130},
-        {"label": "Bby Gala No. 014","fieldname": "g014",               "fieldtype": "Float",                             "width": 130},
-        {"label": "Bby Gala No. 203","fieldname": "g203",               "fieldtype": "Float",                             "width": 130},
-        {"label": "Unit-1 Shelvali", "fieldname": "u1",                  "fieldtype": "Float",                             "width": 130},
-        {"label": "Unit-2 BIDCO",    "fieldname": "u2",                  "fieldtype": "Float",                             "width": 130},
-        {"label": "Unit-3 Gundale",  "fieldname": "u3",                  "fieldtype": "Float",                             "width": 130},
-        {"label": "Work In Progress","fieldname": "wip",                 "fieldtype": "Float",                             "width": 130},
-        {"label": "Stores",          "fieldname": "stores",              "fieldtype": "Float",                             "width": 130},
+        {"label": "Finished Goods",   "fieldname": "fg",                 "fieldtype": "Float",                         "width": 130},
+        {"label": "Goods In Transit", "fieldname": "git",                "fieldtype": "Float",                         "width": 130},
+        {"label": "Bby Gala No. 014", "fieldname": "g014",              "fieldtype": "Float",                         "width": 130},
+        {"label": "Bby Gala No. 203", "fieldname": "g203",              "fieldtype": "Float",                         "width": 130},
+        {"label": "Unit-1 Shelvali",  "fieldname": "u1",                "fieldtype": "Float",                         "width": 130},
+        {"label": "Unit-2 BIDCO",     "fieldname": "u2",                "fieldtype": "Float",                         "width": 130},
+        {"label": "Unit-3 Gundale",   "fieldname": "u3",                "fieldtype": "Float",                         "width": 130},
+        {"label": "Work In Progress", "fieldname": "wip",               "fieldtype": "Float",                         "width": 130},
+        {"label": "Stores",           "fieldname": "stores",            "fieldtype": "Float",                         "width": 130},
 
-        # ── KBC columns ──────────────────────────────────────────────────
-        {"label": "Kalvert",         "fieldname": "kalvert_qty",         "fieldtype": "Float",                             "width": 130},
-        {"label": "Buffing",         "fieldname": "buffing_qty",         "fieldtype": "Float",                             "width": 130},
-        {"label": "Charak",          "fieldname": "charak_qty",          "fieldtype": "Float",                             "width": 130},
+        # Single KBC column — clicking item_code opens popup with all 3
+        {"label": "KBC Stock",        "fieldname": "kbc_stock",         "fieldtype": "Data",                          "width": 110},
     ]
 
 
@@ -55,20 +52,7 @@ def get_columns():
 def get_data(item_type, item_group, main_group):
 
     conditions = ""
-    values     = []
-
-    # ── item_type filter ─────────────────────────────────────────────────
-    if item_type:
-        conditions += " AND i.custom_item_type = %s"
-        values.append(item_type)
-    else:
-        # When showing ALL, hide semi-finished suffixed items from main list
-        conditions += """
-            AND i.name NOT LIKE %s
-            AND i.name NOT LIKE %s
-            AND i.name NOT LIKE %s
-        """
-        values += ["%K", "%B", "%C"]
+    values     = [item_type]
 
     if item_group:
         conditions += " AND i.item_group = %s"
@@ -102,8 +86,8 @@ def get_data(item_type, item_group, main_group):
             COALESCE(SUM(CASE WHEN b.warehouse = 'Work In Progress - VCIPL'  THEN b.actual_qty END), 0) AS wip,
             COALESCE(SUM(CASE WHEN b.warehouse = 'Stores - VCIPL'            THEN b.actual_qty END), 0) AS stores
 
-        FROM tabItem i
-        LEFT JOIN tabBin b ON b.item_code = i.name
+        FROM `tabItem` i
+        LEFT JOIN `tabBin` b ON b.item_code = i.name
 
         LEFT JOIN (
             SELECT item_code, MAX(price_list_rate) AS rate
@@ -116,24 +100,23 @@ def get_data(item_type, item_group, main_group):
         WHERE
             i.disabled      = 0
             AND i.is_stock_item = 1
+            AND i.custom_item_type = %s
             {conditions}
 
         GROUP BY
             i.name, i.custom_main_group, i.item_name,
             i.item_group, i.safety_stock, rate.rate
 
-        ORDER BY
-            current_stock DESC
+        ORDER BY current_stock DESC
         """,
         values,
         as_dict=True,
     )
 
-    # ── Enrich each row with KBC quantities ──────────────────────────────
-    # For item_code "TC10" → look up stock for "TC10K", "TC10B", "TC10C"
     if not rows:
         return []
 
+    # ── Fetch KBC totals in one bulk query ───────────────────────────────
     kbc_items = []
     for r in rows:
         kbc_items += [r.item_code + "K", r.item_code + "B", r.item_code + "C"]
@@ -142,7 +125,7 @@ def get_data(item_type, item_group, main_group):
     kbc_stock = frappe.db.sql(
         f"""
         SELECT item_code, COALESCE(SUM(actual_qty), 0) AS total_qty
-        FROM tabBin
+        FROM `tabBin`
         WHERE item_code IN ({placeholders})
         GROUP BY item_code
         """,
@@ -153,8 +136,13 @@ def get_data(item_type, item_group, main_group):
     stock_map = {s.item_code: s.total_qty for s in kbc_stock}
 
     for r in rows:
-        r["kalvert_qty"] = stock_map.get(r.item_code + "K", 0)
-        r["buffing_qty"] = stock_map.get(r.item_code + "B", 0)
-        r["charak_qty"]  = stock_map.get(r.item_code + "C", 0)
+        k = stock_map.get(r.item_code + "K", 0)
+        b = stock_map.get(r.item_code + "B", 0)
+        c = stock_map.get(r.item_code + "C", 0)
+        # Store totals as data attributes — JS reads them to show popup
+        r["kbc_stock"]   = "View KBC"
+        r["kalvert_qty"] = k
+        r["buffing_qty"] = b
+        r["charak_qty"]  = c
 
     return rows

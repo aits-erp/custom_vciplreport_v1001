@@ -1,5 +1,4 @@
 frappe.query_reports["Stock Report - Cumulative"] = {
-
     filters: [
         {
             fieldname: "custom_item_type",
@@ -32,21 +31,22 @@ frappe.query_reports["Stock Report - Cumulative"] = {
         }
     ],
 
-    onload: function(report) {
-        report.wrapper.on("click", ".kbc-open", function(e) {
-            e.preventDefault();
-            show_kbc_popup($(this).data("item"));
-        });
-    },
-
     formatter: function(value, row, column, data, default_formatter) {
         if (column.fieldname === "item_code") {
             return `<a href="/app/item/${value}" target="_blank">${value}</a>
-                &nbsp;<a href="#" class="kbc-open" data-item="${value}"
+                &nbsp;<span class="kbc-open" data-item="${value}"
                     title="View KBC Stock"
-                    style="color:#e67e22;font-size:13px;text-decoration:none">📦</a>`;
+                    style="cursor:pointer;color:#e67e22;font-size:13px">📦</span>`;
         }
         return default_formatter(value, row, column, data);
+    },
+
+    after_datatable_render: function(datatable) {
+        $(datatable.wrapper).off("click", ".kbc-open").on("click", ".kbc-open", function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            show_kbc_popup($(this).data("item"));
+        });
     }
 };
 

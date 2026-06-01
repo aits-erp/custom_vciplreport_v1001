@@ -61,7 +61,7 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
             "/app/query-report/Stock%20Report%20-%20Cumulative",
 
         "KBC Report":
-            "/app/report/KBC%20-Report",
+            "/app/query-report/KBC%20-Report",
 
         "Pricing Rule Report":
             "/app/query-report/Pricing%20Rule",

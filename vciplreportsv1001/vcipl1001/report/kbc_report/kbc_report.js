@@ -1,4 +1,4 @@
-frappe.query_reports["Stock Report - Cumulative"] = {
+frappe.query_reports["KBC Report"] = {
     filters: [
         {
             fieldname: "custom_item_type",

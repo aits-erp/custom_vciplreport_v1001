@@ -17,8 +17,8 @@
  "owner": "Administrator",
  "prepared_report": 0,
  "ref_doctype": "Stock Ledger Entry",
- "report_name": "KBC Report",
- "report_type": "Script Report",
+ "report_name": "",
+ "report_type": "ScriKBC Reportpt Report",
  "roles": [],
  "timeout": 0
 }

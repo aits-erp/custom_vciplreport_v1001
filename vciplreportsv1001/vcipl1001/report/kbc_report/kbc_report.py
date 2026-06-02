@@ -35,6 +35,7 @@ def get_columns():
         {"label": "Unit-3 Gundale",   "fieldname": "u3",               "fieldtype": "Float",                         "width": 130},
         {"label": "Work In Progress", "fieldname": "wip",              "fieldtype": "Float",                         "width": 130},
         {"label": "Stores",           "fieldname": "stores",           "fieldtype": "Float",                         "width": 130},
+        {"label": "View KBC",         "fieldname": "view_kbc",         "fieldtype": "Data",                          "width": 100},
     ]
 
 
@@ -51,7 +52,7 @@ def get_data(item_type, item_group, main_group):
         conditions += " AND i.custom_main_group = %s"
         values.append(main_group)
 
-    return frappe.db.sql(
+    rows = frappe.db.sql(
         f"""
         SELECT
             i.name          AS item_code,
@@ -95,4 +96,7 @@ def get_data(item_type, item_group, main_group):
         as_dict=True,
     )
 
-##changes
+    for r in rows:
+        r["view_kbc"] = "View KBC"
+
+    return rows

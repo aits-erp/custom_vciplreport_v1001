@@ -1,4 +1,4 @@
-frappe.query_reports["TSO WISE CATEGORYWISE"] = {
+frappe.query_reports["Test1011"] = {
 
     // ─────────────────────────────────────────────────────────────────────
     // onload: populate the Category multiselect with all available groups.

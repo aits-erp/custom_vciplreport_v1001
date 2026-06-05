@@ -6,18 +6,10 @@ MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
           "Jul","Aug","Sep","Oct","Nov","Dec"]
 
 MONTH_FIELD_MAP = {
-    1:  "jan_target",
-    2:  "feb_target",
-    3:  "mar_target",
-    4:  "apr_target",
-    5:  "may_target",
-    6:  "jun_target",
-    7:  "jul_target",
-    8:  "aug_target",
-    9:  "sep_target",
-    10: "oct_target",
-    11: "nov_target",
-    12: "dec_target"
+    1:  "jan_target", 2:  "feb_target", 3:  "mar_target",
+    4:  "apr_target", 5:  "may_target", 6:  "jun_target",
+    7:  "jul_target", 8:  "aug_target", 9:  "sep_target",
+    10: "oct_target", 11: "nov_target", 12: "dec_target"
 }
 
 def execute(filters=None):
@@ -77,13 +69,13 @@ def get_columns(categories, filters=None):
         ])
 
     columns.extend([
-        {"label": _("Month"),              "fieldname": "month",               "fieldtype": "Data",     "width": 100, "align": "center"},
-        {"label": _("TSO"),                "fieldname": "tso_name",            "fieldtype": "Link",     "options": "Sales Person", "width": 200},
-        {"label": _("Customer Name"),      "fieldname": "customer_name",       "fieldtype": "Data",     "width": 200},
-        {"label": _("Region"),             "fieldname": "custom_region",       "fieldtype": "Data",     "width": 150},
-        {"label": _("Head Sales Person"),  "fieldname": "parent_sales_person", "fieldtype": "Link",     "options": "Sales Person", "width": 200},
-        {"label": _("Total Achieved"),     "fieldname": "total_achieved",      "fieldtype": "Currency", "width": 150},
-        {"label": _("Total Target"),       "fieldname": "total_target",        "fieldtype": "Currency", "width": 150}
+        {"label": _("Month"),             "fieldname": "month",               "fieldtype": "Data",     "width": 100},
+        {"label": _("TSO"),               "fieldname": "tso_name",            "fieldtype": "Data",     "width": 200},
+        {"label": _("Customer Name"),     "fieldname": "customer_name",       "fieldtype": "Data",     "width": 200},
+        {"label": _("Region"),            "fieldname": "custom_region",       "fieldtype": "Data",     "width": 150},
+        {"label": _("Head Sales Person"), "fieldname": "parent_sales_person", "fieldtype": "Data",     "width": 200},
+        {"label": _("Total Achieved"),    "fieldname": "total_achieved",      "fieldtype": "Currency", "width": 150},
+        {"label": _("Total Target"),      "fieldname": "total_target",        "fieldtype": "Currency", "width": 150}
     ])
 
     for cat in categories:
@@ -95,12 +87,17 @@ def get_columns(categories, filters=None):
 
 
 # ─────────────────────────────────────────────
-# TARGET CACHE
+# TARGET CACHE — keyed by (customer, month_num)
 # ─────────────────────────────────────────────
 _target_cache = {}
 
-def _load_targets_for_tso(tso_name, month_num):
-    cache_key = (tso_name, month_num)
+def _load_targets_for_customer(customer, month_num):
+    """
+    Targets are stored per customer in tabSales Person Target.
+    tabMonthly Target Detail has main_group and monthly target values.
+    Returns dict: {main_group: target_amount}
+    """
+    cache_key = (customer, month_num)
     if cache_key in _target_cache:
         return _target_cache[cache_key]
 
@@ -114,24 +111,24 @@ def _load_targets_for_tso(tso_name, month_num):
             FROM `tabMonthly Target Detail` mtd
             INNER JOIN `tabSales Person Target` spt
                 ON spt.name = mtd.parent
-            WHERE mtd.sales_person = %(tso_name)s
-              AND spt.period_type  = 'Monthly'
-              AND spt.docstatus    = 0
-        """, {"tso_name": tso_name}, as_dict=1)
+            WHERE spt.name = %(customer)s
+              AND spt.period_type = 'Monthly'
+              AND spt.docstatus IN (0, 1)
+        """, {"customer": customer}, as_dict=1)
 
         result = {r.main_group: flt(r.target_amount) for r in rows if r.main_group}
         _target_cache[cache_key] = result
         return result
 
     except Exception as e:
-        frappe.log_error(f"Target fetch error for {tso_name}: {e}", "TSO Report")
+        frappe.log_error(f"Target fetch error for customer {customer}: {e}", "TSO Report")
 
     _target_cache[cache_key] = {}
     return {}
 
 
-def get_month_target_from_sales_team(tso_name, month_num, category):
-    targets = _load_targets_for_tso(tso_name, month_num)
+def get_target_for_customer_category(customer, month_num, category):
+    targets = _load_targets_for_customer(customer, month_num)
     return flt(targets.get(category, 0))
 
 
@@ -151,9 +148,7 @@ def get_data(filters, categories):
         values["to_date"] = filters.get("to_date")
 
     if filters.get("sales_person"):
-        conditions.append("""
-            COALESCE(sp_inv.name, sp_cust.name) = %(sales_person)s
-        """)
+        conditions.append("COALESCE(sp_inv.name, sp_cust.name) = %(sales_person)s")
         values["sales_person"] = filters.get("sales_person")
 
     if filters.get("parent_sales_person"):
@@ -176,10 +171,7 @@ def get_data(filters, categories):
         if isinstance(regions, str):
             regions = [x.strip() for x in regions.split(",") if x.strip()]
         if regions:
-            conditions.append("""
-                COALESCE(sp_inv.custom_region,
-                         sp_cust.custom_region) IN %(custom_region)s
-            """)
+            conditions.append("COALESCE(sp_inv.custom_region, sp_cust.custom_region) IN %(custom_region)s")
             values["custom_region"] = tuple(regions)
 
     if filters.get("custom_head_sales_code"):
@@ -187,10 +179,7 @@ def get_data(filters, categories):
         if isinstance(codes, str):
             codes = [x.strip() for x in codes.split(",") if x.strip()]
         if codes:
-            conditions.append("""
-                COALESCE(sp_inv.custom_head_sales_code,
-                         sp_cust.custom_head_sales_code) IN %(custom_head_sales_code)s
-            """)
+            conditions.append("COALESCE(sp_inv.custom_head_sales_code, sp_cust.custom_head_sales_code) IN %(custom_head_sales_code)s")
             values["custom_head_sales_code"] = tuple(codes)
 
     if filters.get("custom_main_group"):
@@ -207,6 +196,7 @@ def get_data(filters, categories):
         DATE_FORMAT(si.posting_date, '%%Y-%%m'),
         MONTH(si.posting_date),
         YEAR(si.posting_date),
+        si.customer,
         COALESCE(sp_inv.name, sp_cust.name, 'Unassigned'),
         COALESCE(sp_inv.parent_sales_person, sp_cust.parent_sales_person, ''),
         COALESCE(sp_inv.custom_region, sp_cust.custom_region, ''),
@@ -222,6 +212,7 @@ def get_data(filters, categories):
             DATE_FORMAT(si.posting_date, '%%Y-%%m')                        AS month_key,
             MONTH(si.posting_date)                                          AS month_num,
             YEAR(si.posting_date)                                           AS year,
+            si.customer                                                     AS customer,
             COALESCE(sp_inv.name, sp_cust.name, 'Unassigned')              AS tso_name,
             COALESCE(sp_inv.parent_sales_person,
                      sp_cust.parent_sales_person, '')                       AS parent_sales_person,
@@ -237,40 +228,21 @@ def get_data(filters, categories):
         INNER JOIN `tabSales Invoice Item` sii   ON sii.parent = si.name
         INNER JOIN `tabItem` i                   ON i.name = sii.item_code
         INNER JOIN `tabCustomer` c               ON c.name = si.customer
-
-        -- Sales Person from Invoice Sales Team (priority)
         LEFT JOIN `tabSales Team` st_inv         ON st_inv.parent = si.name
                                                  AND st_inv.parenttype = 'Sales Invoice'
                                                  AND st_inv.idx = 1
         LEFT JOIN `tabSales Person` sp_inv       ON sp_inv.name = st_inv.sales_person
-
-        -- Sales Person from Customer master (fallback when invoice has none)
         LEFT JOIN `tabSales Team` st_cust        ON st_cust.parent = si.customer
                                                  AND st_cust.parenttype = 'Customer'
         LEFT JOIN `tabSales Person` sp_cust      ON sp_cust.name = st_cust.sales_person
-
         WHERE si.docstatus = 1
           AND i.custom_main_group IS NOT NULL
           AND i.custom_main_group != ''
-
-        AND EXISTS (
-        SELECT 1
-        FROM `tabMonthly Target Detail` mtd
-        INNER JOIN `tabSales Person Target` spt
-        ON spt.name = mtd.parent
-        WHERE mtd.sales_person =
-        COALESCE(sp_inv.name, sp_cust.name)
-          AND spt.period_type = 'Monthly'
-          AND spt.docstatus = 1
-)
-
-AND {where_clause}
-
-GROUP BY {group_by}
-
-ORDER BY YEAR(si.posting_date),
-         MONTH(si.posting_date),
-         COALESCE(sp_inv.name, sp_cust.name, 'Unassigned')
+          AND {where_clause}
+        GROUP BY {group_by}
+        ORDER BY YEAR(si.posting_date),
+                 MONTH(si.posting_date),
+                 si.customer
     """
 
     data = frappe.db.sql(query, values, as_dict=1)
@@ -278,13 +250,12 @@ ORDER BY YEAR(si.posting_date),
 
     for row in data:
         tso = row.tso_name or "Unassigned"
+        customer = row.customer
 
         if filters.get("show_item_details"):
-            key = (row.month_key, tso, row.customer_name,
-                   row.parent_sales_person, row.custom_region, row.item_code)
+            key = (row.month_key, customer, tso, row.item_code)
         else:
-            key = (row.month_key, tso, row.customer_name,
-                   row.parent_sales_person, row.custom_region)
+            key = (row.month_key, customer, tso)
 
         if key not in result:
             entry = {
@@ -308,9 +279,8 @@ ORDER BY YEAR(si.posting_date),
             for cat in categories:
                 safe = cat.replace(" ", "_").replace("-", "_")
                 entry[f"{safe}_achieved"] = 0
-                target_value = get_month_target_from_sales_team(
-                    tso, row.month_num, cat
-                )
+                # ✅ NOW FETCHING TARGET BY CUSTOMER, NOT TSO
+                target_value = get_target_for_customer_category(customer, row.month_num, cat)
                 entry[f"{safe}_target"]  = flt(target_value)
                 entry["total_target"]   += flt(target_value)
 

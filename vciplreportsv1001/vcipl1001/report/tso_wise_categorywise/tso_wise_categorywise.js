@@ -1,3 +1,6 @@
+// Copyright (c) 2026, Sukku and contributors
+// For license information, please see license.txt
+
 frappe.query_reports["TSO WISE CATEGORYWISE"] = {
 
     onload: async function(report) {
@@ -56,10 +59,17 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                     group_by: "custom_region",
                     limit: 50
                 });
-                return [...new Set(rows.map(r => r.custom_region).filter(Boolean))].sort()
-                    .map(v => ({ label: v, value: v }));
+
+                return [...new Set(
+                    rows.map(r => r.custom_region).filter(Boolean)
+                )]
+                    .sort()
+                    .map(v => ({
+                        label: v,
+                        value: v
+                    }));
             }
-        },    
+        },
         {
             fieldname: "custom_head_sales_code",
             label: "Head Sales Code",
@@ -74,8 +84,15 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                     group_by: "custom_head_sales_code",
                     limit: 50
                 });
-                return [...new Set(rows.map(r => r.custom_head_sales_code).filter(Boolean))].sort()
-                    .map(v => ({ label: v, value: v }));
+
+                return [...new Set(
+                    rows.map(r => r.custom_head_sales_code).filter(Boolean)
+                )]
+                    .sort()
+                    .map(v => ({
+                        label: v,
+                        value: v
+                    }));
             }
         },
         {
@@ -105,8 +122,15 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                     group_by: "custom_main_group",
                     limit: 100
                 });
-                return [...new Set(rows.map(r => r.custom_main_group).filter(Boolean))].sort()
-                    .map(v => ({ label: v, value: v }));
+
+                return [...new Set(
+                    rows.map(r => r.custom_main_group).filter(Boolean)
+                )]
+                    .sort()
+                    .map(v => ({
+                        label: v,
+                        value: v
+                    }));
             }
         },
         {

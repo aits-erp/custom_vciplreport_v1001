@@ -3,21 +3,6 @@
 
 frappe.query_reports["TSO WISE CATEGORYWISE"] = {
 
-    onload: async function(report) {
-        const result = await frappe.db.get_list("Item", {
-            fields: ["custom_main_group"],
-            filters: [["custom_main_group", "!=", ""]],
-            group_by: "custom_main_group",
-            limit: 0
-        });
-
-        const groups = [...new Set(
-            result.map(r => r.custom_main_group).filter(Boolean)
-        )].sort();
-
-        report.set_filter_value("custom_main_group", groups);
-    },
-
     filters: [
         {
             fieldname: "from_date",
@@ -59,15 +44,8 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                     group_by: "custom_region",
                     limit: 50
                 });
-
-                return [...new Set(
-                    rows.map(r => r.custom_region).filter(Boolean)
-                )]
-                    .sort()
-                    .map(v => ({
-                        label: v,
-                        value: v
-                    }));
+                return [...new Set(rows.map(r => r.custom_region).filter(Boolean))]
+                    .sort().map(v => ({ label: v, value: v }));
             }
         },
         {
@@ -84,15 +62,8 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                     group_by: "custom_head_sales_code",
                     limit: 50
                 });
-
-                return [...new Set(
-                    rows.map(r => r.custom_head_sales_code).filter(Boolean)
-                )]
-                    .sort()
-                    .map(v => ({
-                        label: v,
-                        value: v
-                    }));
+                return [...new Set(rows.map(r => r.custom_head_sales_code).filter(Boolean))]
+                    .sort().map(v => ({ label: v, value: v }));
             }
         },
         {
@@ -112,6 +83,22 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
             fieldname: "custom_main_group",
             label: "Category",
             fieldtype: "MultiSelectList",
+            // ✅ All 13 hardcoded categories as default
+            default: [
+                "Nonstick",
+                "Horeca",
+                "Pressure Cookers",
+                "SS Cookware",
+                "Healux",
+                "Kraft",
+                "Platinum",
+                "Platinum Triply P.cooker",
+                "Cast Iron",
+                "Bottle",
+                "Csd",
+                "Other",
+                "Futuretec"
+            ],
             get_data: async function(txt) {
                 const rows = await frappe.db.get_list("Item", {
                     fields: ["custom_main_group"],
@@ -122,15 +109,8 @@ frappe.query_reports["TSO WISE CATEGORYWISE"] = {
                     group_by: "custom_main_group",
                     limit: 100
                 });
-
-                return [...new Set(
-                    rows.map(r => r.custom_main_group).filter(Boolean)
-                )]
-                    .sort()
-                    .map(v => ({
-                        label: v,
-                        value: v
-                    }));
+                return [...new Set(rows.map(r => r.custom_main_group).filter(Boolean))]
+                    .sort().map(v => ({ label: v, value: v }));
             }
         },
         {

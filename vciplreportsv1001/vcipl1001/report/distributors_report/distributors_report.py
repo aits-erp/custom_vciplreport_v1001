@@ -26,12 +26,7 @@ def get_columns():
             "fieldtype": "Data",
             "width": 260
         },
-        {
-            "label": "Region",
-            "fieldname": "region",
-            "fieldtype": "Data",
-            "width": 140
-        },
+
         {
             "label": "RSM",
             "fieldname": "rsm",
@@ -139,9 +134,7 @@ def get_data(filters=None):
             si.customer_group,
             si.posting_date,
             si.outstanding_amount,
-            si.grand_total,
-            c.custom_region AS region
-                             
+            si.grand_total
 
         FROM `tabSales Invoice` si
 
@@ -233,11 +226,10 @@ def get_data(filters=None):
         if cust not in cust_map:
 
             cust_map[cust] = {
-                
+
                 "customer_code": cust,
                 "customer_name": inv.customer_name,
                 "customer_group": inv.customer_group,
-                "region": inv.custom_region,
 
                 "total_outstanding": 0,
                 "total_overdue": 0,
@@ -399,8 +391,6 @@ def get_data(filters=None):
             "customer": row["customer_name"],
 
             "customer_code": row["customer_code"],
-
-            "region": row["region"],
 
             "rsm": rsm,
             "asm": asm,

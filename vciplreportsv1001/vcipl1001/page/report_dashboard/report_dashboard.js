@@ -16,7 +16,7 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
     // ================================
     const REPORT_PATHS = {
         "Outstanding Debtors Report":
-            "/app/query-report/Outstanding%20Debtors%20Report?customer_group=Debtors+Distributors",
+            "/app/query-report/Outstanding%20Debtors%20-%20Report?customer_group=Debtors+Distributors",
 
         "Top selling below MSL report":
             "/app/query-report/Most%20Selling%20Below%20MSL%20Report?custom_item_type=Finished+Goods",

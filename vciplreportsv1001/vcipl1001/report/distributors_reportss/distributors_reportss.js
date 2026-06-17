@@ -2,70 +2,100 @@ frappe.query_reports["Distributors Reportss"] = {
 
     filters: [
         {
-            fieldname: "month",
-            label: "Month",
-            fieldtype: "Select",
-            options: [
-                { label: "January", value: 1 },
-                { label: "February", value: 2 },
-                { label: "March", value: 3 },
-                { label: "April", value: 4 },
-                { label: "May", value: 5 },
-                { label: "June", value: 6 },
-                { label: "July", value: 7 },
-                { label: "August", value: 8 },
-                { label: "September", value: 9 },
-                { label: "October", value: 10 },
-                { label: "November", value: 11 },
-                { label: "December", value: 12 }
-            ],
-            default: new Date().getMonth() + 1
-        },
-        {
-            fieldname: "year",
-            label: "Year",
-            fieldtype: "Select",
-            options: ["2023", "2024", "2025", "2026"],
-            default: new Date().getFullYear().toString()
-        },
-        {
-            fieldname: "from_date",
-            label: "From Date",
-            fieldtype: "Date",
-            default: frappe.sys_defaults.year_start_date
-        },
-        {
-            fieldname: "to_date",
-            label: "To Date",
-            fieldtype: "Date",
-            default: frappe.sys_defaults.year_end_date
-        },
-        {
-            fieldname: "custom_region",
-            label: "Region",
-            fieldtype: "Data"
-        },
-        {
-            fieldname: "custom_location",
-            label: "Location",
-            fieldtype: "Data"
-        },
-        {
-            fieldname: "custom_territory",
-            label: "Territory",
-            fieldtype: "Data"
-        },
-        {
-            fieldname: "parent_sales_person",
-            label: "Parent Sales Person",
+            fieldname: "customer_group",
+            label: "Customer Group",
             fieldtype: "Link",
-            options: "Sales Person"
+            options: "Customer Group",
+            default: "Debtors Distributors"
         },
-        {
-            fieldname: "customer",
-            label: "Customer",
-            fieldtype: "Link",
-            options: "Customer"
+
+    ],
+
+    formatter(value, row, column, data, default_formatter) {
+
+        value = default_formatter(value, row, column, data);
+
+        if (column.fieldname === "customer" && data.customer_code) {
+            return `<a href="/app/customer/${data.customer_code}"
+                target="_blank"
+                style="font-weight:bold;color:#1674E0">
+                ${value}
+            </a>`;
         }
-    ]
+
+        if (column.fieldname === "total_outstanding" && data.outstanding_drill) {
+            return this.make_link(value, data.outstanding_drill, "Outstanding Invoices");
+        }
+
+        if (column.fieldname === "total_overdue" && data.overdue_drill) {
+            return this.make_link(value, data.overdue_drill, "Overdue Invoices");
+        }
+
+        if (column.fieldname === "avg_overdue_days" && data.avg_overdue_drill) {
+            return this.make_link(value, data.avg_overdue_drill, "Invoices – Average Overdue Days");
+        }
+
+        if (column.fieldname === "avg_payment_days" && data.avg_payment_drill) {
+            return this.make_link(value, data.avg_payment_drill, "Invoices – Average Payment Days");
+        }
+
+        return value;
+    },
+
+    make_link(value, data, title) {
+        return `<a style="font-weight:bold;cursor:pointer;color:#1674E0"
+            onclick='frappe.query_reports["Distributors Report"]
+            .show_popup(${data}, "${title}")'>
+            ${value}
+        </a>`;
+    },
+
+    show_popup(rows, title) {
+        if (title === "Invoices – Average Overdue Days") {
+            rows = rows.filter(r => flt(r.amount) > 0);
+        }
+
+        if (!rows || rows.length === 0) {
+            frappe.msgprint(__("No data available"));
+            return;
+        }
+
+        let html = `
+        <div style="max-height:500px;overflow:auto">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Invoice</th>
+                    <th>Posting Date</th>
+                    <th>Due / Payment Date</th>
+                    <th>Amount</th>
+                    <th>Days</th>
+                </tr>
+            </thead><tbody>`;
+
+        rows.forEach(r => {
+            html += `
+            <tr>
+                <td>
+                    <a href="/app/sales-invoice/${r.invoice}"
+                       target="_blank"
+                       style="font-weight:bold">
+                        ${r.invoice}
+                    </a>
+                </td>
+                <td>${r.posting_date}</td>
+                <td>${r.due_date || r.payment_date || "-"}</td>
+                <td>${r.amount ? format_currency(r.amount) : "-"}</td>
+                <td>${r.days || r.overdue_days || "-"}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+
+        frappe.msgprint({
+            title: title,
+            message: html,
+            wide: true
+        });
+    }
 };

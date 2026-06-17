@@ -269,7 +269,11 @@ def get_data(filters=None):
                 "outstanding_list": [],
                 "overdue_list": [],
                 "avg_overdue_list": [],
-                "avg_payment_list": []
+                "avg_payment_list": [],
+                "aging_0_15_list": [],
+                "aging_16_30_list": [],
+                "aging_31_45_list": [],
+            
 
             }
 
@@ -317,13 +321,40 @@ def get_data(filters=None):
                 cust_map[cust]["total_overdue"] += flt(inv.outstanding_amount)
 
                 if 0 <= overdue_days <= 15:
+
                     cust_map[cust]["aging_0_15"] += flt(inv.outstanding_amount)
 
+                    cust_map[cust]["aging_0_15_list"].append({
+                        "invoice": inv.invoice,
+                        "posting_date": str(inv.posting_date),
+                        "due_date": str(due_date),
+                        "amount": flt(inv.outstanding_amount),
+                        "days": overdue_days
+                    })
+
                 elif 16 <= overdue_days <= 30:
+
                     cust_map[cust]["aging_16_30"] += flt(inv.outstanding_amount)
 
+                    cust_map[cust]["aging_16_30_list"].append({
+                        "invoice": inv.invoice,
+                        "posting_date": str(inv.posting_date),
+                        "due_date": str(due_date),
+                        "amount": flt(inv.outstanding_amount),
+                        "days": overdue_days
+                    })
+
                 else:
+
                     cust_map[cust]["aging_31_45"] += flt(inv.outstanding_amount)
+
+                    cust_map[cust]["aging_31_45_list"].append({
+                        "invoice": inv.invoice,
+                        "posting_date": str(inv.posting_date),
+                        "due_date": str(due_date),
+                        "amount": flt(inv.outstanding_amount),
+                        "days": overdue_days
+                    })
 
                 cust_map[cust]["overdue_list"].append({
                     "invoice": inv.invoice,
@@ -340,8 +371,6 @@ def get_data(filters=None):
                     "amount": flt(inv.outstanding_amount),
                     "days": overdue_days
                 })
-    
-
         # --------------------------------------------------
         # PAYMENT DAYS POPUP
         # --------------------------------------------------
@@ -462,7 +491,19 @@ def get_data(filters=None):
 
             "avg_payment_drill": frappe.as_json(
                 row["avg_payment_list"]
-            )
+            ),
+
+            "aging_0_15_drill": frappe.as_json(
+                row["aging_0_15_list"]
+            ),
+
+            "aging_16_30_drill": frappe.as_json(
+                row["aging_16_30_list"]
+            ),
+
+            "aging_31_45_drill": frappe.as_json(
+                row["aging_31_45_list"]
+            ),
 
         })
 

@@ -39,6 +39,18 @@ frappe.query_reports["Distributors Report"] = {
             return this.make_link(value, data.avg_payment_drill, "Invoices – Average Payment Days");
         }
 
+        if (column.fieldname === "aging_0_15" && data.aging_0_15_drill) {
+            return this.make_link(value, data.aging_0_15_drill, "0-15 Days");
+        }
+
+        if (column.fieldname === "aging_16_30" && data.aging_16_30_drill) {
+            return this.make_link(value, data.aging_16_30_drill, "16-30 Days");
+        }
+
+        if (column.fieldname === "aging_31_45" && data.aging_31_45_drill) {
+            return this.make_link(value, data.aging_31_45_drill, "31+ Days");
+        }
+
         return value;
     },
 

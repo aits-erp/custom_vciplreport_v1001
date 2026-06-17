@@ -1,4 +1,4 @@
-frappe.query_reports["Distributors Reportss"] = {
+frappe.query_reports["Distributors Report"] = {
 
     filters: [
         {
@@ -8,7 +8,7 @@ frappe.query_reports["Distributors Reportss"] = {
             options: "Customer Group",
             default: "Debtors Distributors"
         },
-
+        
     ],
 
     formatter(value, row, column, data, default_formatter) {

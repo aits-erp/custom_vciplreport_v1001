@@ -26,7 +26,12 @@ def get_columns():
             "fieldtype": "Data",
             "width": 260
         },
-
+        {
+            "label": "Region",
+            "fieldname": "region",
+            "fieldtype": "Data",
+            "width": 140
+        },
         {
             "label": "RSM",
             "fieldname": "rsm",
@@ -49,13 +54,6 @@ def get_columns():
             "fieldtype": "Link",
             "options": "Sales Person",
             "width": 150
-        },
-
-        {
-            "label": "Region",
-            "fieldname": "region",
-            "fieldtype": "Data",
-            "width": 130
         },
 
         {
@@ -160,24 +158,6 @@ def get_data(filters=None):
         return []
 
     # --------------------------------------------------
-    # SALES PERSON MASTER  (region + parent in one query)
-    #   Same SQL access to custom_region that works in the
-    #   TSO WISE and Distributors Reportss reports.
-    # --------------------------------------------------
-    sales_persons = frappe.db.sql("""
-
-        SELECT
-            name,
-            parent_sales_person,
-            custom_region
-
-        FROM `tabSales Person`
-
-    """, as_dict=True)
-
-    sp_map = {sp.name: sp for sp in sales_persons}
-
-    # --------------------------------------------------
     # PAYMENT SCHEDULE
     # --------------------------------------------------
     payment_terms = frappe.db.sql("""
@@ -223,21 +203,27 @@ def get_data(filters=None):
     # SALES TEAM
     # --------------------------------------------------
     sales_team = frappe.db.sql("""
-
         SELECT
-            st.parent AS customer,
-            st.sales_person
+           st.parent AS customer,
+           st.sales_person,
+           sp.custom_region
 
         FROM `tabSales Team` st
 
-        WHERE st.parenttype = 'Customer'
+        LEFT JOIN `tabSales Person` sp
+            ON sp.name = st.sales_person
 
-    """, as_dict=True)
+        WHERE st.parenttype = 'Customer'
+        """, as_dict=True)
 
     cust_sales_map = {}
+    cust_region_map = {}
 
     for s in sales_team:
         cust_sales_map.setdefault(s.customer, []).append(s.sales_person)
+
+        if s.customer not in cust_region_map:
+            cust_region_map[s.customer] = s.custom_region
 
     cust_map = {}
 
@@ -255,6 +241,7 @@ def get_data(filters=None):
                 "customer_code": cust,
                 "customer_name": inv.customer_name,
                 "customer_group": inv.customer_group,
+                "region": cust_region_map.get(cust, ""),
 
                 "total_outstanding": 0,
                 "total_overdue": 0,
@@ -360,25 +347,17 @@ def get_data(filters=None):
         asm = None
         rsm = None
 
-        region = ""
-
         # --------------------------------------------------
-        # ROLE DETECTION + REGION
-        #   Region comes from the first sales person on the
-        #   customer's team that has a custom_region value —
-        #   independent of the RSM/ASM/TSO name matching.
+        # ROLE DETECTION
         # --------------------------------------------------
         for sp in cust_sales_map.get(cust, []):
 
-            sp_doc = sp_map.get(sp)
-            if not sp_doc:
-                continue
+            parent = frappe.db.get_value(
+                "Sales Person",
+                sp,
+                "parent_sales_person"
+            )
 
-            # pick up region from any sales person that has one
-            if not region and sp_doc.custom_region:
-                region = sp_doc.custom_region
-
-            parent = sp_doc.parent_sales_person
             if not parent:
                 continue
 
@@ -422,14 +401,14 @@ def get_data(filters=None):
             "customer_group": row["customer_group"],
 
             "customer": row["customer_name"],
+            
+            "region": row["region"],
 
             "customer_code": row["customer_code"],
 
             "rsm": rsm,
             "asm": asm,
             "tso": tso,
-
-            "region": region,
 
             "total_outstanding": row["total_outstanding"],
 

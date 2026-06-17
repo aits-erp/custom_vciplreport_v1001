@@ -11,7 +11,7 @@ frappe.query_reports["Distributors Reportss"] = {
     ],
 
     // registry that holds drill-down payloads so we don't embed raw JSON in the DOM
-    _drill_store: {},
+    _drill_store: {}, 
     _drill_seq: 0,
 
     // column fieldname -> [drill field on the row, popup title]

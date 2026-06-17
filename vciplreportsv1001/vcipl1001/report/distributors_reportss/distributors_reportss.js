@@ -52,12 +52,12 @@ frappe.query_reports["Distributors Reportss"] = {
 
                 // only make it a link if there's actually something to show
                 if (rows && rows.length) {
-                    const me = frappe.query_reports["Distributors Report"];
+                    const me = frappe.query_reports["Distributors Reportss"];
                     const key = "d" + (me._drill_seq++);
                     me._drill_store[key] = { rows: rows, title: title };
 
                     return `<a style="font-weight:bold;cursor:pointer;color:#1674E0"
-                               onclick='frappe.query_reports["Distributors Report"].show_popup_by_key("${key}")'>${value}</a>`;
+                               onclick='frappe.query_reports["Distributors Reportss"].show_popup_by_key("${key}")'>${value}</a>`;
                 }
             }
         }

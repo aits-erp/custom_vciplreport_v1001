@@ -160,6 +160,24 @@ def get_data(filters=None):
         return []
 
     # --------------------------------------------------
+    # SALES PERSON MASTER  (region + parent in one query)
+    #   Same SQL access to custom_region that works in the
+    #   TSO WISE and Distributors Reportss reports.
+    # --------------------------------------------------
+    sales_persons = frappe.db.sql("""
+
+        SELECT
+            name,
+            parent_sales_person,
+            custom_region
+
+        FROM `tabSales Person`
+
+    """, as_dict=True)
+
+    sp_map = {sp.name: sp for sp in sales_persons}
+
+    # --------------------------------------------------
     # PAYMENT SCHEDULE
     # --------------------------------------------------
     payment_terms = frappe.db.sql("""
@@ -342,41 +360,38 @@ def get_data(filters=None):
         asm = None
         rsm = None
 
-        tso_region = None
-        asm_region = None
-        rsm_region = None
+        region = ""
 
         # --------------------------------------------------
-        # ROLE DETECTION
+        # ROLE DETECTION + REGION
+        #   Region comes from the first sales person on the
+        #   customer's team that has a custom_region value —
+        #   independent of the RSM/ASM/TSO name matching.
         # --------------------------------------------------
         for sp in cust_sales_map.get(cust, []):
 
-            sp_doc = frappe.db.get_value(
-                "Sales Person",
-                sp,
-                ["parent_sales_person", "custom_region"],
-                as_dict=True
-            )
-
-            if not sp_doc or not sp_doc.parent_sales_person:
+            sp_doc = sp_map.get(sp)
+            if not sp_doc:
                 continue
 
-            parent_name = sp_doc.parent_sales_person.lower()
+            # pick up region from any sales person that has one
+            if not region and sp_doc.custom_region:
+                region = sp_doc.custom_region
+
+            parent = sp_doc.parent_sales_person
+            if not parent:
+                continue
+
+            parent_name = parent.lower()
 
             if parent_name.startswith("tso") and not tso:
                 tso = sp
-                tso_region = sp_doc.custom_region
 
             elif parent_name.startswith("asm") and not asm:
                 asm = sp
-                asm_region = sp_doc.custom_region
 
             elif parent_name.startswith("rsm") and not rsm:
                 rsm = sp
-                rsm_region = sp_doc.custom_region
-
-        # region: prefer TSO, then ASM, then RSM
-        region = tso_region or asm_region or rsm_region or ""
 
         # --------------------------------------------------
         # AVERAGES

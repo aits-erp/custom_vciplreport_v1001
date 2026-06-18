@@ -2,6 +2,43 @@ frappe.query_reports["Distributors Report"] = {
 
     filters: [
         {
+            fieldname: "fiscal_year",
+            label: "Fiscal Year",
+            fieldtype: "Link",
+            options: "Fiscal Year",
+            default: frappe.defaults.get_user_default("fiscal_year"),
+            reqd: 1,
+            on_change() {
+                const fy = frappe.query_report.get_filter_value("fiscal_year");
+                if (!fy) return;
+
+                frappe.db.get_value(
+                    "Fiscal Year",
+                    fy,
+                    ["year_start_date", "year_end_date"]
+                ).then(r => {
+                    const d = r.message;
+                    if (!d) return;
+
+                    // set both dates in one shot -> single refresh
+                    frappe.query_report.set_filter_value({
+                        from_date: d.year_start_date,
+                        to_date: d.year_end_date
+                    });
+                });
+            }
+        },
+        {
+            fieldname: "from_date",
+            label: "From Date",
+            fieldtype: "Date"
+        },
+        {
+            fieldname: "to_date",
+            label: "To Date",
+            fieldtype: "Date"
+        },
+        {
             fieldname: "customer_group",
             label: "Customer Group",
             fieldtype: "Link",
@@ -11,7 +48,7 @@ frappe.query_reports["Distributors Report"] = {
     ],
 
     // registry that holds drill-down payloads so we don't embed raw JSON in the DOM
-    _drill_store: {}, 
+    _drill_store: {},
     _drill_seq: 0,
 
     // column fieldname -> [drill field on the row, popup title]

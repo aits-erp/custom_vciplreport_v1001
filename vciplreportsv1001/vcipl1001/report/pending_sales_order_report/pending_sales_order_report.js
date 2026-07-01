@@ -75,7 +75,7 @@ frappe.query_reports["Pending Sales Order Report"] = {
         <h4>Customer: ${customer}</h4>
         <h5>Sales Order: ${sales_order}</h5>
 
-        <div style="max-height:450px;overflow:auto">
+        <div id="print-container">
         <table class="table table-bordered">
         <tr>
             <th>Item Code</th>   <!-- ✅ ADDED -->
@@ -173,17 +173,31 @@ window.print_pending_popup = function () {
                     background:#f2f2f2;
                 }
 
-                @media print{
+            @media print{
 
-                    body{
-                        width:100%;
-                    }
-
-                    table{
-                        width:100%;
-                    }
-
+                body{
+                    width:100%;
                 }
+
+                #print-container{
+                    max-height: none !important;
+                    overflow: visible !important;
+                }
+
+                table{
+                    width:100%;
+                    border-collapse: collapse;
+                }
+
+                tr{
+                    page-break-inside: avoid;
+                }
+
+                thead{
+                    display: table-header-group;
+                }
+
+            }
 
             </style>
 

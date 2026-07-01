@@ -10,19 +10,19 @@ def execute(filters=None):
         if filters.from_date > filters.to_date:
             frappe.throw(_("To Date must be greater than or equal to From Date"))
 
-    columns = get_columns()
+    columns = get_columns(filters)
     data = get_data(filters)
 
     return columns, data
 
 
-def get_columns():
+def get_columns(filters):
     return [
         {
             "label": _("Subcontract Order"),
-            "fieldtype": "Dynamic Link",
+            "fieldtype": "Link",
             "fieldname": "subcontract_order",
-            "options": "order_type",
+            "options": filters.order_type,
             "width": 180,
         },
         {
@@ -41,7 +41,7 @@ def get_columns():
             "label": _("Item Name"),
             "fieldtype": "Data",
             "fieldname": "item_name",
-            "width": 220,
+            "width": 250,
         },
         {
             "label": _("Rate"),
@@ -77,53 +77,58 @@ def get_data(filters):
 
     for row in order_rm_item_details:
         transferred_qty = flt(row.get("transferred_qty"))
+        required_qty = flt(row.get("reqd_qty"))
 
-        if transferred_qty < flt(row.get("reqd_qty")):
-            row["p_qty"] = flt(row.get("reqd_qty")) - transferred_qty
+        if transferred_qty < required_qty:
+            row["p_qty"] = required_qty - transferred_qty
             data.append(row)
 
     return data
 
 
 def get_order_items_to_supply(filters):
-    supplied_items_table = (
-        "Purchase Order Item Supplied"
-        if filters.order_type == "Purchase Order"
-        else "Subcontracting Order Supplied Item"
-    )
+
+    if filters.order_type == "Purchase Order":
+        supplied_items_table = "Purchase Order Item Supplied"
+    else:
+        supplied_items_table = "Subcontracting Order Supplied Item"
 
     parent_table = f"`tab{filters.order_type}`"
     child_table = f"`tab{supplied_items_table}`"
 
-    conditions = """
-        parent.per_received < 100
-        AND parent.docstatus = 1
-        AND parent.transaction_date BETWEEN %(from_date)s AND %(to_date)s
-    """
+    conditions = [
+        "parent.per_received < 100",
+        "parent.docstatus = 1",
+        "parent.transaction_date >= %(from_date)s",
+        "parent.transaction_date <= %(to_date)s",
+    ]
 
     if filters.get("supplier"):
-        conditions += " AND parent.supplier = %(supplier)s"
-
-    if filters.order_type == "Purchase Order":
-        conditions += " AND parent.is_old_subcontracting_flow = 1"
+        conditions.append("parent.supplier = %(supplier)s")
 
     if filters.get("item_code"):
-        conditions += " AND child.rm_item_code = %(item_code)s"
+        conditions.append("child.rm_item_code = %(item_code)s")
+
+    if filters.order_type == "Purchase Order":
+        conditions.append("parent.is_old_subcontracting_flow = 1")
+
+    conditions = " AND ".join(conditions)
 
     query = f"""
         SELECT
             parent.name AS subcontract_order,
-            %(order_type)s AS order_type,
             parent.transaction_date AS date,
             parent.supplier_name AS supplier_name,
             child.rm_item_code,
-            child.item_name,
+            item.item_name AS item_name,
             child.rate,
             child.required_qty AS reqd_qty,
             child.supplied_qty AS transferred_qty
         FROM {parent_table} parent
         INNER JOIN {child_table} child
             ON child.parent = parent.name
+        LEFT JOIN `tabItem` item
+            ON item.name = child.rm_item_code
         WHERE {conditions}
         ORDER BY parent.transaction_date DESC
     """

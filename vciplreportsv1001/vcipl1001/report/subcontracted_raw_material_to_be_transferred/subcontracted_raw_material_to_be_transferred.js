@@ -12,7 +12,12 @@ frappe.query_reports["Subcontracted Raw Material To Be Transferred"] = {
 			label: __("Supplier"),
 			fieldtype: "Link",
 			options: "Supplier",
-			reqd: 1,
+		},
+		{
+			fieldname: "item_code",
+			label: __("Item"),
+			fieldtype: "Link",
+			options: "Item",
 		},
 		{
 			fieldname: "from_date",

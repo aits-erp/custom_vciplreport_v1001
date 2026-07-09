@@ -319,9 +319,13 @@ function show_kbc_popup(base) {
         kbc_get_bin(base + "K"),
         kbc_get_bin(base + "B"),
         kbc_get_bin(base + "C")
-    ]).then(function([k_rows, b_rows, c_rows]) {
+    ]).then(function(results) {
 
         frappe.dom.unfreeze();
+
+        const k_rows = results[0];
+        const b_rows = results[1];
+        const c_rows = results[2];
 
         const k_total = k_rows.reduce((s, r) => s + flt(r.actual_qty), 0);
         const b_total = b_rows.reduce((s, r) => s + flt(r.actual_qty), 0);
@@ -374,15 +378,16 @@ function show_kbc_popup(base) {
             });
         }
 
-        if (cur_dialog) cur_dialog.hide();
-
         let d = new frappe.ui.Dialog({
             title: __("KBC Stock : " + base),
-            fields: [{ fieldtype: "HTML", fieldname: "kbc_html" }]
+            size: "large",
+            fields: [{ fieldtype: "HTML", fieldname: "kbc_html" }],
+            primary_action_label: __("Close"),
+            primary_action: function() { d.hide(); }
         });
 
         d.fields_dict.kbc_html.$wrapper.html(`
-            <table class="table table-bordered" style="margin:0;width:100%;min-width:480px">
+            <table class="table table-bordered" style="margin:0;width:100%">
                 <thead style="background:#e8f0fe">
                     <tr>
                         <th style="padding:8px 10px">Warehouse</th>
@@ -422,12 +427,16 @@ function show_kbc_popup(base) {
             show_kbc_drill($(this).data("item"), $(this).data("label"), base);
         });
 
-        d.set_primary_btn(__("Close"), () => d.hide());
         d.show();
 
-    }).catch(function() {
+    }).catch(function(err) {
         frappe.dom.unfreeze();
-        frappe.msgprint(__("Could not load KBC stock. Please try again."));
+        console.error("KBC popup error:", err);
+        frappe.msgprint({
+            title: __("KBC Error"),
+            indicator: "red",
+            message: __("Error: ") + (err && err.message ? err.message : err)
+        });
     });
 }
 
@@ -470,7 +479,14 @@ function show_kbc_drill(item_code, label, base) {
 
             let d2 = new frappe.ui.Dialog({
                 title: __(`${label} Warehouse Stock : ${item_code}`),
-                fields: [{ fieldtype: "HTML", fieldname: "wh_html" }]
+                fields: [{ fieldtype: "HTML", fieldname: "wh_html" }],
+                primary_action_label: __("Close"),
+                primary_action: function() { d2.hide(); },
+                secondary_action_label: __("← Back to KBC"),
+                secondary_action: function() {
+                    d2.hide();
+                    show_kbc_popup(base);
+                }
             });
 
             d2.fields_dict.wh_html.$wrapper.html(`
@@ -485,8 +501,6 @@ function show_kbc_drill(item_code, label, base) {
                 </table>
             `);
 
-            d2.add_custom_btn(__("← Back to KBC"), () => { d2.hide(); show_kbc_popup(base); });
-            d2.set_primary_btn(__("Close"), () => d2.hide());
             d2.show();
         }
     });
@@ -504,7 +518,8 @@ function kbc_get_bin(item_code) {
                 fields: ["warehouse", "actual_qty"],
                 limit_page_length: 50
             },
-            callback: function(r) { resolve(r.message || []); }
+            callback: function(r) { resolve(r.message || []); },
+            error: function() { resolve([]); }
         });
     });
 }

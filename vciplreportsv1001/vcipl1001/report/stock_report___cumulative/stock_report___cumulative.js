@@ -287,14 +287,11 @@ frappe.query_reports["Stock Report - Cumulative"] = {
 
     formatter: function(value, row, column, data, default_formatter) {
 
-        if (column.fieldname === "item_code") {
-            return `<a href="/app/item/${value}" target="_blank">${value}</a>`;
-        }
-
-        if (column.fieldname === "view_kbc" && data && data.item_code) {
+        // ── Item Code → click opens KBC popup ──
+        if (column.fieldname === "item_code" && data && data.item_code) {
             return `<a href="#" class="kbc-open" data-item="${data.item_code}"
-                style="color:#2490ef;font-weight:500">
-                📦 View KBC
+                style="color:#2490ef;font-weight:600;text-decoration:none">
+                ${value}
             </a>`;
         }
 
@@ -312,19 +309,25 @@ frappe.query_reports["Stock Report - Cumulative"] = {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STEP 1 — KBC popup
+// STEP 1 — KBC popup (opens on Item Code click)
 // ─────────────────────────────────────────────────────────────────────────────
 function show_kbc_popup(base) {
+
+    frappe.dom.freeze(__("Loading KBC stock..."));
+
     Promise.all([
         kbc_get_bin(base + "K"),
         kbc_get_bin(base + "B"),
         kbc_get_bin(base + "C")
     ]).then(function([k_rows, b_rows, c_rows]) {
 
+        frappe.dom.unfreeze();
+
         const k_total = k_rows.reduce((s, r) => s + flt(r.actual_qty), 0);
         const b_total = b_rows.reduce((s, r) => s + flt(r.actual_qty), 0);
         const c_total = c_rows.reduce((s, r) => s + flt(r.actual_qty), 0);
 
+        // unique warehouse list across K / B / C
         const warehouses = [];
         [k_rows, b_rows, c_rows].forEach(rows => {
             rows.forEach(r => {
@@ -405,10 +408,14 @@ function show_kbc_popup(base) {
                 </tbody>
             </table>
             <p style="margin:8px 0 0;font-size:11px;color:#999">
-                💡 Click any quantity to see warehouse-wise breakdown
+                💡 Click any quantity to see warehouse-wise breakdown &nbsp;|&nbsp;
+                <a href="/app/item/${base}" target="_blank" style="color:#2490ef">
+                    Open Item Master ↗
+                </a>
             </p>
         `);
 
+        // qty click → drill-down
         d.fields_dict.kbc_html.$wrapper.on("click", ".kbc-drill", function(e) {
             e.preventDefault();
             d.hide();
@@ -417,12 +424,16 @@ function show_kbc_popup(base) {
 
         d.set_primary_btn(__("Close"), () => d.hide());
         d.show();
+
+    }).catch(function() {
+        frappe.dom.unfreeze();
+        frappe.msgprint(__("Could not load KBC stock. Please try again."));
     });
 }
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STEP 2 — Warehouse drill-down
+// STEP 2 — Warehouse drill-down (click on any K / B / C qty)
 // ─────────────────────────────────────────────────────────────────────────────
 function show_kbc_drill(item_code, label, base) {
     frappe.call({

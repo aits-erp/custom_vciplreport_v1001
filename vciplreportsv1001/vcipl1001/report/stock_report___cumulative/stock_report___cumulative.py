@@ -338,6 +338,14 @@ import re
 import frappe
 
 
+# ── Exact warehouse names to pin right after "Current Stock", in this order ──
+PINNED_WAREHOUSES = [
+    "Unit-1 Shelvali - VCIPL",
+    "Unit-2 BIDCO - VCIPL",
+    "Unit-3 Gundale - VCIPL",
+]
+
+
 def execute(filters=None):
     filters = filters or {}
 
@@ -373,8 +381,12 @@ def get_enabled_warehouses():
 
 
 def warehouse_label(warehouse_name):
-    """'Unit-3 Gundale - VCIPL' -> 'Unit-3 Gundale'"""
-    return warehouse_name.split(" - ")[0].strip()
+    """'Unit-3 Gundale - VCIPL' -> 'Unit-3 Gundale'
+       'Unit-3 Gundale - VCIPL WIP - VCIPL' -> 'Unit-3 Gundale - VCIPL WIP'
+       (only strips the final ' - <Company>' suffix, so similarly-named
+       warehouses stay visually distinguishable in column headers)"""
+    parts = warehouse_name.rsplit(" - ", 1)
+    return parts[0].strip() if len(parts) > 1 else warehouse_name.strip()
 
 
 def warehouse_fieldname(warehouse_name):
@@ -385,9 +397,11 @@ def warehouse_fieldname(warehouse_name):
 
 def get_columns(warehouses):
 
-    # Unit-3 Gundale is pinned right after "Current Stock"
-    pinned_wh = [w for w in warehouses if w["label"] == "Unit-3 Gundale"]
-    other_wh  = [w for w in warehouses if w["label"] != "Unit-3 Gundale"]
+    # ── pin by EXACT warehouse name (not label) to avoid duplicate collisions ──
+    wh_by_name = {w["name"]: w for w in warehouses}
+    pinned_wh  = [wh_by_name[n] for n in PINNED_WAREHOUSES if n in wh_by_name]
+    pinned_names = set(PINNED_WAREHOUSES)
+    other_wh   = [w for w in warehouses if w["name"] not in pinned_names]
 
     columns = [
         {"label": "Item Code",     "fieldname": "item_code",         "fieldtype": "Link", "options": "Item",       "width": 150},
@@ -397,7 +411,7 @@ def get_columns(warehouses):
         {"label": "Current Stock", "fieldname": "current_stock",     "fieldtype": "Float",                        "width": 130},
     ]
 
-    # ── pinned Unit-3 Gundale column, right after Current Stock ──
+    # ── pinned warehouses, right after Current Stock, in PINNED_WAREHOUSES order ──
     for w in pinned_wh:
         columns.append({"label": w["label"], "fieldname": w["fieldname"], "fieldtype": "Float", "width": 130})
 
@@ -407,7 +421,7 @@ def get_columns(warehouses):
         {"label": "Amount",          "fieldname": "amount",       "fieldtype": "Currency", "width": 150},
     ]
 
-    # ── every other enabled warehouse from Warehouse master ──
+    # ── every other enabled warehouse from Warehouse master (incl. the WIP variants) ──
     for w in other_wh:
         columns.append({"label": w["label"], "fieldname": w["fieldname"], "fieldtype": "Float", "width": 130})
 

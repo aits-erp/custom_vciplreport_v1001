@@ -577,41 +577,72 @@ frappe.query_reports["Stock Report - Cumulative"] = {
         return default_formatter(value, row, column, data);
     },
 
+    // after_datatable_render: function(datatable) {
     after_datatable_render: function(datatable) {
 
-        // ── inject row-highlight style once ──
         if (!$("#kbc-row-highlight-style").length) {
             $("<style>")
                 .attr("id", "kbc-row-highlight-style")
                 .html(`
-                    .dt-row.kbc-row-highlight .dt-cell,
-                    [data-row-index].kbc-row-highlight .dt-cell {
+                    .dt-cell.kbc-row-highlight {
                         background-color: #d6e9ff !important;
                     }
                 `)
                 .appendTo("head");
         }
 
-        function highlight_row($target) {
-            const $row = $target.closest(".dt-row, [data-row-index]");
-            if (!$row.length) return;
-            $(datatable.wrapper).find(".dt-row, [data-row-index]").removeClass("kbc-row-highlight");
-            $row.addClass("kbc-row-highlight");
+        function highlight_row($cell) {
+            const rowIndex = $cell.attr("data-row-index");
+            if (rowIndex === undefined) return;
+            $(datatable.wrapper).find(".dt-cell").removeClass("kbc-row-highlight");
+            $(datatable.wrapper).find(`.dt-cell[data-row-index="${rowIndex}"]`).addClass("kbc-row-highlight");
         }
 
-        // ── click anywhere on a row (any column) → highlight that row ──
         $(datatable.wrapper).off("click", ".dt-cell").on("click", ".dt-cell", function(e) {
             highlight_row($(this));
         });
 
-        // ── item code click → open KBC popup AND highlight the row ──
         $(datatable.wrapper).off("click", ".kbc-open").on("click", ".kbc-open", function(e) {
             e.preventDefault();
             e.stopPropagation();
-            highlight_row($(this));
+            highlight_row($(this).closest(".dt-cell"));
             show_kbc_popup($(this).data("item"));
         });
     }
+
+    //     // ── inject row-highlight style once ──
+    //     if (!$("#kbc-row-highlight-style").length) {
+    //         $("<style>")
+    //             .attr("id", "kbc-row-highlight-style")
+    //             .html(`
+    //                 .dt-row.kbc-row-highlight .dt-cell,
+    //                 [data-row-index].kbc-row-highlight .dt-cell {
+    //                     background-color: #d6e9ff !important;
+    //                 }
+    //             `)
+    //             .appendTo("head");
+    //     }
+
+    //     function highlight_row($target) {
+    //         const $row = $target.closest(".dt-row, [data-row-index]");
+    //         if (!$row.length) return;
+    //         $(datatable.wrapper).find(".dt-row, [data-row-index]").removeClass("kbc-row-highlight");
+    //         $row.addClass("kbc-row-highlight");
+    //     }
+
+    //     // ── click anywhere on a row (any column) → highlight that row ──
+    //     $(datatable.wrapper).off("click", ".dt-cell").on("click", ".dt-cell", function(e) {
+    //         highlight_row($(this));
+    //     });
+
+    //     // ── item code click → open KBC popup AND highlight the row ──
+    //     $(datatable.wrapper).off("click", ".kbc-open").on("click", ".kbc-open", function(e) {
+    //         e.preventDefault();
+    //         e.stopPropagation();
+    //         highlight_row($(this));
+    //         show_kbc_popup($(this).data("item"));
+    //     });
+    // }
 };
 
 

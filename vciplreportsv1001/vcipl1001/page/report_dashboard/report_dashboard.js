@@ -69,8 +69,9 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "Item Category Wise - Report": "/app/query-report/Item%20Category%20Wise%20-%20Report?from_date=2026-01-01&to_date=2026-01-31",   
         
         "Item Category wise Qty -Report": "/app/query-report/Item%20Category%20wise%20Qty%20-Report?from_date=2026-01-01&to_date=2026-01-31",
-        "Ageing - Customers":"/app/query-report/Ageing%20-%20Customers?company=Vinod+Cookware+India+Private+Limited&report_date=2026-01-31&ageing_based_on=Due+Date&calculate_ageing_with=Report+Date&range=30%2C+60%2C+90%2C+120&customer_group=Debtors+Distributors"
-        
+        "Ageing - Customers":"/app/query-report/Ageing%20-%20Customers?company=Vinod+Cookware+India+Private+Limited&report_date=2026-01-31&ageing_based_on=Due+Date&calculate_ageing_with=Report+Date&range=30%2C+60%2C+90%2C+120&customer_group=Debtors+Distributors",
+         "Sunil Sir Report":
+            "https://vcipl.m.frappe.cloud/app/sales-mis-dashboard"
        
     };
 

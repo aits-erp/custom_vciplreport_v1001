@@ -591,21 +591,19 @@ frappe.query_reports["Stock Report - Cumulative"] = {
                 .appendTo("head");
         }
 
-        function highlight_row($cell) {
-            const rowIndex = $cell.attr("data-row-index");
-            if (rowIndex === undefined) return;
+        function highlight_cell($cell) {
             $(datatable.wrapper).find(".dt-cell").removeClass("kbc-row-highlight");
-            $(datatable.wrapper).find(`.dt-cell[data-row-index="${rowIndex}"]`).addClass("kbc-row-highlight");
+            $cell.addClass("kbc-row-highlight");
         }
 
         $(datatable.wrapper).off("click", ".dt-cell").on("click", ".dt-cell", function(e) {
-            highlight_row($(this));
+            highlight_cell($(this));
         });
 
         $(datatable.wrapper).off("click", ".kbc-open").on("click", ".kbc-open", function(e) {
             e.preventDefault();
             e.stopPropagation();
-            highlight_row($(this).closest(".dt-cell"));
+            highlight_cell($(this).closest(".dt-cell"));
             show_kbc_popup($(this).data("item"));
         });
     }

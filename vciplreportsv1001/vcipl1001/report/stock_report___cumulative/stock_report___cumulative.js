@@ -608,30 +608,22 @@ frappe.query_reports["Stock Report - Cumulative"] = {
             show_kbc_popup($(this).data("item"));
         });
 
-        // ── keyboard arrow navigation (and anything else) ──
-        // Frappe's datatable toggles a "dt-cell--focus" class on whichever
-        // cell is currently active (click OR arrow keys). Watch for that
-        // class appearing and mirror our highlight onto the same cell.
-        if (datatable._kbcFocusObserver) {
-            datatable._kbcFocusObserver.disconnect();
-        }
+        // ── keyboard arrow navigation ──
+        $(datatable.wrapper).off("keydown.kbcHighlight").on("keydown.kbcHighlight", function(e) {
+            const arrowKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+            if (arrowKeys.indexOf(e.key) === -1) return;
 
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(m) {
-                const el = m.target;
-                if (el.classList && el.classList.contains("dt-cell--focus")) {
-                    highlight_cell($(el));
-                }
+            // wait two animation frames so Frappe finishes moving its
+            // internal "dt-cell--focus" class before we read it
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    const $focused = $(datatable.wrapper).find(".dt-cell--focus").first();
+                    if ($focused.length) {
+                        highlight_cell($focused);
+                    }
+                });
             });
         });
-
-        observer.observe(datatable.wrapper, {
-            attributes: true,
-            attributeFilter: ["class"],
-            subtree: true
-        });
-
-        datatable._kbcFocusObserver = observer;
     }
 
     //     // ── inject row-highlight style once ──

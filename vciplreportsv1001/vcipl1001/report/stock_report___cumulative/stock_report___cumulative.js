@@ -591,41 +591,25 @@ frappe.query_reports["Stock Report - Cumulative"] = {
                 .appendTo("head");
         }
 
-        function highlight_cell($cell) {
+        function highlight_row($cell) {
+            const rowIndex = $cell.attr("data-row-index");
+            if (rowIndex === undefined) return;
             $(datatable.wrapper).find(".dt-cell").removeClass("kbc-row-highlight");
-            $cell.addClass("kbc-row-highlight");
+            $(datatable.wrapper).find(`.dt-cell[data-row-index="${rowIndex}"]`).addClass("kbc-row-highlight");
         }
 
-        // ── mouse click ──
         $(datatable.wrapper).off("click", ".dt-cell").on("click", ".dt-cell", function(e) {
-            highlight_cell($(this));
+            highlight_row($(this));
         });
 
         $(datatable.wrapper).off("click", ".kbc-open").on("click", ".kbc-open", function(e) {
             e.preventDefault();
             e.stopPropagation();
-            highlight_cell($(this).closest(".dt-cell"));
+            highlight_row($(this).closest(".dt-cell"));
             show_kbc_popup($(this).data("item"));
         });
-
-        // ── keyboard arrow navigation ──
-        $(datatable.wrapper).off("keydown.kbcHighlight").on("keydown.kbcHighlight", function(e) {
-            const arrowKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
-            if (arrowKeys.indexOf(e.key) === -1) return;
-
-            // wait two animation frames so Frappe finishes moving its
-            // internal "dt-cell--focus" class before we read it
-            requestAnimationFrame(function() {
-                requestAnimationFrame(function() {
-                    const $focused = $(datatable.wrapper).find(".dt-cell--focus").first();
-                    if ($focused.length) {
-                        highlight_cell($focused);
-                    }
-                });
-            });
-        });
     }
-
+    
     //     // ── inject row-highlight style once ──
     //     if (!$("#kbc-row-highlight-style").length) {
     //         $("<style>")

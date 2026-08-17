@@ -24,16 +24,19 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "Top Most Selling Items":
             "/app/query-report/Top%20Most%20Selling%20Items",
 
-        "Bottom 100 Most selling Item":
-            "/app/query-report/Bottom%20100%20Most%20selling%20Item",
+        // Hidden from live dashboard — keep for future use, do not delete
+        // "Bottom 100 Most selling Item":
+        //     "/app/query-report/Bottom%20100%20Most%20selling%20Item",
 
-        "Sales Person Report":
-            "/app/query-report/Sales%20Person%20Report?month=1&year=2026",
+        // Hidden from live dashboard — keep for future use, do not delete
+        // "Sales Person Report":
+        //     "/app/query-report/Sales%20Person%20Report?month=1&year=2026",
 
         // "TSO WISE CATEGORYWISE":
         //     "/app/query-report/TSO%20WISE%20CATEGORYWISE1?from_date=2026-05-01&to_date=2026-05-31&customer_group=Debtors+Distributors&custom_main_group=%5B"Assorted+Utensils"%2C"Bag"%2C"Bottle"%2C"Carton"%2C"Cast+Iron"%2C"Circle"%2C"Coil"%2C"Csd"%2C"Electrical+Appliances"%2C"Futuretec"%2C"Healux"%2C"Horeca"%2C"Kraft"%2C"Machinery"%2C"Nonstick"%2C"Other"%2C"Other+Spare"%2C"Platinum"%2C"Platinum+Triply+P.cooker"%2C"Polishing"%2C"Powder"%2C"Pressure+Cookers"%2C"SFG"%2C"SS+Cookware"%2C"Scrap"%2C"Sticker+%26+Warranty+Card"%2C"Tool"%2C"Trading+SFG"%5D",
-        "TSO WISE CATEGORYWISE":
-        "/app/query-report/TSO%20WISE%20CATEGORYWISE?from_date=2026-06-01&to_date=2026-06-30&customer_group=Debtors+Distributors  ",
+        // Hidden from live dashboard — keep for future use, do not delete
+        // "TSO WISE CATEGORYWISE":
+        // "/app/query-report/TSO%20WISE%20CATEGORYWISE?from_date=2026-06-01&to_date=2026-06-30&customer_group=Debtors+Distributors  ",
 
         "Monthwise Sales Report":
             "/app/query-report/Monthwise%20Sales%20Report",
@@ -42,14 +45,17 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
             "/app/query-report/Pending%20Sales%20Order%20Report" +
             "?company=Vinod+Cookware+India+Private+Limited&group_by_so=1",
 
-        "FILL RATIO SALES ORDER":
-            "/app/query-report/FILL%20RATIO%20SALES%20ORDER?company=AITS+%28Demo%29",
+        // Hidden from live dashboard — keep for future use, do not delete
+        // "FILL RATIO SALES ORDER":
+        //     "/app/query-report/FILL%20RATIO%20SALES%20ORDER?company=AITS+%28Demo%29",
 
-        "Customer Fill Ratio":
-            "/app/query-report/Customer%20Fill%20Ratio?company=AITS+%28Demo%29",
+        // Hidden from live dashboard — keep for future use, do not delete
+        // "Customer Fill Ratio":
+        //     "/app/query-report/Customer%20Fill%20Ratio?company=AITS+%28Demo%29",
 
-            "Supplier Fill Ratio":
-            "/app/query-report/Supplier%20Fill%20Ratio?company=AITS+%28Demo%29",
+        // Hidden from live dashboard — keep for future use, do not delete
+        // "Supplier Fill Ratio":
+        //     "/app/query-report/Supplier%20Fill%20Ratio?company=AITS+%28Demo%29",
 
         "Monthwises Purchase":
             "/app/query-report/Monthwises%20Purchase",
@@ -71,8 +77,11 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "Item Category wise Qty -Report": "/app/query-report/Item%20Category%20wise%20Qty%20-Report?from_date=2026-01-01&to_date=2026-01-31",
         "Ageing - Customers":"/app/query-report/Ageing%20-%20Customers?company=Vinod+Cookware+India+Private+Limited&report_date=2026-01-31&ageing_based_on=Due+Date&calculate_ageing_with=Report+Date&range=30%2C+60%2C+90%2C+120&customer_group=Debtors+Distributors",
          "Sunil Sir Report":
-            "https://vcipl.m.frappe.cloud/app/sales-mis-dashboard"
-       
+            "https://vcipl.m.frappe.cloud/app/sales-mis-dashboard",
+
+        "Sales Anaytic Customer-Group":
+            "https://vcipl.m.frappe.cloud/app/query-report/Sales%20Anaytic%20Customer-Group"
+
     };
 
     // ================================

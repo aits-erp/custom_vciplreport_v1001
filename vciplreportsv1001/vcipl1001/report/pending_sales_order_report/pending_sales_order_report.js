@@ -220,8 +220,6 @@
 // };
 
 
-
-
 frappe.query_reports["Pending Sales Order Report"] = {
 
     filters: [
@@ -315,8 +313,20 @@ frappe.query_reports["Pending Sales Order Report"] = {
             return;
         }
 
+        // cached.rows comes from Python's frappe.as_json(), so it is a
+        // JSON string, not an array yet - parse it here before use.
+        let rows = cached.rows;
+        if (typeof rows === "string") {
+            try {
+                rows = JSON.parse(rows);
+            } catch (e) {
+                console.error("Failed to parse pending_popup JSON", e);
+                rows = [];
+            }
+        }
+
         frappe.query_reports["Pending Sales Order Report"].show_popup(
-            cached.rows, cached.customer, cached.sales_order
+            rows, cached.customer, cached.sales_order
         );
     },
 
@@ -477,4 +487,4 @@ window.print_pending_popup = function () {
     };
 };
 
-//# sourceURL=pending_sales_order_report.js
+

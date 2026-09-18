@@ -80,8 +80,11 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
          "Sunil Sir Report":
             "https://vcipl.m.frappe.cloud/app/sales-mis-dashboard",
 
-        "Sales Anaytic Customer-Group":
-            "https://vcipl.m.frappe.cloud/app/query-report/Sales%20Anaytic%20Customer-Group"
+        // "Sales Anaytic Customer-Group":
+        //     "https://vcipl.m.frappe.cloud/app/query-report/Sales%20Anaytic%20Customer-Group",
+
+         "Sales Analytic Dashboard":
+            "https://vcipl.m.frappe.cloud/app/query-report/Sales%20Analytic%20Dashboard?tree_type=Customer&doc_type=Sales+Invoice&value_quantity=Value&from_date=2026-04-01&to_date=2027-03-31&company=Vinod+Cookware+India+Private+Limited&range=Monthly&curves=all"
 
     };
 

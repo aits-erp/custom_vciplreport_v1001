@@ -72,7 +72,10 @@ def get_columns(warehouses):
         {"label": "Main Group",    "fieldname": "custom_main_group",                                                "width": 150},
         {"label": "Item Name",     "fieldname": "item_name",                                                        "width": 220},
         {"label": "Item Group",    "fieldname": "item_group",        "fieldtype": "Link", "options": "Item Group", "width": 160},
+        {"label": "Rate",            "fieldname": "rate",         "fieldtype": "Currency", "width": 120},
         {"label": "Current Stock", "fieldname": "current_stock",     "fieldtype": "Float",                        "width": 130},
+        {"label": "Amount",          "fieldname": "amount",       "fieldtype": "Currency", "width": 150},
+
     ]
 
     # ── pinned warehouses, right after Current Stock, in PINNED_WAREHOUSES order ──
@@ -81,8 +84,8 @@ def get_columns(warehouses):
 
     columns += [
         {"label": "Min Stock Level", "fieldname": "safety_stock", "fieldtype": "Float",    "width": 130},
-        {"label": "Rate",            "fieldname": "rate",         "fieldtype": "Currency", "width": 120},
-        {"label": "Amount",          "fieldname": "amount",       "fieldtype": "Currency", "width": 150},
+    #     {"label": "Rate",            "fieldname": "rate",         "fieldtype": "Currency", "width": 120},
+    #     {"label": "Amount",          "fieldname": "amount",       "fieldtype": "Currency", "width": 150},
     ]
 
     # ── every other enabled warehouse from Warehouse master (incl. the WIP variants) ──

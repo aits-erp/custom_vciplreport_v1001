@@ -491,6 +491,11 @@ def get_data(filters):
         elif filters["expired"] == "No":
             conditions.append("(pr.valid_upto IS NULL OR pr.valid_upto >= %(today)s)")
 
+    # Customer filter
+    if filters.get("customer"):
+        conditions.append("pr.customer = %(customer)s")
+        values["customer"] = filters["customer"]
+
     where_clause = " AND ".join(conditions) if conditions else "1=1"
 
     # Note: The Pricing Rule stores item details in child tables
@@ -533,7 +538,6 @@ def get_data(filters):
         ORDER BY
             pr.creation DESC,
             pr.valid_from DESC
-        LIMIT 1000
     """
 
     data = frappe.db.sql(query, values, as_dict=1)

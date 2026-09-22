@@ -201,6 +201,13 @@ frappe.query_reports["Pricing Rule"] = {
             "options": "\nYes\nNo",
             "width": 100,
             "description": __("Filter rules based on whether they have expired as of today (Valid Upto vs today's date)")
+        },
+        {
+            "fieldname": "customer",
+            "label": __("Customer"),
+            "fieldtype": "Link",
+            "options": "Customer",
+            "width": 150
         }
     ],
 

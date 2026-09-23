@@ -373,6 +373,30 @@ def get_columns():
             "width": 100
         },
         {
+            "label": _("Trade Margin"),
+            "fieldname": "custom_trade_mark",
+            "fieldtype": "Percent",
+            "width": 100
+        },
+        {
+            "label": _("P Scheme"),
+            "fieldname": "custom_p_scheme",
+            "fieldtype": "Percent",
+            "width": 100
+        },
+        {
+            "label": _("Freight"),
+            "fieldname": "custom_freight",
+            "fieldtype": "Currency",
+            "width": 100
+        },
+        {
+            "label": _("Extra Discount"),
+            "fieldname": "custom_extra_discount",
+            "fieldtype": "Currency",
+            "width": 120
+        },
+        {
             "label": _("Discount Amount"),
             "fieldname": "discount_amount",
             "fieldtype": "Currency",
@@ -512,6 +536,10 @@ def get_data(filters):
             pr.valid_upto,
             pr.rate,
             pr.discount_percentage,
+            pr.custom_trade_mark,
+            pr.custom_p_scheme,
+            pr.custom_freight,
+            pr.custom_extra_discount,
             pr.discount_amount,
             pr.rate_or_discount,
             pr.company,

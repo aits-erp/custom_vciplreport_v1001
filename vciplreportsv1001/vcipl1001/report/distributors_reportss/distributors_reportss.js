@@ -112,7 +112,7 @@
 //             </tr>`;
 //         });
 
-frappe.query_reports["Distributors Report"] = {
+frappe.query_reports["Distributors Reportss"] = {
 
     filters: [
         {
@@ -123,7 +123,7 @@ frappe.query_reports["Distributors Report"] = {
             default: frappe.defaults.get_user_default("fiscal_year"),
             reqd: 1,
             on_change() {
-                frappe.query_reports["Distributors Report"].apply_fy_dates();
+                frappe.query_reports["Distributors Reportss"].apply_fy_dates();
             }
         },
         {
@@ -148,7 +148,7 @@ frappe.query_reports["Distributors Report"] = {
 
     // set from_date = fiscal year start when the report is first opened
     onload(report) {
-        frappe.query_reports["Distributors Report"].apply_fy_dates();
+        frappe.query_reports["Distributors Reportss"].apply_fy_dates();
     },
 
     // from_date = FY start; to_date = today (current FY) or FY end (past/future FY)
@@ -225,12 +225,12 @@ frappe.query_reports["Distributors Report"] = {
 
                 // only make it a link if there's actually something to show
                 if (rows && rows.length) {
-                    const me = frappe.query_reports["Distributors Report"];
+                    const me = frappe.query_reports["Distributors Reportss"];
                     const key = "d" + (me._drill_seq++);
                     me._drill_store[key] = { rows: rows, title: title };
 
                     return `<a style="font-weight:bold;cursor:pointer;color:#1674E0"
-                               onclick='frappe.query_reports["Distributors Report"].show_popup_by_key("${key}")'>${value}</a>`;
+                               onclick='frappe.query_reports["Distributors Reportss"].show_popup_by_key("${key}")'>${value}</a>`;
                 }
             }
         }
@@ -290,8 +290,3 @@ frappe.query_reports["Distributors Report"] = {
         frappe.msgprint({ title: title, message: html, wide: true });
     }
 };
-//         html += `</tbody></table></div>`;
-
-//         frappe.msgprint({ title: title, message: html, wide: true });
-//     }
-// };

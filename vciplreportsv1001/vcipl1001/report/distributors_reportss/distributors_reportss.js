@@ -1,6 +1,142 @@
-frappe.query_reports["Distributors Reportss"] = {
+// frappe.query_reports["Distributors Reportss"] = {
+
+//     filters: [
+//         {
+//             fieldname: "customer_group",
+//             label: "Customer Group",
+//             fieldtype: "Link",
+//             options: "Customer Group",
+//             default: "Debtors Distributors"
+//         }
+//     ],
+
+//     // registry that holds drill-down payloads so we don't embed raw JSON in the DOM
+//     _drill_store: {}, 
+//     _drill_seq: 0,
+
+//     // column fieldname -> [drill field on the row, popup title]
+//     drill_map: {
+//         total_outstanding: ["outstanding_drill", "Outstanding Invoices"],
+//         total_overdue:     ["overdue_drill", "Overdue Invoices"],
+//         avg_overdue_days:  ["avg_overdue_drill", "Invoices – Average Overdue Days"],
+//         avg_payment_days:  ["avg_payment_drill", "Invoices – Average Payment Days"],
+//         aging_0_15:        ["aging_0_15_drill", "0-15 Days"],
+//         aging_16_30:       ["aging_16_30_drill", "16-30 Days"],
+//         aging_31_45:       ["aging_31_45_drill", "31+ Days"]
+//     },
+
+//     formatter(value, row, column, data, default_formatter) {
+
+//         value = default_formatter(value, row, column, data);
+
+//         // Distributor name -> customer link
+//         if (column.fieldname === "customer" && data.customer_code) {
+//             return `<a href="/app/customer/${data.customer_code}"
+//                        target="_blank"
+//                        style="font-weight:bold;color:#1674E0">${value}</a>`;
+//         }
+
+//         // Clickable drill-down columns
+//         const drill = this.drill_map[column.fieldname];
+//         if (drill) {
+//             const [drill_field, title] = drill;
+//             const raw = data[drill_field];
+
+//             if (raw) {
+//                 let rows = [];
+//                 try {
+//                     rows = typeof raw === "string" ? JSON.parse(raw) : raw;
+//                 } catch (e) {
+//                     rows = [];
+//                 }
+
+//                 // only make it a link if there's actually something to show
+//                 if (rows && rows.length) {
+//                     const me = frappe.query_reports["Distributors Reportss"];
+//                     const key = "d" + (me._drill_seq++);
+//                     me._drill_store[key] = { rows: rows, title: title };
+
+//                     return `<a style="font-weight:bold;cursor:pointer;color:#1674E0"
+//                                onclick='frappe.query_reports["Distributors Reportss"].show_popup_by_key("${key}")'>${value}</a>`;
+//                 }
+//             }
+//         }
+
+//         return value;
+//     },
+
+//     show_popup_by_key(key) {
+//         const entry = this._drill_store[key];
+//         if (!entry) {
+//             frappe.msgprint(__("No data available"));
+//             return;
+//         }
+//         this.show_popup(entry.rows, entry.title);
+//     },
+
+//     show_popup(rows, title) {
+
+//         if (title === "Invoices – Average Overdue Days") {
+//             rows = rows.filter(r => flt(r.amount) > 0);
+//         }
+
+//         if (!rows || rows.length === 0) {
+//             frappe.msgprint(__("No data available"));
+//             return;
+//         }
+
+//         let html = `
+//         <div style="max-height:500px;overflow:auto">
+//         <table class="table table-bordered">
+//             <thead>
+//                 <tr>
+//                     <th>Invoice</th>
+//                     <th>Posting Date</th>
+//                     <th>Due / Payment Date</th>
+//                     <th>Amount</th>
+//                     <th>Days</th>
+//                 </tr>
+//             </thead><tbody>`;
+
+//         rows.forEach(r => {
+//             html += `
+//             <tr>
+//                 <td>
+//                     <a href="/app/sales-invoice/${r.invoice}"
+//                        target="_blank" style="font-weight:bold">${r.invoice}</a>
+//                 </td>
+//                 <td>${r.posting_date}</td>
+//                 <td>${r.due_date || r.payment_date || "-"}</td>
+//                 <td>${r.amount ? format_currency(r.amount) : "-"}</td>
+//                 <td>${r.days || r.overdue_days || "-"}</td>
+//             </tr>`;
+//         });
+
+frappe.query_reports["Distributors Report"] = {
 
     filters: [
+        {
+            fieldname: "fiscal_year",
+            label: "Fiscal Year",
+            fieldtype: "Link",
+            options: "Fiscal Year",
+            default: frappe.defaults.get_user_default("fiscal_year"),
+            reqd: 1,
+            on_change() {
+                frappe.query_reports["Distributors Report"].apply_fy_dates();
+            }
+        },
+        {
+            fieldname: "from_date",
+            label: "From Date",
+            fieldtype: "Date"
+        },
+        {
+            fieldname: "to_date",
+            label: "To Date",
+            fieldtype: "Date",
+            default: frappe.datetime.get_today()
+        },
         {
             fieldname: "customer_group",
             label: "Customer Group",
@@ -10,8 +146,45 @@ frappe.query_reports["Distributors Reportss"] = {
         }
     ],
 
+    // set from_date = fiscal year start when the report is first opened
+    onload(report) {
+        frappe.query_reports["Distributors Report"].apply_fy_dates();
+    },
+
+    // from_date = FY start; to_date = today (current FY) or FY end (past/future FY)
+    apply_fy_dates() {
+        const fy = frappe.query_report.get_filter_value("fiscal_year");
+        if (!fy) return;
+
+        frappe.db.get_value(
+            "Fiscal Year",
+            fy,
+            ["year_start_date", "year_end_date"]
+        ).then(r => {
+            const d = r.message;
+            if (!d) return;
+
+            const today = frappe.datetime.get_today();
+            let to_date;
+
+            if (d.year_start_date > today) {
+                to_date = d.year_end_date;      // future FY: use its own end
+            } else if (d.year_end_date < today) {
+                to_date = d.year_end_date;      // past FY: stop at FY end
+            } else {
+                to_date = today;                // current FY: stop at today
+            }
+
+            // set both dates in one shot -> single refresh
+            frappe.query_report.set_filter_value({
+                from_date: d.year_start_date,
+                to_date: to_date
+            });
+        });
+    },
+
     // registry that holds drill-down payloads so we don't embed raw JSON in the DOM
-    _drill_store: {}, 
+    _drill_store: {},
     _drill_seq: 0,
 
     // column fieldname -> [drill field on the row, popup title]
@@ -52,12 +225,12 @@ frappe.query_reports["Distributors Reportss"] = {
 
                 // only make it a link if there's actually something to show
                 if (rows && rows.length) {
-                    const me = frappe.query_reports["Distributors Reportss"];
+                    const me = frappe.query_reports["Distributors Report"];
                     const key = "d" + (me._drill_seq++);
                     me._drill_store[key] = { rows: rows, title: title };
 
                     return `<a style="font-weight:bold;cursor:pointer;color:#1674E0"
-                               onclick='frappe.query_reports["Distributors Reportss"].show_popup_by_key("${key}")'>${value}</a>`;
+                               onclick='frappe.query_reports["Distributors Report"].show_popup_by_key("${key}")'>${value}</a>`;
                 }
             }
         }
@@ -117,3 +290,8 @@ frappe.query_reports["Distributors Reportss"] = {
         frappe.msgprint({ title: title, message: html, wide: true });
     }
 };
+//         html += `</tbody></table></div>`;
+
+//         frappe.msgprint({ title: title, message: html, wide: true });
+//     }
+// };

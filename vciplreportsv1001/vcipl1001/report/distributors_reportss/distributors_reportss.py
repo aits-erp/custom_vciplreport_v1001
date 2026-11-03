@@ -756,6 +756,8 @@
 #         })
 
 #     return result
+
+
 import frappe
 from frappe.utils import today, getdate, date_diff, flt
 

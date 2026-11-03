@@ -120,7 +120,7 @@ frappe.query_reports["Distributors Reportss"] = {
             label: "Fiscal Year",
             fieldtype: "Link",
             options: "Fiscal Year",
-            default: frappe.defaults.get_user_default("fiscal_year"),
+            default: "2026-2027",
             reqd: 1,
             on_change() {
                 frappe.query_reports["Distributors Reportss"].apply_fy_dates();

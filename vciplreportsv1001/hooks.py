@@ -13,7 +13,9 @@ app_include_css = [
 ]
 
 app_include_js = [
-    "/assets/vciplreportsv1001/js/global_dashboard_btn_v2.js"
+    "/assets/vciplreportsv1001/js/global_dashboard_btn_v2.js",
+    "/assets/vciplreportsv1001/js/sales_analytic.js"
+
     # export_override.js is completely removed since we use Python global patch now
 ]
 

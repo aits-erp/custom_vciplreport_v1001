@@ -22,7 +22,7 @@
 //             fieldname: "to_date",
 //             label: __("To Date"),
 //             fieldtype: "Date",
-//             default: frappe.datetime.year_end()
+//             default: frappe.datetime.get_today()   // ✅ CHANGED: current date
 //         },
 
 //         {
@@ -328,11 +328,13 @@ frappe.query_reports["Pending Sales Order Report"] = {
 
         value = default_formatter(value, row, column, data);
 
+        if (!data) return value;   // ✅ ADDED: total row has no data
+
         if (column.fieldname === "pending_qty" && data?.pending_qty > 0) {
             value = `<span style="color:red;font-weight:600">${value}</span>`;
         }
 
-        if (column.fieldname === "pending_delivery") {
+        if (column.fieldname === "pending_delivery" && data.pending_popup) {   // ✅ CHANGED: added data.pending_popup check
 
             let report = frappe.query_reports["Pending Sales Order Report"];
             report._pending_key_counter += 1;

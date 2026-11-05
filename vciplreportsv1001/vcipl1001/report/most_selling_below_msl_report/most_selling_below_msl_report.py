@@ -1,17 +1,34 @@
 import frappe
 from datetime import date
+from frappe.utils import flt
 
+
+# def execute(filters=None):
+#     filters = filters or {}
+
+#     # If user does not select date range → default Financial Year
+#     if not filters.get("from_date") or not filters.get("to_date"):
+#         today = date.today()
+#         fy_year = today.year if today.month > 3 else today.year - 1
+
+#         filters["from_date"] = date(fy_year, 4, 1)
+#         filters["to_date"] = date(fy_year + 1, 3, 31)
+
+#     columns = get_columns()
+#     data = get_data(filters)
+
+#     return columns, data
 
 def execute(filters=None):
     filters = filters or {}
 
-    # If user does not select date range → default Financial Year
+    # If user does not select date range → default Financial Year start to today
     if not filters.get("from_date") or not filters.get("to_date"):
         today = date.today()
         fy_year = today.year if today.month > 3 else today.year - 1
 
         filters["from_date"] = date(fy_year, 4, 1)
-        filters["to_date"] = date(fy_year + 1, 3, 31)
+        filters["to_date"] = today
 
     columns = get_columns()
     data = get_data(filters)

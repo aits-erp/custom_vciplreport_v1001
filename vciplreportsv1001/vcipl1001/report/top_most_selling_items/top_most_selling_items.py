@@ -11,7 +11,7 @@ def execute(filters=None):
         fy_year = today.year if today.month > 3 else today.year - 1
 
         filters.from_date = date(fy_year, 4, 1)
-        filters.to_date = date(fy_year + 1, 3, 31)
+        filters.to_date = today
 
     columns = get_columns()
     data = get_data(filters)
@@ -32,26 +32,26 @@ def get_columns():
             "label": "Item Name",
             "fieldname": "item_name",
             "fieldtype": "Data",
-            "width": 200
+            "width": 240
         },
         {
             "label": "Item Group",
             "fieldname": "item_group",
             "fieldtype": "Link",
             "options": "Item Group",
-            "width": 150
+            "width": 200
         },
         {
             "label": "Total Sales Amount",
             "fieldname": "total_amount",
             "fieldtype": "Currency",
-            "width": 150
+            "width": 170
         },
         {
             "label": "Total Sold Qty",
             "fieldname": "total_qty",
             "fieldtype": "Float",
-            "width": 120
+            "width": 130
         },
         {
             "label": "Total Stock Qty",

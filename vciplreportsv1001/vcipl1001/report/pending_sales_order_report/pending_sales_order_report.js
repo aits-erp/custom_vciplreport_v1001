@@ -1,3 +1,4 @@
+
 // frappe.query_reports["Pending Sales Order Report"] = {
 
 //     filters: [
@@ -48,6 +49,12 @@
 //         { fieldname: "group_by_so", label: __("Group by Sales Order"), fieldtype: "Check", default: 1 }
 //     ],
 
+//     // Cache row data in memory, keyed by a safe generated string.
+//     // We NEVER embed raw customer/item text (which may contain apostrophes,
+//     // quotes, etc. e.g. "Chef's Lagan") into an onclick attribute anymore.
+//     _pending_cache: {},
+//     _pending_key_counter: 0,
+
 //     formatter(value, row, column, data, default_formatter) {
 
 //         value = default_formatter(value, row, column, data);
@@ -57,9 +64,19 @@
 //         }
 
 //         if (column.fieldname === "pending_delivery") {
+
+//             let report = frappe.query_reports["Pending Sales Order Report"];
+//             report._pending_key_counter += 1;
+//             let key = "row_" + report._pending_key_counter;
+
+//             report._pending_cache[key] = {
+//                 rows: data.pending_popup,
+//                 customer: data.customer,
+//                 sales_order: data.sales_order
+//             };
+
 //             return `<a style="font-weight:bold;color:#1674E0;cursor:pointer"
-//                 onclick='frappe.query_reports["Pending Sales Order Report"]
-//                 .show_popup(${data.pending_popup}, "${data.customer}", "${data.sales_order}")'>
+//                 onclick='frappe.query_reports["Pending Sales Order Report"].show_popup_by_key("${key}")'>
 //                 View Pending
 //             </a>`;
 //         }
@@ -67,18 +84,48 @@
 //         return value;
 //     },
 
+//     show_popup_by_key(key) {
+//         let cached = frappe.query_reports["Pending Sales Order Report"]._pending_cache[key];
+
+//         if (!cached) {
+//             frappe.msgprint(__("Could not load pending data for this row."));
+//             return;
+//         }
+
+//         // cached.rows comes from Python's frappe.as_json(), so it is a
+//         // JSON string, not an array yet - parse it here before use.
+//         let rows = cached.rows;
+//         if (typeof rows === "string") {
+//             try {
+//                 rows = JSON.parse(rows);
+//             } catch (e) {
+//                 console.error("Failed to parse pending_popup JSON", e);
+//                 rows = [];
+//             }
+//         }
+
+//         frappe.query_reports["Pending Sales Order Report"].show_popup(
+//             rows, cached.customer, cached.sales_order
+//         );
+//     },
+
 //     show_popup(rows, customer, sales_order) {
+
+//         // Escape every dynamic value before inserting into HTML so that
+//         // apostrophes, quotes, &, <, > in customer/item names never break
+//         // the popup markup either.
+//         const esc = (val) => frappe.utils.escape_html(val == null ? "" : String(val));
 
 //         let html = `
 //         <div id="pending-popup">
 
-//         <h4>Customer: ${customer}</h4>
-//         <h5>Sales Order: ${sales_order}</h5>
+//         <h4>Customer: ${esc(customer)}</h4>
+//         <h5>Sales Order: ${esc(sales_order)}</h5>
 
 //         <div id="print-container">
 //         <table class="table table-bordered">
 //         <tr>
-//             <th>Item Code</th>   <!-- ✅ ADDED -->
+//             <th>Item Code</th>
 //             <th>Item Name</th>
 //             <th>Pending</th>
 //             <th>Available</th>
@@ -91,11 +138,11 @@
 
 //             html += `
 //             <tr>
-//                 <td>${r.item_code}</td> <!-- ✅ ADDED -->
-//                 <td>${r.item_name}</td>
-//                 <td style="color:red;font-weight:bold">${r.pending_qty}</td>
-//                 <td style="color:green;font-weight:bold">${r.available_qty}</td>
-//                 <td>${r.delivery_date}</td>
+//                 <td>${esc(r.item_code)}</td>
+//                 <td>${esc(r.item_name)}</td>
+//                 <td style="color:red;font-weight:bold">${esc(r.pending_qty)}</td>
+//                 <td style="color:green;font-weight:bold">${esc(r.available_qty)}</td>
+//                 <td>${esc(r.delivery_date)}</td>
 //             </tr>`;
 //         });
 
@@ -220,6 +267,7 @@
 // };
 
 
+
 frappe.query_reports["Pending Sales Order Report"] = {
 
     filters: [
@@ -243,7 +291,7 @@ frappe.query_reports["Pending Sales Order Report"] = {
             fieldname: "to_date",
             label: __("To Date"),
             fieldtype: "Date",
-            default: frappe.datetime.year_end()
+            default: frappe.datetime.get_today()   // ✅ CHANGED: current date
         },
 
         {
@@ -486,5 +534,3 @@ window.print_pending_popup = function () {
         w.print();
     };
 };
-
-

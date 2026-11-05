@@ -198,9 +198,19 @@ frappe.query_reports["Distributors Reportss"] = {
         aging_31_45:       ["aging_31_45_drill", "31+ Days"]
     },
 
-    formatter(value, row, column, data, default_formatter) {
+    // formatter(value, row, column, data, default_formatter) {
+
+    //     value = default_formatter(value, row, column, data);
+
+    //     // Distributor name -> customer link
+    //     if (column.fieldname === "customer" && data.customer_code) {
+
+        formatter(value, row, column, data, default_formatter) {
 
         value = default_formatter(value, row, column, data);
+
+        // total row / empty rows have no data -> return plain value
+        if (!data) return value;
 
         // Distributor name -> customer link
         if (column.fieldname === "customer" && data.customer_code) {

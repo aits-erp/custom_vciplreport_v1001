@@ -38,8 +38,8 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         // "TSO WISE CATEGORYWISE":
         // "/app/query-report/TSO%20WISE%20CATEGORYWISE?from_date=2026-06-01&to_date=2026-06-30&customer_group=Debtors+Distributors  ",
 
-        "Monthwise Sales Report":
-            "/app/query-report/Monthwise%20Sales%20Report",
+        // "Monthwise Sales Report":
+        //     "/app/query-report/Monthwise%20Sales%20Report",
 
         "Pending Sales Order Report":
             "/app/query-report/Pending%20Sales%20Order%20Report" +
@@ -57,11 +57,11 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         // "Supplier Fill Ratio":
         //     "/app/query-report/Supplier%20Fill%20Ratio?company=AITS+%28Demo%29",
 
-        "Monthwises Purchase":
-            "/app/query-report/Monthwises%20Purchase",
+        // "Monthwises Purchase":
+        //     "/app/query-report/Monthwises%20Purchase",
 
-        "Item Category Wise - Report":
-            "/app/query-report/Item%20Category%20Wise%20-%20Report",
+        // "Item Category Wise - Report":
+        //     "/app/query-report/Item%20Category%20Wise%20-%20Report",
 
         "Stock Balance Report":
             "/app/query-report/Stock%20Report%20-%20Cumulative",
@@ -72,16 +72,16 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "Pricing Rule Report":
             "/app/query-report/Pricing%20Rule",
 
-        "Item Category Wise - Report": "/app/query-report/Item%20Category%20Wise%20-%20Report?from_date=2026-01-01&to_date=2026-01-31",   
+        // "Item Category Wise - Report": "/app/query-report/Item%20Category%20Wise%20-%20Report?from_date=2026-01-01&to_date=2026-01-31",   
         
-        "Item Category wise Qty -Report": "/app/query-report/Item%20Category%20wise%20Qty%20-Report?from_date=2026-01-01&to_date=2026-01-31",
+        // "Item Category wise Qty -Report": "/app/query-report/Item%20Category%20wise%20Qty%20-Report?from_date=2026-01-01&to_date=2026-01-31",
         "VCIPL Stock Balance Report": "/app/query-report/VCIPL%20Stock%20Balance%20Report",
-        "Ageing - Customers":"/app/query-report/Ageing%20-%20Customers?company=Vinod+Cookware+India+Private+Limited&report_date=2026-01-31&ageing_based_on=Due+Date&calculate_ageing_with=Report+Date&range=30%2C+60%2C+90%2C+120&customer_group=Debtors+Distributors",
+        // "Ageing - Customers":"/app/query-report/Ageing%20-%20Customers?company=Vinod+Cookware+India+Private+Limited&report_date=2026-01-31&ageing_based_on=Due+Date&calculate_ageing_with=Report+Date&range=30%2C+60%2C+90%2C+120&customer_group=Debtors+Distributors",
          "Sunil Sir Report":
             "https://vcipl.m.frappe.cloud/app/sales-mis-dashboard",
 
-        // "Sales Anaytic Customer-Group":
-        //     "https://vcipl.m.frappe.cloud/app/query-report/Sales%20Anaytic%20Customer-Group",
+        "Sales Anaytic Customer-Group":
+            "https://vcipl.m.frappe.cloud/app/query-report/Sales%20Anaytic%20Customer-Group",
 
          "Sales Analytic Dashboard":
             "https://vcipl.m.frappe.cloud/app/query-report/Sales%20Analytic%20Dashboard?tree_type=Customer&doc_type=Sales+Invoice&value_quantity=Value&from_date=2026-04-01&to_date=2027-03-31&company=Vinod+Cookware+India+Private+Limited&range=Monthly&curves=all"

@@ -79,6 +79,9 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         // "Ageing - Customers":"/app/query-report/Ageing%20-%20Customers?company=Vinod+Cookware+India+Private+Limited&report_date=2026-01-31&ageing_based_on=Due+Date&calculate_ageing_with=Report+Date&range=30%2C+60%2C+90%2C+120&customer_group=Debtors+Distributors",
          "Sunil Sir Report":
             "https://vcipl.m.frappe.cloud/app/sales-mis-dashboard",
+          
+        "Customer Group Category Wise":
+            "https://vcipl.m.frappe.cloud/app/customer-group-dashb",
 
         "Sales Anaytic Customer-Group":
             "https://vcipl.m.frappe.cloud/app/query-report/Sales%20Anaytic%20Customer-Group",

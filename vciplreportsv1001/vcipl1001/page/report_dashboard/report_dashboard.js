@@ -83,6 +83,9 @@ frappe.pages['report-dashboard'].on_page_load = function (wrapper) {
         "Customer Group Category Wise":
             "https://vcipl.m.frappe.cloud/app/customer-group-dashb",
 
+        "Customer Group Fixed Category MIS":
+            "https://vcipl.m.frappe.cloud/app/customer-group-mis",
+
         "Sales Anaytic Customer-Group":
             "https://vcipl.m.frappe.cloud/app/query-report/Sales%20Anaytic%20Customer-Group",
 
